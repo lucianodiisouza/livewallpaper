@@ -57,19 +57,24 @@ CLI, which suits AI-driven development. A shell script assembles the `.app` bund
 Package.swift
 Sources/LiveWallpaper/
   main.swift              # NSApplication bootstrap, .accessory activation policy
-  AppDelegate.swift       # wiring: per-screen windows, Governor, status-bar menu
+  AppDelegate.swift       # wiring: per-screen windows, Governor, menu (switcher + settings)
   DesktopWindow.swift     # borderless click-through window at .desktopWindow level
   WallpaperRenderer.swift # renderer protocol (video/metal/web all conform)
   VideoRenderer.swift     # AVPlayerLooper video (+ animated-gradient fallback)
+  MetalRenderer.swift     # MSL fragment shader → CAMetalLayer, CADisplayLink-driven (M1)
+  BuiltInShaders.swift    # embedded MSL source for demo shaders (Plasma, Aurora)
+  WallpaperCatalog.swift  # the built-in wallpapers shown in the menu
+  ConfigParameter.swift   # ConfigParameter/ConfigValue model (M2 manifest decode reuses this)
+  SettingsPanel.swift     # auto-generated SwiftUI settings form + window controller
   Governor.swift          # power/visibility signal aggregation → RenderDirective
 LiveWallpaper.entitlements # app-sandbox + network.client + user-selected files
 scripts/build-app.sh       # assemble .app, generate loop.mp4 (ffmpeg), ad-hoc sign
 dist/LiveWallpaper.app     # build output (gitignored)
 ```
 
-Not yet created (later milestones): `MetalRenderer`, `WebRenderer`, `.livewallpaper` package
-parsing, the installed library, and the Phase-2 workshop backend client. Add them as their
-milestones land — don't populate Phase 2 early.
+Not yet created (later milestones): `WebRenderer` (M3), `.livewallpaper` package parsing + the
+installed library (M2), and the Phase-2 workshop backend client. Add them as their milestones
+land — don't populate Phase 2 early.
 
 ## Build & run
 

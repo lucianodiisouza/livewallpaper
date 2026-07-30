@@ -53,16 +53,28 @@ the Governor pauses/resumes it via the occlusion signal.
 
 ---
 
-## M1 — Renderer abstraction + Metal ⬜
+## M1 — Renderer abstraction + Metal ✅ (DONE)
 
-- ⬜ `WallpaperRenderer` protocol (start/pause/resume/setFrameRate/apply(config:)/stop)
-- ⬜ Refactor video path to conform
-- ⬜ The **Governor**: aggregate all signals (occlusion, battery, Low Power Mode, thermal,
-  screen-lock, fullscreen-app, active-space) into one target-fps/paused state
-- ⬜ Drive frames with `CADisplayLink` (ProMotion-adaptive)
-- ⬜ `MetalRenderer`: MSL fragment shader → `CAMetalLayer`, standard uniforms (resolution/time/frame)
-- ⬜ Bundle a few first-party demo shaders
-- ⬜ Auto-generated config panel from `manifest.config`
+- ✅ `WallpaperRenderer` protocol (configSchema/start/pause/resume/setFrameRate/apply(config:)/stop)
+- ✅ Video path conforms
+- ✅ The **Governor** aggregates occlusion, battery, Low Power Mode, thermal, screen-lock, sleep.
+  _(Explicit fullscreen-app / active-space signals still ⬜ — occlusion already covers the common
+  case: a fullscreen app fully covers the wallpaper → PAUSED. Add dedicated signals in M6 polish.)_
+- ✅ `MetalRenderer` driven by a view-synced `CADisplayLink` (ProMotion-adaptive via
+  `preferredFrameRateRange`); pausing the link → ~0% GPU
+- ✅ `MetalRenderer`: MSL fragment shader compiled at runtime → `CAMetalLayer`, uniforms
+  (resolution/time/speed/tint)
+- ✅ Bundled demo shaders (Plasma, Aurora) — embedded MSL source, no resource bundling
+- ✅ Auto-generated SwiftUI config panel from a wallpaper's `configSchema` (float/bool/color)
+- ✅ Menu-bar **wallpaper switcher** (Video / Plasma / Aurora) with persisted selection
+
+**Verified:** Plasma shader renders full-screen at 3440×1440 from the sandboxed app, RUNNING @
+60fps via the display link, window at exact `.desktopWindow` level.
+
+### M1 notes
+- `ConfigParameter`/`ConfigValue` are the shared config model M2's manifest decode will reuse.
+- Config values are reset to schema defaults each launch (only the wallpaper *selection* persists);
+  wiring per-wallpaper value persistence is a small follow-up.
 
 ---
 

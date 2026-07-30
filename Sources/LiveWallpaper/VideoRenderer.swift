@@ -19,6 +19,10 @@ final class VideoRenderer: WallpaperRenderer {
     private var gradientLayer: CAGradientLayer?
     private weak var hostLayer: CALayer?
 
+    // Video has no tweakable parameters in M1.
+    let configSchema: [ConfigParameter] = []
+    func apply(config: [String: ConfigValue]) { /* no-op */ }
+
     func start(in layer: CALayer) {
         hostLayer = layer
 
