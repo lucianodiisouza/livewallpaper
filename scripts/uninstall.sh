@@ -28,16 +28,16 @@ done
 
 shopt -s nullglob
 
-# Must run as the normal user (NOT sudo): deleting a sandbox container relies on the user's Finder,
-# and even root cannot unlink the SIP-protected container metadata directly.
+# Must run as the normal user (NOT sudo): ~/Library/Containers is TCC-protected, so deletion needs
+# the user's Finder (or Full Disk Access) — sudo/root does not override TCC.
 if [ "$(id -u)" -eq 0 ]; then
     echo "Do not run this with sudo. Run it as your normal user:"
     echo "    scripts/uninstall.sh"
     exit 1
 fi
 
-# Remove a path. Plain rm first; if the OS protects it (sandbox containers have a SIP-managed
-# metadata file that rm/sudo cannot unlink), fall back to having Finder move it to the Trash.
+# Remove a path. Plain rm first; if the OS protects it (~/Library/Containers is TCC-protected and
+# rm/sudo get "Operation not permitted"), fall back to having Finder move it to the Trash.
 remove_path() {
     local p="$1"
     chflags -R noschg,nouchg "$p" 2>/dev/null || true
@@ -118,9 +118,15 @@ defaults delete "$BUNDLE_ID" 2>/dev/null || true
 echo
 if [ "$FAILED" -eq 1 ]; then
     echo "⚠ Some items could not be removed automatically."
-    echo "  If Finder prompted for permission, approve it and re-run."
-    echo "  Otherwise, open Finder → Go → Go to Folder → ~/Library/Containers"
-    echo "  and drag 'com.livewallpaper.app' to the Trash manually."
+    echo "  ~/Library/Containers is protected by macOS privacy (TCC) — only Finder or a"
+    echo "  process with Full Disk Access may delete it (sudo does NOT override this)."
+    echo "  Fix it with any ONE of these:"
+    echo "    • Run this script from your own Terminal and approve the one-time"
+    echo "      'Terminal wants to control Finder' prompt, then it will Trash it; or"
+    echo "    • In Finder: Shift-Cmd-G → ~/Library/Containers →"
+    echo "      drag 'com.livewallpaper.app' to the Trash; or"
+    echo "    • Grant your terminal Full Disk Access (System Settings → Privacy &"
+    echo "      Security → Full Disk Access), then re-run this script."
 else
     echo "✅ Done. (Items moved to Trash still occupy space until you empty it.)"
 fi
