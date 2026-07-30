@@ -99,9 +99,16 @@ final class Governor {
 
     // MARK: - Decision
 
+    /// Recompute after a preference change (e.g. battery behavior).
+    func preferencesChanged() { recompute() }
+
     private func recompute() {
-        let paused = !anyWindowVisible || screensAsleep || locked || thermal == .critical
-        let throttled = onBattery || lowPower || thermal == .serious
+        let behavior = Preferences.shared.batteryBehavior
+        let batteryPause = onBattery && behavior == .pause
+        let batteryThrottle = onBattery && behavior == .throttle
+
+        let paused = !anyWindowVisible || screensAsleep || locked || thermal == .critical || batteryPause
+        let throttled = batteryThrottle || lowPower || thermal == .serious
         let fps = throttled ? 30 : 60
         let next = RenderDirective(paused: paused, fps: fps)
 

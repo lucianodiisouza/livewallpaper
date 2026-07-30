@@ -100,6 +100,16 @@ enum SelfTest {
               && !WebRenderer.ruleJSON(allowlist: []).contains("if-domain"))
         check("allowlist adds a host exception", WebRenderer.ruleJSON(allowlist: ["cdn.example"]).contains("*cdn.example"))
 
+        // 9) Config value persistence round-trips through Codable.
+        let sample: [String: ConfigValue] = ["speed": .float(1.5), "on": .bool(true), "tint": .color("#112233")]
+        if let data = try? JSONEncoder().encode(sample),
+           let back = try? JSONDecoder().decode([String: ConfigValue].self, from: data) {
+            check("config values persist (Codable round-trip)", back == sample)
+        } else { check("config values persist (Codable round-trip)", false) }
+
+        // 10) Battery behavior parses from its raw value.
+        check("battery behavior enum round-trips", BatteryBehavior(rawValue: "pause") == .pause)
+
         // Clean up installed selftest packages.
         for pkg in library.installedPackages() where pkg.manifest.id.hasPrefix("selftest.") {
             try? FileManager.default.removeItem(at: pkg.directory)

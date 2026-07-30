@@ -12,6 +12,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let governor = Governor()
     private let library = Library()
     private let settingsController = SettingsWindowController()
+    private let prefsController = PreferencesWindowController()
+    private var rotationTimer: Timer?
 
     private var statusItem: NSStatusItem?
     private var statusStateItem: NSMenuItem?
@@ -41,7 +43,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.updateStatusTitle(directive)
         }
         governor.start()
+        loadConfig()
         rebuildScreenlets()
+
+        // React to preference changes (battery behavior, rotation).
+        Preferences.shared.onChange = { [weak self] in
+            self?.governor.preferencesChanged()
+            self?.restartRotation()
+        }
+        restartRotation()
 
         NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
@@ -162,8 +172,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
         addItem(to: menu, "Import Wallpaper…", #selector(importWallpaper), key: "o")
         addItem(to: menu, "Export Sample Wallpaper…", #selector(exportSample), key: "e")
-        let settings = addItem(to: menu, "Settings…", #selector(openSettings), key: ",")
+        let settings = addItem(to: menu, "Wallpaper Settings…", #selector(openSettings), key: "")
         settings.isEnabled = !(screenlets.first(where: { $0.id == currentID })?.schema.isEmpty ?? true)
+        addItem(to: menu, "Preferences…", #selector(openPreferences), key: ",")
 
         menu.addItem(.separator())
         addItem(to: menu, "Quit LiveWallpaper", #selector(quit), key: "q")
@@ -239,14 +250,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             self.configByID[self.currentID] = values
             for s in self.screenlets where s.id == self.currentID { s.renderer.apply(config: values) }
+            self.saveConfig()
         }
         let title = wallpaperEntries().first(where: { $0.id == currentID })?.title ?? "Wallpaper"
         settingsController.show(store: store, title: title)
     }
 
+    @objc private func openPreferences() { prefsController.show() }
+
     @objc private func quit() {
         for s in screenlets { s.renderer.stop() }
         NSApplication.shared.terminate(nil)
+    }
+
+    // MARK: - Config persistence
+
+    private func loadConfig() {
+        guard let data = UserDefaults.standard.data(forKey: "configByID"),
+              let decoded = try? JSONDecoder().decode([String: [String: ConfigValue]].self, from: data)
+        else { return }
+        configByID = decoded
+    }
+
+    private func saveConfig() {
+        if let data = try? JSONEncoder().encode(configByID) {
+            UserDefaults.standard.set(data, forKey: "configByID")
+        }
+    }
+
+    // MARK: - Rotation
+
+    private func restartRotation() {
+        rotationTimer?.invalidate(); rotationTimer = nil
+        guard Preferences.shared.rotationEnabled else { return }
+        let interval = TimeInterval(max(1, Preferences.shared.rotationMinutes) * 60)
+        rotationTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.rotateWallpaper() }
+        }
+    }
+
+    private func rotateWallpaper() {
+        let entries = wallpaperEntries()
+        guard entries.count > 1, let main = NSScreen.main ?? NSScreen.screens.first else { return }
+        let current = library.assignedID(for: main, default: WallpaperCatalog.defaultID)
+        let idx = entries.firstIndex { $0.id == current } ?? -1
+        let next = entries[(idx + 1) % entries.count]
+        library.assignToAll(next.id, screens: NSScreen.screens)
+        rebuildScreenlets()
     }
 
     // MARK: - Helpers

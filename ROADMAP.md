@@ -153,11 +153,21 @@ Everything below is **Phase 2 — the community workshop** (deliberately deferre
 
 ---
 
-## M6 — Polish ⬜
+## M6 — Polish 🟡 (first slice DONE)
 
-- ⬜ Playlists / rotation / schedules
+Done in the first polish slice:
+- ✅ Config-value persistence (per-wallpaper values survive relaunch — ConfigValue is Codable)
+- ✅ Launch at login (SMAppService, reconciled with system state on launch)
+- ✅ Configurable battery behavior (Pause / Throttle / Keep full rate) wired into the Governor
+- ✅ Wallpaper rotation (cycle through all wallpapers every N minutes)
+- ✅ Preferences window (SwiftUI) — general / power / rotation
+- ✅ Self-test extended to 18 checks (config Codable round-trip, battery-behavior parse)
+
+Still open (future polish):
 - ⬜ Per-space wallpapers
-- ⬜ Energy dashboard (show cost per wallpaper)
+- ⬜ Schedules (time-of-day wallpaper changes)
+- ⬜ Energy dashboard (show measured cost per wallpaper)
+- ⬜ Explicit fullscreen-app / active-space Governor signal (occlusion covers the common case)
 - ⬜ Onboarding
 
 ---
