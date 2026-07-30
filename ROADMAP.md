@@ -134,16 +134,18 @@ Everything below is **Phase 2 — the community workshop** (deliberately deferre
 
 ---
 
-## M4 — Backend + workshop (read) ⬜ · Phase 2  ([scope](docs/PHASE2_BACKEND.md) · [plan](docs/M4_PLAN.md))
+## M4 — Backend + workshop (read) ✅ (DONE — live)  ([scope](docs/PHASE2_BACKEND.md) · [plan](docs/M4_PLAN.md))
 
-- ✅ Client (built, backend-agnostic): `WorkshopConfig`/`Item`/`Client`/`UI`, **Browse Workshop…**
-  menu, `--export` + `--workshop-smoke` CLIs, `scripts/seed-workshop.sh`
-- ⬜ **You:** provision VPS + PocketBase, create `wallpapers` collection (M4_PLAN §1–2), set config
-- ⬜ Seed first-party content (`seed-workshop.sh`); verify via `--workshop-smoke` + Browse Workshop…
-- ⬜ (Optional) download-count hook
+- ✅ Client (backend-agnostic): `WorkshopConfig`/`Item`/`Client`/`UI`, **Browse Workshop…** menu,
+  `--export` + `--workshop-smoke` CLIs
+- ✅ Backend deployed: **PocketBase on Railway** + persistent volume; `wallpapers` collection with
+  `status = "published"` read rule; download-count hook
+- ✅ **Cloudflare R2** serving bundle bytes (zero egress); backend repo `livewallpaper-workshop`
+- ✅ Seeded first-party content (Plasma/Aurora/Matrix); verified `--workshop-smoke` → `OK: 3` and
+  the in-app workshop lists + installs them
 
-> Decisions locked: in-app self-serve submission · Sign in with Apple (M5) · **self-hosted
-> PocketBase, no R2** (~€5/mo) · gate-before-public. See [M4_PLAN.md](docs/M4_PLAN.md).
+> Decisions locked: in-app self-serve submission · Sign in with Apple (M5) · **PocketBase on
+> Railway + R2 for files** (~$5/mo) · gate-before-public. Backend: `livewallpaper-workshop` repo.
 
 ---
 
