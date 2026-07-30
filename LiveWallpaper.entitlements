@@ -9,8 +9,8 @@
     <!-- Workshop downloads (Phase 2) — harmless to include now. -->
     <key>com.apple.security.network.client</key>
     <true/>
-    <!-- Importing a local .livewallpaper via a file picker. -->
-    <key>com.apple.security.files.user-selected.read-only</key>
+    <!-- Importing a local .livewallpaper (open panel) and exporting one (save panel). -->
+    <key>com.apple.security.files.user-selected.read-write</key>
     <true/>
 </dict>
 </plist>

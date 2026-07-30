@@ -78,14 +78,29 @@ the Governor pauses/resumes it via the occlusion signal.
 
 ---
 
-## M2 — Package format + local library ⬜
+## M2 — Package format + local library ✅ (DONE)
 
-- ⬜ Freeze `.livewallpaper` v1 (lock the schema)
-- ⬜ Manifest decode + schema validation
-- ⬜ Zip bundle open + checksum verify (on install and every load)
-- ⬜ Import a local `.livewallpaper` (drag-drop / file picker)
-- ⬜ Installed-library store + per-screen wallpaper assignment
-- ⬜ Metal static checks at import (fragment-only, reject compute/buffer writes)
+- ✅ Froze `.livewallpaper` v1 (Manifest.swift; checksum algorithm normative in PACKAGE_FORMAT.md)
+- ✅ Manifest decode + schema validation (schemaVersion, required fields, minMacOS gate)
+- ✅ Native ZIP reader/writer (ZipArchive.swift — stored+deflate read, stored write; defensive:
+  bounds-checked, size-capped, path-traversal-rejecting) — no third-party dependency
+- ✅ Checksum verify (SHA-256 over `content/`) on install **and** every load
+- ✅ Import a local `.livewallpaper` via file picker (NSOpenPanel) → extract, validate, store unpacked
+- ✅ Export a sample `.livewallpaper` (NSSavePanel) — full round-trip, self-consistent checksum
+- ✅ Installed-library store (unpacked under app-container Application Support)
+- ✅ Per-screen wallpaper assignment (model + apply; per-display submenus when >1 screen)
+- ✅ Metal static checks at import (fragment-only; rejects compute kernels, writable device
+  buffers, atomics, local includes — ShaderValidator.swift)
+- ✅ Headless self-test (`LiveWallpaper --selftest`, 11 checks) covering the whole pipeline +
+  tamper detection + the shader gate
+
+**Verified:** self-test 11/11; sandboxed app initializes the library in its container and renders.
+Import/export are the two GUI-panel actions to try by hand.
+
+### M2 notes
+- `web` packages decode & install but render is deferred to M3 (makeRenderer falls back with a log).
+- Config *values* still reset per launch (only selection/assignment persists) — small follow-up.
+- ZipArchive is intentionally minimal (no ZIP64/encryption/multi-disk); fine for wallpaper bundles.
 
 ---
 

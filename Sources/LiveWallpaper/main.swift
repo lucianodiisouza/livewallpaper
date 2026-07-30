@@ -9,6 +9,11 @@ import AppKit
 //      but below the Finder icons — and keeps working under sandboxing.
 //   2. The Governor drives that render to ~0% GPU whenever the window is covered, on battery, etc.
 
+// Headless package-pipeline check: `LiveWallpaper --selftest` (no GUI, no desktop window).
+if CommandLine.arguments.contains("--selftest") {
+    exit(SelfTest.run())
+}
+
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate

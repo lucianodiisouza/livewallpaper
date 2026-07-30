@@ -19,14 +19,18 @@ final class VideoRenderer: WallpaperRenderer {
     private var gradientLayer: CAGradientLayer?
     private weak var hostLayer: CALayer?
 
-    // Video has no tweakable parameters in M1.
+    /// An explicit video URL (e.g. a package's entry file); falls back to the bundled demo loop.
+    private let explicitURL: URL?
+    init(url: URL? = nil) { self.explicitURL = url }
+
+    // Video has no tweakable parameters in M1/M2.
     let configSchema: [ConfigParameter] = []
     func apply(config: [String: ConfigValue]) { /* no-op */ }
 
     func start(in layer: CALayer) {
         hostLayer = layer
 
-        guard let url = Self.loopVideoURL() else {
+        guard let url = explicitURL ?? Self.loopVideoURL() else {
             log.notice("No bundled loop video found — using animated gradient fallback.")
             startGradientFallback(in: layer)
             return

@@ -1,8 +1,22 @@
 # The `.livewallpaper` package format
 
-**Status: v1 draft. Freeze before building the workshop backend.** Everything in the app hangs
-off this spec — treat schema changes as breaking and version them (`schemaVersion`), never mutate
-v1 in place.
+**Status: v1 FROZEN (as of M2).** Implemented by `Manifest.swift` / `WallpaperPackage.swift` /
+`ZipArchive.swift`. Everything in the app hangs off this spec — treat schema changes as breaking
+and bump `schemaVersion`; never mutate v1 in place.
+
+## Checksum algorithm (normative)
+
+`checksum` covers the **`content/` payload only**, computed as:
+
+1. Enumerate every regular file under `content/`; take each path **relative to `content/`**
+   (e.g. `shader.metal`, `sub/tex.png`).
+2. Sort those relative paths ascending (byte order).
+3. For each, update a SHA-256 hash with: the UTF-8 relative path, a single `0x00` byte, then the
+   file's bytes.
+4. Encode as `"sha256-" + lowercase-hex(digest)`.
+
+Verified on install **and** on every load. A mismatch refuses the package. (The exporter and the
+verifier share one implementation, so a freshly exported package always verifies.)
 
 ## Bundle layout
 

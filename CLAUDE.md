@@ -64,17 +64,25 @@ Sources/LiveWallpaper/
   MetalRenderer.swift     # MSL fragment shader → CAMetalLayer, CADisplayLink-driven (M1)
   BuiltInShaders.swift    # embedded MSL source for demo shaders (Plasma, Aurora)
   WallpaperCatalog.swift  # the built-in wallpapers shown in the menu
-  ConfigParameter.swift   # ConfigParameter/ConfigValue model (M2 manifest decode reuses this)
+  ConfigParameter.swift   # ConfigParameter/ConfigValue model (shared by manifest decode)
   SettingsPanel.swift     # auto-generated SwiftUI settings form + window controller
   Governor.swift          # power/visibility signal aggregation → RenderDirective
-LiveWallpaper.entitlements # app-sandbox + network.client + user-selected files
+  Manifest.swift          # .livewallpaper manifest decode + validation (M2)
+  ZipArchive.swift        # native ZIP reader/writer, defensive (M2)
+  WallpaperPackage.swift  # load/verify a package (checksum, shader gate) + makeRenderer (M2)
+  Library.swift           # installed-package store, import/export, per-screen assignment (M2)
+  ShaderValidator.swift   # fragment-only static safety gate for community shaders (M2)
+  SelfTest.swift          # `--selftest` headless pipeline check (M2)
+LiveWallpaper.entitlements # app-sandbox + network.client + user-selected read-write
 scripts/build-app.sh       # assemble .app, generate loop.mp4 (ffmpeg), ad-hoc sign
 dist/LiveWallpaper.app     # build output (gitignored)
 ```
 
-Not yet created (later milestones): `WebRenderer` (M3), `.livewallpaper` package parsing + the
-installed library (M2), and the Phase-2 workshop backend client. Add them as their milestones
-land — don't populate Phase 2 early.
+Not yet created (later milestones): `WebRenderer` (M3) and the Phase-2 workshop backend client.
+Add them as their milestones land — don't populate Phase 2 early.
+
+Handy: `swift build -c release && .build/release/LiveWallpaper --selftest` runs the M2 package
+pipeline checks with no GUI.
 
 ## Build & run
 
