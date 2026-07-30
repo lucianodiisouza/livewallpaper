@@ -6,7 +6,7 @@ import Foundation
 /// full URLs come back in each record). Set this to your Railway PocketBase URL.
 /// Backend infra lives in the separate `livewallpaper-workshop` repo.
 enum WorkshopConfig {
-    static let pocketBaseURL = "https://YOUR-POCKETBASE-HOST"
+    static let pocketBaseURL = "https://livewallpaper-workshop-production.up.railway.app"
 
     /// False while the placeholder is unchanged — lets the UI show a friendly "not set up yet".
     static var isConfigured: Bool { !pocketBaseURL.contains("YOUR-POCKETBASE") }
