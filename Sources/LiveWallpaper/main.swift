@@ -14,6 +14,12 @@ if CommandLine.arguments.contains("--selftest") {
     exit(SelfTest.run())
 }
 
+// Generate an importable sample package: `LiveWallpaper --make-sample <path.livewallpaper>`.
+// Compile-checks the shader first so the emitted package is guaranteed to render.
+if let i = CommandLine.arguments.firstIndex(of: "--make-sample"), i + 1 < CommandLine.arguments.count {
+    exit(SampleMaker.run(path: CommandLine.arguments[i + 1]))
+}
+
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate

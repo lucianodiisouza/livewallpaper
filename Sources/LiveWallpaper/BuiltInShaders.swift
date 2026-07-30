@@ -50,6 +50,41 @@ enum BuiltInShaders {
     }
     """
 
+    /// Matrix-style "code rain": columns of faux glyphs falling with a bright head. Used to
+    /// generate the importable sample package (`--make-sample`).
+    static let matrixRain = prelude + """
+
+    float mrand(float2 p) { return fract(sin(dot(p, float2(41.13, 289.7))) * 43758.5453); }
+
+    fragment float4 f_main(float4 fragCoord [[position]], constant Uniforms& u [[buffer(0)]]) {
+        float cell = 14.0;
+        float2 px = fragCoord.xy;
+        float2 id = floor(px / cell);
+        float2 cuv = fract(px / cell);
+        float rows = max(1.0, u.resolution.y / cell);
+
+        float speed = mix(3.0, 10.0, mrand(float2(id.x, 1.0))) * max(0.05, u.speed);
+        float head = fract(u.time * speed * 0.06 + mrand(float2(id.x, 7.0))) * rows;
+
+        float dist = head - id.y;
+        if (dist < 0.0) dist += rows;
+        float trail = 10.0;
+        float b = (dist < trail) ? (1.0 - dist / trail) : 0.0;
+        float headGlow = (dist < 1.0) ? 1.0 : 0.0;
+
+        // Faux glyph: a 5x5 bit pattern per cell that flips a few times per second.
+        float t = floor(u.time * 6.0) / 6.0;
+        float2 g = floor(cuv * 5.0);
+        float bit = step(0.5, mrand(id * 1.7 + g * 3.1 + t));
+
+        float3 green = float3(0.15, 1.0, 0.30);
+        float3 col = green * b * bit;
+        col += float3(0.85, 1.0, 0.9) * headGlow * bit;   // white-hot head
+        col *= u.tint.rgb;
+        return float4(col, 1.0);
+    }
+    """
+
     /// Soft flowing bands — an aurora-ish gradient.
     static let aurora = prelude + """
 
