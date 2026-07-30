@@ -13,6 +13,11 @@ enum SampleMaker {
         "plasma": Sample(title: "Plasma", source: BuiltInShaders.plasma),
         "aurora": Sample(title: "Aurora", source: BuiltInShaders.aurora),
         "matrix": Sample(title: "Matrix Code Rain", source: BuiltInShaders.matrixRain),
+        "rings": Sample(title: "Rings", source: BuiltInShaders.rings),
+        "interference": Sample(title: "Interference", source: BuiltInShaders.interference),
+        "spiral": Sample(title: "Spiral", source: BuiltInShaders.spiral),
+        "tunnel": Sample(title: "Tunnel", source: BuiltInShaders.tunnel),
+        "cells": Sample(title: "Cells", source: BuiltInShaders.cells),
     ]
 
     /// `--export <id> <path>`

@@ -102,4 +102,82 @@ enum BuiltInShaders {
         return float4(col, 1.0);
     }
     """
+
+    /// Concentric pulsing rings.
+    static let rings = prelude + """
+
+    fragment float4 f_main(float4 fragCoord [[position]], constant Uniforms& u [[buffer(0)]]) {
+        float2 uv = (fragCoord.xy - 0.5 * u.resolution) / u.resolution.y;
+        float d = length(uv);
+        float v = 0.5 + 0.5 * sin(d * 40.0 - u.time * u.speed * 3.0);
+        return float4(v * u.tint.rgb, 1.0);
+    }
+    """
+
+    /// Layered sine interference.
+    static let interference = prelude + """
+
+    fragment float4 f_main(float4 fragCoord [[position]], constant Uniforms& u [[buffer(0)]]) {
+        float2 uv = fragCoord.xy / u.resolution;
+        float t = u.time * u.speed;
+        float v = 0.0;
+        for (int i = 1; i <= 4; i++) {
+            float fi = float(i);
+            v += sin(uv.x * 10.0 * fi + t * fi + uv.y * 6.0) / fi;
+        }
+        v = 0.5 + 0.5 * v;
+        float3 col = 0.5 + 0.5 * cos(6.28318 * (v + float3(0.0, 0.33, 0.67)));
+        return float4(col * u.tint.rgb, 1.0);
+    }
+    """
+
+    /// Rotating spiral arms.
+    static let spiral = prelude + """
+
+    fragment float4 f_main(float4 fragCoord [[position]], constant Uniforms& u [[buffer(0)]]) {
+        float2 uv = (fragCoord.xy - 0.5 * u.resolution) / u.resolution.y;
+        float a = atan2(uv.y, uv.x);
+        float r = length(uv);
+        float v = 0.5 + 0.5 * sin(a * 6.0 + r * 20.0 - u.time * u.speed * 2.0);
+        return float4(v * u.tint.rgb, 1.0);
+    }
+    """
+
+    /// Perspective tunnel.
+    static let tunnel = prelude + """
+
+    fragment float4 f_main(float4 fragCoord [[position]], constant Uniforms& u [[buffer(0)]]) {
+        float2 p = (fragCoord.xy - 0.5 * u.resolution) / u.resolution.y;
+        float a = atan2(p.y, p.x);
+        float r = max(length(p), 0.001);
+        float2 uv = float2(0.3 / r + u.time * u.speed * 0.5, a / 3.14159);
+        float v = 0.5 + 0.5 * sin(uv.x * 12.0) * sin(uv.y * 30.0);
+        float3 col = v * u.tint.rgb * clamp(r * 2.0, 0.0, 1.0);
+        return float4(col, 1.0);
+    }
+    """
+
+    /// Animated Voronoi cells.
+    static let cells = prelude + """
+
+    float2 hash2(float2 p) {
+        p = float2(dot(p, float2(127.1, 311.7)), dot(p, float2(269.5, 183.3)));
+        return fract(sin(p) * 43758.5453);
+    }
+
+    fragment float4 f_main(float4 fragCoord [[position]], constant Uniforms& u [[buffer(0)]]) {
+        float2 uv = fragCoord.xy / u.resolution.y * 8.0;
+        float2 g = floor(uv);
+        float2 f = fract(uv);
+        float md = 1.5;
+        for (int y = -1; y <= 1; y++) {
+            for (int x = -1; x <= 1; x++) {
+                float2 o = float2(x, y);
+                float2 c = o + 0.5 + 0.5 * sin(u.time * u.speed + 6.28318 * hash2(g + o));
+                md = min(md, length(c - f));
+            }
+        }
+        return float4((1.0 - md) * u.tint.rgb, 1.0);
+    }
+    """
 }
