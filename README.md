@@ -34,8 +34,18 @@ builds with in-app auto-updates are planned once an Apple Developer account is i
 
 ## Build from source
 
-The Xcode project is being scaffolded. Build instructions will land here once it exists; see
-[CLAUDE.md](CLAUDE.md) and [DESIGN.md](DESIGN.md) for the current architecture.
+Requires Xcode 26+ and `ffmpeg` (for the bundled test loop; `brew install ffmpeg`).
+
+```bash
+git clone https://github.com/lucianodiisouza/livewallpaper.git
+cd livewallpaper
+./scripts/build-app.sh        # builds & assembles dist/LiveWallpaper.app
+open dist/LiveWallpaper.app   # runs it — quit from the 🖼️ menu-bar item
+```
+
+The project is a SwiftPM executable; `swift build` compiles it, and `scripts/build-app.sh`
+assembles the signed `.app`. See [CLAUDE.md](CLAUDE.md) and [DESIGN.md](DESIGN.md) for
+architecture.
 
 ## Documentation
 

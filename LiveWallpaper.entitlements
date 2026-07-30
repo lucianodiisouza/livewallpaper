@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- M0 sandbox spike: the whole point is to confirm a sandboxed app can still create a
+         desktop-level window on macOS 26. Set app-sandbox to false to A/B test the difference. -->
+    <key>com.apple.security.app-sandbox</key>
+    <true/>
+    <!-- Workshop downloads (Phase 2) — harmless to include now. -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+    <!-- Importing a local .livewallpaper via a file picker. -->
+    <key>com.apple.security.files.user-selected.read-only</key>
+    <true/>
+</dict>
+</plist>

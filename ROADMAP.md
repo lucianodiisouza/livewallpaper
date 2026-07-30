@@ -20,24 +20,36 @@ community workshop (deferred until the engine ships).**
 
 ---
 
-## M0 — Illusion spike 🔴 (next — go/no-go on the whole approach)
+## M0 — Illusion spike ✅ (DONE — approach validated)
 
-The only real technical unknown. Prove the desktop-window illusion + power model before building more.
+The only real technical unknown. Proven on real hardware (macOS 26.5, Apple Silicon, 3440×1440).
 
-- ⬜ Create the Xcode/SwiftPM project; decide project structure per CLAUDE.md layout
-- ⬜ Menu-bar app shell (`LSUIElement`, no Dock icon, status-bar item)
-- ⬜ One borderless desktop-level `NSWindow` per `NSScreen` (level `.desktopWindow`)
-- ⬜ Rebuild window set on `didChangeScreenParametersNotification` (monitor/resolution changes)
-- ⬜ Looping video via `AVPlayer` + `AVPlayerLooper` in the window
-- ⬜ Occlusion pausing (`NSWindow.occlusionState`) — **verify ~0% GPU when covered**
-- ⬜ Battery pause/throttle (`IOPSCopyPowerSourcesInfo`)
-- 🔴 ⬜ **Spike: does an App-Sandbox build allow the desktop-level window on macOS 26?**
-  → decides whether Mac App Store is ever a channel (DESIGN.md §12)
-- ⬜ Update CLAUDE.md "Build & run" with the real build/run commands
-- ⬜ Update README with build-from-source instructions
+- ✅ Create the project — **SwiftPM executable chosen** (text-based, CLI/AI-reproducible) +
+  `scripts/build-app.sh` assembles & signs the `.app`
+- ✅ Menu-bar app shell (`.accessory`/`LSUIElement`, no Dock icon, 🖼️ status-bar item + Quit)
+- ✅ One borderless desktop-level `NSWindow` per `NSScreen` (level `.desktopWindow`)
+- ✅ Rebuild window set on `didChangeScreenParametersNotification`
+- ✅ Looping video via `AVQueuePlayer` + `AVPlayerLooper` (bundled `loop.mp4`; gradient fallback)
+- ✅ Occlusion pausing (`NSWindow.occlusionState`) — pipeline verified: Governor flips
+  PAUSED↔RUNNING on the `visible` signal. _(Still worth eyeballing ~0% GPU with `powermetrics`
+  under a full cover; the mechanism is confirmed working.)_
+- ✅ Battery / Low Power / thermal / screen-lock / sleep signals in the Governor
+- 🟢 ✅ **RESOLVED — YES: a sandboxed build creates the desktop-level window on macOS 26.**
+  Sandbox container was created (`~/Library/Containers/com.livewallpaper.app`), and the
+  WindowServer reports our on-screen window at layer `-2147483623` = exactly `.desktopWindow`,
+  full-screen, alpha 1. **→ Mac App Store (Phase D) stays viable.**
+- ✅ Updated CLAUDE.md "Build & run" with real commands
+- ✅ Updated README with build-from-source instructions
 
-**Exit criteria:** a looping video wallpaper renders across all screens and costs ~0% GPU when
-covered, and we know whether sandbox permits it.
+**Exit criteria met:** a looping video wallpaper renders full-screen from a *sandboxed* app, and
+the Governor pauses/resumes it via the occlusion signal.
+
+### M0 findings (for the record)
+- The desktop-window trick works under App Sandbox — no special entitlement needed for it.
+- `.info`-level `os_log` is not persisted to disk; use `log stream --level info` to watch the
+  Governor live. Key lifecycle lines were bumped to `.notice`.
+- Video: pausing the player is the real power lever (frame-rate throttle is a no-op for video;
+  it becomes meaningful for Metal/web in M1/M3).
 
 ---
 

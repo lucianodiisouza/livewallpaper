@@ -48,34 +48,48 @@ illusion holds. If sandbox blocks it → distribution stays notarized-direct onl
 4. **`capabilities` in a manifest are enforced, never trusted.** A package declaring
    `network: []` must be *made* unable to reach the network, not asked nicely.
 
-## Intended project layout (create as you build)
+## Project layout (as built at M0)
+
+Decided at M0: **SwiftPM executable** (not an `.xcodeproj`) — text-based and reproducible from the
+CLI, which suits AI-driven development. A shell script assembles the `.app` bundle.
 
 ```
-LiveWallpaper/            # app target (Xcode project or SwiftPM — TBD at M0)
-  App/                    # menu-bar shell (LSUIElement), AppDelegate, DesktopWindow
-  Engine/                 # WallpaperRenderer protocol + VideoRenderer, MetalRenderer, WebRenderer
-  Governor/               # power/visibility signal aggregation
-  Package/                # .livewallpaper parsing, manifest decode, checksum/signature verify
-  Library/                # installed-package store, per-screen assignment
-  Shaders/                # bundled MSL shaders
-  Workshop/               # backend client — PHASE 2, do not populate yet
-  Resources/
-docs/                     # PACKAGE_FORMAT.md, DISTRIBUTION.md, …
-DESIGN.md                 # architecture source of truth
+Package.swift
+Sources/LiveWallpaper/
+  main.swift              # NSApplication bootstrap, .accessory activation policy
+  AppDelegate.swift       # wiring: per-screen windows, Governor, status-bar menu
+  DesktopWindow.swift     # borderless click-through window at .desktopWindow level
+  WallpaperRenderer.swift # renderer protocol (video/metal/web all conform)
+  VideoRenderer.swift     # AVPlayerLooper video (+ animated-gradient fallback)
+  Governor.swift          # power/visibility signal aggregation → RenderDirective
+LiveWallpaper.entitlements # app-sandbox + network.client + user-selected files
+scripts/build-app.sh       # assemble .app, generate loop.mp4 (ffmpeg), ad-hoc sign
+dist/LiveWallpaper.app     # build output (gitignored)
 ```
 
-> The Xcode/SwiftPM project does not exist yet. Do not fabricate build commands that assume it.
-> When you scaffold it, update the "Build & run" section below with the real commands.
+Not yet created (later milestones): `MetalRenderer`, `WebRenderer`, `.livewallpaper` package
+parsing, the installed library, and the Phase-2 workshop backend client. Add them as their
+milestones land — don't populate Phase 2 early.
 
 ## Build & run
 
-_Not scaffolded yet._ Expected once the project exists:
+```bash
+# Fast compile check
+swift build -c release
 
-- Xcode project: `xcodebuild -scheme LiveWallpaper -configuration Debug build`
-- or SwiftPM: `swift build` / `swift run`
-- Run the actual app via the `/run` skill once a launch config exists.
+# Assemble + sign the .app (default: WITH the App Sandbox entitlement — the M0 spike config)
+./scripts/build-app.sh                # sandboxed
+./scripts/build-app.sh --no-sandbox   # comparison build without sandbox
 
-Keep this section truthful — update it the moment the project is created.
+# Run it
+open dist/LiveWallpaper.app           # quit via the 🖼️ menu-bar item → Quit
+# Watch the Governor live (info-level os_log isn't persisted; stream it):
+log stream --level info --predicate 'subsystem == "com.livewallpaper.app"'
+```
+
+M0 verified on macOS 26.5 / Apple Silicon: the **sandboxed** app creates a full-screen window at
+exactly the `.desktopWindow` level, and the Governor pauses/resumes it on the occlusion signal.
+See ROADMAP.md → M0 findings.
 
 ## Conventions
 
