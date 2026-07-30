@@ -11,15 +11,17 @@ Phase 2 is the network + storage + trust layer around it.
 >   minimize friction over a GitHub-PR flow.
 > - **Identity:** **Sign in with Apple** — lowest-friction accountability on macOS (Touch ID, no
 >   password). Gates *publishing only*; browsing/installing stays anonymous. (M5.)
-> - **Stack:** **self-hosted PocketBase** (one Go binary + SQLite: catalog + API rules + auth +
->   file storage + admin UI) on a ~€5/mo VPS. **Files served by PocketBase** — **no R2/CDN** (a
->   ~20 TB/mo VPS allowance covers ~10k users; R2 stays a later swap if traffic goes multi-TB or
->   needs global low-latency). Chosen over Supabase for flat, self-controlled cost.
+> - **Stack:** **PocketBase on Railway** (catalog + API rules + auth + admin UI) **+ Cloudflare R2
+>   for the file bytes** (zero egress). Railway *meters egress*, so bundles are served from R2, not
+>   Railway — keeps cost ~$5/mo even with video. Chosen over Supabase for cost control.
+> - **Hosting:** Railway (managed deploy of PocketBase). **Backend lives in a separate repo:
+>   `livewallpaper-workshop`** (schema, hooks, Railway/R2 deploy, seed). This repo is the client only.
 > - **Moderation:** **gate-before-public** — validated uploads sit `pending` until approved (M5 uses
 >   PocketBase's built-in admin UI as the review queue).
 >
-> Detailed M4 plan + server checklist: [M4_PLAN.md](M4_PLAN.md). Note: §§2–10 below still describe
-> the original Supabase+R2 design as reference/rationale; the **locked** choices above supersede them.
+> Client plan: [M4_PLAN.md](M4_PLAN.md). Deploy details live in the `livewallpaper-workshop` repo.
+> Note: §§2–10 below describe the original Supabase+R2 design as reference/rationale; the **locked**
+> choices above supersede them.
 
 ## 1. Goals & constraints (these shape every choice)
 

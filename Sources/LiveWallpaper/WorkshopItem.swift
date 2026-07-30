@@ -1,7 +1,8 @@
 import Foundation
 
-/// One published wallpaper as returned by PocketBase's records API. File fields (`bundle`, `thumb`,
-/// `preview`) hold filenames; the public URL is built from the collection + record id + filename.
+/// One published wallpaper as returned by the PocketBase `wallpapers` collection. The catalog
+/// (metadata) lives in PocketBase on Railway; the actual bundle/preview/thumbnail bytes live in
+/// Cloudflare R2 (zero-egress), so each record stores their **full R2 URLs**.
 struct WorkshopItem: Codable, Identifiable, Sendable {
     let id: String
     let title: String
@@ -11,23 +12,21 @@ struct WorkshopItem: Codable, Identifiable, Sendable {
     let checksum: String
     let sizeBytes: Int?
     let downloadCount: Int
-    let bundle: String       // filename of the .livewallpaper
-    let thumb: String?
-    let preview: String?
+    let bundleURLString: String
+    let thumbURLString: String?
+    let previewURLString: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, title, type, tags, checksum, bundle, thumb, preview
+        case id, title, type, tags, checksum
         case authorHandle = "author_handle"
         case sizeBytes = "size_bytes"
         case downloadCount = "download_count"
+        case bundleURLString = "bundle_url"
+        case thumbURLString = "thumb_url"
+        case previewURLString = "preview_url"
     }
 
-    var bundleURL: URL? { fileURL(bundle) }
-    var thumbURL: URL? { thumb.flatMap(fileURL) }
-    var previewURL: URL? { preview.flatMap(fileURL) }
-
-    private func fileURL(_ filename: String) -> URL? {
-        guard !filename.isEmpty else { return nil }
-        return URL(string: "\(WorkshopConfig.pocketBaseURL)/api/files/wallpapers/\(id)/\(filename)")
-    }
+    var bundleURL: URL? { URL(string: bundleURLString) }
+    var thumbURL: URL? { thumbURLString.flatMap { URL(string: $0) } }
+    var previewURL: URL? { previewURLString.flatMap { URL(string: $0) } }
 }
