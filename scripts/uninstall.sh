@@ -28,6 +28,30 @@ done
 
 shopt -s nullglob
 
+# Must run as the normal user (NOT sudo): deleting a sandbox container relies on the user's Finder,
+# and even root cannot unlink the SIP-protected container metadata directly.
+if [ "$(id -u)" -eq 0 ]; then
+    echo "Do not run this with sudo. Run it as your normal user:"
+    echo "    scripts/uninstall.sh"
+    exit 1
+fi
+
+# Remove a path. Plain rm first; if the OS protects it (sandbox containers have a SIP-managed
+# metadata file that rm/sudo cannot unlink), fall back to having Finder move it to the Trash.
+remove_path() {
+    local p="$1"
+    chflags -R noschg,nouchg "$p" 2>/dev/null || true
+    rm -rf "$p" 2>/dev/null || true
+    if [ ! -e "$p" ]; then echo "  removed:  $p"; return 0; fi
+
+    echo "  protected — moving to Trash via Finder: $p"
+    osascript -e "tell application \"Finder\" to delete (POSIX file \"$p\" as alias)" >/dev/null 2>&1 || true
+    if [ ! -e "$p" ]; then echo "  trashed:  $p"; return 0; fi
+
+    echo "  ⚠ could NOT remove: $p"
+    return 1
+}
+
 # Candidate locations (globs expand to existing files only via nullglob).
 CANDIDATES=(
     "/Applications/$APP_NAME.app"
@@ -82,17 +106,24 @@ if [ "${#EXISTING[@]}" -gt 0 ] && [ "$ASSUME_YES" -eq 0 ]; then
     esac
 fi
 
-# 3) Delete.
+# 3) Delete (with Finder fallback for protected paths).
+FAILED=0
 for p in "${EXISTING[@]}"; do
-    echo "  removing: $p"
-    rm -rf "$p"
+    remove_path "$p" || FAILED=1
 done
 
 # 4) Flush the preferences daemon's cache of our domain.
 defaults delete "$BUNDLE_ID" 2>/dev/null || true
 
 echo
-echo "✅ Done."
+if [ "$FAILED" -eq 1 ]; then
+    echo "⚠ Some items could not be removed automatically."
+    echo "  If Finder prompted for permission, approve it and re-run."
+    echo "  Otherwise, open Finder → Go → Go to Folder → ~/Library/Containers"
+    echo "  and drag 'com.livewallpaper.app' to the Trash manually."
+else
+    echo "✅ Done. (Items moved to Trash still occupy space until you empty it.)"
+fi
 echo
 echo "Note on 'Launch at login':"
 echo "  If you had enabled it, macOS may still list $APP_NAME under"
