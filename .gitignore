@@ -1,0 +1,52 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+
+# Xcode
+build/
+DerivedData/
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+!*.xcworkspace/contents.xcworkspacedata
+**/xcshareddata/WorkspaceSettings.xcsettings
+*.xcuserstate
+xcuserdata/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# CocoaPods / Carthage (not expected, but ignore if ever used)
+Pods/
+Carthage/Build/
+
+# Signing & secrets — never commit
+*.p12
+*.mobileprovision
+*.cer
+*.certSigningRequest
+AuthKey_*.p8
+.env
+.env.*
+secrets/
+
+# Release artifacts (published via GitHub Releases, not committed)
+*.app
+*.zip
+*.dmg
+dist/
+
+# Editor / tooling
+.idea/
+*.swp
+.vscode/
