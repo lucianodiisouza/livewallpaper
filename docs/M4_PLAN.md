@@ -1,190 +1,173 @@
 # M4 — Read-only Workshop: implementation plan + setup checklist
 
 Goal: browse a catalog of wallpapers in the app and **install any of them from the cloud**, with no
-auth. Seeded with first-party content. This proves the whole download → install path and is useful
-on its own. Publishing/auth/moderation are M5.
+auth. Seeded with first-party content. Proves the whole download → install path and is useful on its
+own. Publishing/auth/moderation are M5.
 
-Parent scope: [PHASE2_BACKEND.md](PHASE2_BACKEND.md). Decisions locked there (Supabase + R2,
-gate-before-public, Sign in with Apple for M5).
+**Backend: self-hosted PocketBase** (one Go binary + SQLite), files served by PocketBase itself.
+**No R2/CDN** — a ~€5/mo VPS with a large bandwidth allowance covers ~10k users comfortably (see
+cost recap §8). Parent scope: [PHASE2_BACKEND.md](PHASE2_BACKEND.md).
 
 ---
 
-## 0. Why M4 needs almost no server code
+## 0. Architecture — almost no custom server code
 
-Supabase exposes an **auto-generated REST API** (PostgREST) over your tables, guarded by
-**Row-Level Security**. If the only rule is "anyone may read rows where `status = 'published'`", the
-app can query the catalog directly — no custom endpoints to write. R2 serves the bundle/preview/
-thumbnail bytes over its CDN. So M4 is: **SQL + a seed script + a Workshop UI in the app.**
+PocketBase gives you a REST API + per-collection **API rules** (its RLS equivalent) + a built-in
+admin UI. If the `wallpapers` collection's list/view rule is `status = "published"`, the app reads
+the catalog directly and downloads bundle files straight from PocketBase — no endpoints to write.
 
 ```
- app  ──HTTPS GET (anon key)──►  Supabase PostgREST  ──►  wallpapers table (RLS: read published)
-   │                                                          returns rows incl. R2 keys
-   └──HTTPS GET (public)────────►  Cloudflare R2 / CDN  ──►  bundle .livewallpaper + preview + thumb
-        then → Library.install(fromZipAt:)  (verifies checksum + shader gate — Phase 1)
+ app ──HTTPS GET──► PocketBase /api/collections/wallpapers/records   (rule: read published)
+   │                 └─ returns records incl. bundle/thumb filenames
+   └──HTTPS GET──► PocketBase /api/files/wallpapers/{id}/{file}       (the .livewallpaper bytes)
+        then → Library.install(fromZipAt:)   (verifies checksum + shader gate — Phase 1)
 ```
 
-**Security note that makes this safe:** installs still go through `Library.install`, which verifies
-the SHA-256 checksum and runs the fragment-only shader gate. A compromised catalog or CDN **cannot**
-bypass the client's safety checks — the backend is convenience, not the trust boundary.
+**Why this is safe:** installs still run through `Library.install`, which verifies the SHA-256
+checksum and the fragment-only shader gate. A compromised catalog **cannot** bypass the client's
+safety checks — the backend is convenience, not the trust boundary.
+
+The client is already built (backend-agnostic): `WorkshopConfig`, `WorkshopItem`, `WorkshopClient`,
+`WorkshopUI`, the **Browse Workshop…** menu item, and `--export` / `--workshop-smoke` CLIs.
 
 ---
 
-## 1. Account-setup checklist (your part — needs account creation + keys)
+## 1. Server-setup checklist (your part)
 
-I can't create accounts or hold your keys, so do this once. UI labels may shift slightly.
+### A. A small VPS
+1. Create a VPS (Hetzner CX22-class: 2 vCPU / 4GB / ~20TB traffic, ~€5/mo — the big traffic
+   allowance is why we don't need a CDN). Ubuntu is fine.
+2. Point a domain/subdomain at it (e.g. `api.yourdomain.com`) and put **HTTPS** in front —
+   easiest is a Caddy reverse proxy (auto-TLS) to PocketBase on `:8090`.
 
-### A. Supabase (catalog + API)
-1. Create an account at **supabase.com** → **New project**.
-2. Pick a **region** near your users; set a strong **database password** (store in your password manager).
-3. When it's ready, go to **Project Settings → API** and copy:
-   - **Project URL** — e.g. `https://abcd1234.supabase.co`  *(public — safe to ship)*
-   - **anon public** key  *(public by design — RLS protects the data; safe to ship in the app)*
-   - **service_role** key  *(SECRET — seeding/admin only; never in the app or git)*
-4. Open **SQL Editor** and run the schema in §2 (creates the table + RLS policies).
+### B. PocketBase
+1. Download the PocketBase binary for linux/arm64 or amd64, run `./pocketbase serve`
+   (behind Caddy). Consider a systemd unit so it restarts on boot.
+2. Open the **admin UI** (`/_/`) and create your **superuser** account (email + password → these go
+   in `.env` for seeding).
+3. Create the **`wallpapers` collection** with the fields + API rules in §2 (via the admin UI, or
+   import the schema JSON).
+4. **Backups:** schedule a copy of `pb_data/` (SQLite + files) — PocketBase has a built-in Backups
+   panel; enable it.
 
-### B. Cloudflare R2 (bundle storage + CDN)
-1. Create a **Cloudflare** account → **R2** → **Create bucket**, name it `lw-wallpapers`.
-2. **Public access:** for M4, enable the bucket's **r2.dev public URL** (Settings → Public access).
-   Copy the public base URL — e.g. `https://pub-xxxx.r2.dev`. *(Production: attach a custom domain
-   behind Cloudflare's CDN later — same bytes, nicer URL.)*
-3. **API token for seeding:** R2 → **Manage API Tokens** → create a token with **Object Read & Write**
-   for this bucket. Copy the **Access Key ID**, **Secret Access Key**, and the **S3 endpoint**
-   (`https://<accountid>.r2.cloudflarestorage.com`). *(SECRET — seeding only.)*
-
-### C. Put the values where they belong
-- **App config (public):** `Project URL`, `anon key`, and the **R2 public base URL** →
-  `Sources/LiveWallpaper/WorkshopConfig.swift` (see §4). These are safe to commit.
-- **Secrets (never commit):** `service_role` key + R2 API keys/endpoint → a local **`.env`**
-  (already gitignored). Copy `.env.example` → `.env` and fill it in. Used only by the seed script.
+### C. Point the app + env at it
+- **App (public):** set `WorkshopConfig.pocketBaseURL` to your host (e.g.
+  `https://api.yourdomain.com`). Safe to commit — browsing is governed by the collection rule.
+- **Seeding (secret):** copy `.env.example` → `.env` and fill `PB_URL`, `PB_ADMIN_EMAIL`,
+  `PB_ADMIN_PASSWORD`. `.env` is gitignored.
 
 ---
 
-## 2. Database schema (run in Supabase SQL Editor)
+## 2. `wallpapers` collection (schema + API rules)
 
-M4 keeps one flat table (a `versions` table is added in M5 when updates/moderation matter).
+Fields:
 
-```sql
-create table wallpapers (
-  id             uuid primary key default gen_random_uuid(),
-  title          text not null,
-  author_handle  text default 'built-in',
-  type           text not null check (type in ('video','metal','web')),
-  tags           text[] not null default '{}',
-  status         text not null default 'published'
-                   check (status in ('draft','pending','published','rejected','removed')),
-  bundle_key     text not null,          -- R2 object key of the .livewallpaper
-  preview_key    text,                   -- R2 object key of preview.mp4 (optional)
-  thumb_key      text,                   -- R2 object key of thumbnail.png (optional)
-  checksum       text not null,          -- sha256- ... (matches manifest)
-  size_bytes     bigint,
-  download_count bigint not null default 0,
-  created_at     timestamptz not null default now()
-);
+| field | type | notes |
+|---|---|---|
+| `title` | text | required |
+| `author_handle` | text | default `built-in` |
+| `type` | select | `video` / `metal` / `web` |
+| `tags` | json | array of strings |
+| `status` | select | `draft` / `pending` / `published` / `rejected` / `removed` |
+| `bundle` | file | the `.livewallpaper` (single file) |
+| `thumb` | file | optional still image |
+| `preview` | file | optional short loop |
+| `checksum` | text | `sha256-…` (mirrors the manifest) |
+| `size_bytes` | number | bundle size |
+| `download_count` | number | default 0 |
 
--- Row-Level Security: the public may read ONLY published rows; no writes for anon.
-alter table wallpapers enable row level security;
-create policy "read published" on wallpapers
-  for select using (status = 'published');
+`id`, `created`, `updated` are automatic.
 
--- Safe, rate-limitable download counter callable by anyone (no row write access needed).
-create function increment_download(wp uuid) returns void
-  language sql security definer as $$
-    update wallpapers set download_count = download_count + 1
-    where id = wp and status = 'published';
-  $$;
-grant execute on function increment_download(uuid) to anon;
+**API rules** (this is the authorization — set on the collection):
+- **List / View:** `status = "published"`  ← public may read only published rows
+- **Create / Update / Delete:** *(leave locked in M4 — only the superuser/seed script writes; M5
+  opens authenticated create.)*
 
--- Helpful indexes for browse/search.
-create index on wallpapers (created_at desc);
-create index on wallpapers (download_count desc);
-create index on wallpapers using gin (tags);
+---
+
+## 3. Download counter (optional hook)
+
+`WorkshopClient.incrementDownload` best-effort POSTs to `/api/lw/increment/:id`. To make it count,
+add a PocketBase hook file `pb_hooks/main.pb.js`:
+
+```js
+routerAdd("POST", "/api/lw/increment/:id", (c) => {
+  const rec = $app.findRecordById("wallpapers", c.pathParam("id"))
+  if (rec.get("status") !== "published") return c.json(404, {})
+  rec.set("download_count", rec.getInt("download_count") + 1)
+  $app.save(rec)
+  return c.json(200, { ok: true })
+})
 ```
 
-Seeding uses the **service_role** key, which bypasses RLS — so no insert policy is needed for anon.
+Skip it and the counter simply stays at seed value — nothing else breaks.
 
 ---
 
-## 3. Seeding first-party content (admin script, not shipped)
+## 4. Seeding first-party content
 
-`scripts/seed-workshop.sh` (reads `.env`) will, for each built-in wallpaper:
-1. Build a `.livewallpaper` (reuse the app's exporter — generalize `--make-sample` into
-   `--export <builtin-id> <path>`).
-2. Upload bundle (+ optional preview/thumbnail) to R2 via the **S3-compatible** API
-   (`aws s3 cp --endpoint-url <r2-endpoint>` or `rclone`).
-3. `INSERT` a catalog row via PostgREST using the **service_role** key
-   (`curl -H "apikey: $SERVICE_ROLE" -H "Authorization: Bearer $SERVICE_ROLE" ... /rest/v1/wallpapers`).
+`scripts/seed-workshop.sh` (reads `.env`) authenticates as the superuser and, for each built-in
+shader, builds a package with `LiveWallpaper --export <id>` and creates a **published** record with
+the bundle file attached. Run it once the collection exists:
 
-Result: the seeded shaders appear in the in-app Workshop immediately. This same upload+insert path is
-what M5's authenticated upload flow will do server-side.
+```bash
+scripts/seed-workshop.sh
+```
 
----
-
-## 4. Client implementation (in the app)
-
-New files under `Sources/LiveWallpaper/`:
-
-- **`WorkshopConfig.swift`** — public constants (commit these):
-  ```swift
-  enum WorkshopConfig {
-      static let supabaseURL = "https://YOUR-PROJECT.supabase.co"
-      static let supabaseAnonKey = "YOUR-ANON-KEY"   // public by design (RLS enforced)
-      static let r2PublicBase = "https://pub-XXXX.r2.dev"
-  }
-  ```
-- **`WorkshopItem.swift`** — `Codable` mapping a catalog row; computed `bundleURL`, `previewURL`,
-  `thumbURL` = `r2PublicBase + "/" + key`.
-- **`WorkshopClient.swift`** — `URLSession` calls to PostgREST:
-  - `fetchCatalog(query:sort:) async throws -> [WorkshopItem]`
-    → `GET {url}/rest/v1/wallpapers?status=eq.published&select=*&order=created_at.desc`
-      (search: `&title=ilike.*term*`), header `apikey: <anon>`.
-  - `downloadBundle(_:) async throws -> URL` → download to a temp file; then call
-    `increment_download` via `POST {url}/rest/v1/rpc/increment_download`.
-- **`WorkshopView.swift` + `WorkshopWindowController.swift`** — a SwiftUI window: searchable grid of
-  thumbnails (title, type badge, download count) with an **Install** button.
-  Install → `downloadBundle` → **`Library.install(fromZipAt:)`** → success toast + it appears in the
-  🖼️ switcher. Errors surfaced via the existing alert helper.
-- **Menu:** add **"Browse Workshop…"** to the status-bar menu (opens the window).
-
-No new entitlements — `network.client` is already present. All content still verified by
-`Library.install` on the way in.
+Result: Plasma / Aurora / Matrix appear in the in-app **Browse Workshop…** window. This same
+upload-and-create path is what M5's authenticated publish flow will do.
 
 ---
 
-## 5. Secrets & config policy
+## 5. Client (already implemented)
 
-- **Committed (public):** Supabase URL, anon key, R2 public base. These are inherently public in a
-  shipped app; RLS is the actual guard. `WorkshopConfig.swift` ships with placeholders.
-- **Never committed:** `service_role` key, R2 API keys/endpoint → `.env` (gitignored). Used only by
-  `scripts/seed-workshop.sh` on your machine.
-- `.gitignore` already excludes `.env`; a committed **`.env.example`** documents the required vars.
+- `WorkshopConfig.swift` — the public PocketBase URL + `isConfigured`.
+- `WorkshopItem.swift` — decodes a record; builds `/api/files/...` URLs for bundle/thumb/preview.
+- `WorkshopClient.swift` — `fetchCatalog(search:sort:)`, `downloadBundle(_:)`,
+  `incrementDownload(_:)`; plus `WorkshopSmoke` for `--workshop-smoke`.
+- `WorkshopUI.swift` — searchable/sortable list with **Install**; shows a friendly "not set up yet"
+  until `pocketBaseURL` is filled. Install → `downloadBundle` → **`Library.install`** → renders.
+- **Menu:** 🖼️ → **Browse Workshop…**.
+
+No secrets in the app; no new entitlements (uses existing `network.client`).
 
 ---
 
 ## 6. Acceptance criteria
 
-- [ ] `wallpapers` table + RLS live in Supabase; anon can read published rows, cannot write.
-- [ ] R2 bucket serves a seeded `.livewallpaper` over its public URL.
-- [ ] Seed script publishes the built-in shaders (bundle + row) end to end.
-- [ ] In-app **Browse Workshop…** lists seeded wallpapers with thumbnails + search.
-- [ ] **Install** downloads a bundle, `Library.install` verifies + stores it, and it renders.
-- [ ] Tampering with a hosted bundle → install rejected by the checksum gate (proves trust boundary).
-- [ ] `download_count` increments on install.
+- [ ] PocketBase reachable over HTTPS; `wallpapers` collection with the §2 rules.
+- [ ] Anonymous `GET …/records?filter=status='published'` returns rows; non-published hidden.
+- [ ] `scripts/seed-workshop.sh` publishes the three built-in shaders (record + bundle file).
+- [ ] `LiveWallpaper --workshop-smoke` prints `OK: 3 published wallpaper(s).`
+- [ ] In-app **Browse Workshop…** lists them with thumbnails/search; **Install** downloads →
+  `Library.install` verifies + renders.
+- [ ] Tampering with a hosted bundle → install rejected by the checksum gate (trust boundary holds).
+- [ ] (If hook added) `download_count` increments on install.
 
 ---
 
-## 7. Task order & rough effort
+## 7. Task status
 
-1. **You:** provision Supabase + R2, fill `.env` and `WorkshopConfig.swift` (§1). *(~30–45 min)*
-2. Run schema SQL (§2). *(minutes)*
-3. `--export <builtin>` CLI + `scripts/seed-workshop.sh`; seed the built-ins (§3). *(half day)*
-4. `WorkshopClient` + `WorkshopItem` + config (§4). *(half day)*
-5. `WorkshopView` + window + menu entry; wire Install → `Library.install` (§4). *(~day)*
-6. End-to-end test against acceptance criteria (§6); add a `--workshop-smoke` CLI that fetches the
-   catalog and prints the count for CI-free verification. *(~half day)*
+- ✅ Client: config, model, networking, UI, menu entry, `--export` + `--workshop-smoke` CLIs, seed
+  script — **built and compiling now** (verified with `--workshop-smoke` unconfigured + `--export`).
+- ⬜ **You:** provision the VPS + PocketBase, create the collection (§1–2), fill config + `.env`.
+- ⬜ Run `seed-workshop.sh`; verify against §6.
+- ⬜ (Optional) add the increment hook (§3).
 
 ---
 
-## 8. Deferred to M5 (don't build in M4)
+## 8. Cost recap (~10k users, ~100 new wallpapers/month)
 
-Auth (Sign in with Apple), the upload/publish flow, server-side validation Edge Function, the
-`versions` table, moderation queue, ratings/reports, bundle signing. M4 is read + install only.
+- **Storage:** ~1 GB/month → ~12 GB/year. Fits any VPS disk.
+- **Bandwidth (installs, not browsing — the UI uses tiny thumbnails):** ~200 GB/month moderate,
+  ~900 GB/month heavy. A Hetzner-class ~20 TB/month allowance swallows both → **€0 overage**.
+- **Total: ~€5/month flat.** R2/CDN only becomes worthwhile at multi-TB/month or for global
+  low-latency — an easy later swap (point file URLs at a CDN), not a day-one need.
+
+---
+
+## 9. Deferred to M5 (don't build in M4)
+
+Sign in with Apple (needs an Apple-token-verify hook in PocketBase), authenticated upload/publish,
+server-side validation on upload, moderation (PocketBase's admin UI gives you the queue for free),
+ratings/reports, bundle signing. M4 is read + install only.

@@ -20,6 +20,16 @@ if let i = CommandLine.arguments.firstIndex(of: "--make-sample"), i + 1 < Comman
     exit(SampleMaker.run(path: CommandLine.arguments[i + 1]))
 }
 
+// Export a built-in as a package (for workshop seeding): `--export <id> <path.livewallpaper>`.
+if let i = CommandLine.arguments.firstIndex(of: "--export"), i + 2 < CommandLine.arguments.count {
+    exit(SampleMaker.export(id: CommandLine.arguments[i + 1], path: CommandLine.arguments[i + 2]))
+}
+
+// Verify the workshop catalog is reachable: `--workshop-smoke` (no GUI).
+if CommandLine.arguments.contains("--workshop-smoke") {
+    exit(WorkshopSmoke.run())
+}
+
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate

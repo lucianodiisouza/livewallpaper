@@ -124,4 +124,22 @@ struct Manifest: Codable, Sendable {
             }
         }
     }
+
+    /// Inverse of `configSchema()`: turn the shared config model into manifest `config` entries.
+    /// Used by the exporter (both the in-app export and the `--export` CLI).
+    static func configEntries(from schema: [ConfigParameter]) -> [ConfigEntry] {
+        schema.map { p in
+            switch p.kind {
+            case let .float(min, max, def):
+                return ConfigEntry(key: p.key, type: "float", label: p.label,
+                                   min: min, max: max, options: nil, defaultValue: .double(def))
+            case let .bool(def):
+                return ConfigEntry(key: p.key, type: "bool", label: p.label,
+                                   min: nil, max: nil, options: nil, defaultValue: .bool(def))
+            case let .color(def):
+                return ConfigEntry(key: p.key, type: "color", label: p.label,
+                                   min: nil, max: nil, options: nil, defaultValue: .string(def))
+            }
+        }
+    }
 }

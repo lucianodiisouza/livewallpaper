@@ -136,24 +136,24 @@ Everything below is **Phase 2 — the community workshop** (deliberately deferre
 
 ## M4 — Backend + workshop (read) ⬜ · Phase 2  ([scope](docs/PHASE2_BACKEND.md) · [plan](docs/M4_PLAN.md))
 
-- ⬜ Content plane: object store with **zero egress** + CDN (R2) for bundles/previews/thumbnails
-- ⬜ Control plane: Postgres catalog + `GET /wallpapers` search/browse + `/wallpapers/:id`
-- ⬜ Download endpoint (counts) → install via the existing `Library.install`
-- ⬜ In-app Workshop UI: browse → preview → one-click install (verified, no auth needed)
-- ⬜ Seed with first-party content
+- ✅ Client (built, backend-agnostic): `WorkshopConfig`/`Item`/`Client`/`UI`, **Browse Workshop…**
+  menu, `--export` + `--workshop-smoke` CLIs, `scripts/seed-workshop.sh`
+- ⬜ **You:** provision VPS + PocketBase, create `wallpapers` collection (M4_PLAN §1–2), set config
+- ⬜ Seed first-party content (`seed-workshop.sh`); verify via `--workshop-smoke` + Browse Workshop…
+- ⬜ (Optional) download-count hook
 
-> Decisions locked: in-app self-serve submission · Sign in with Apple · Supabase + R2 ·
-> gate-before-public (see [PHASE2_BACKEND.md](docs/PHASE2_BACKEND.md)).
+> Decisions locked: in-app self-serve submission · Sign in with Apple (M5) · **self-hosted
+> PocketBase, no R2** (~€5/mo) · gate-before-public. See [M4_PLAN.md](docs/M4_PLAN.md).
 
 ---
 
 ## M5 — Publishing + moderation ⬜ · Phase 2  ([scope](docs/PHASE2_BACKEND.md))
 
-- ⬜ Auth: Sign in with Apple (Supabase Auth) — one-tap, gates publishing only
-- ⬜ In-app self-serve upload: `POST /uploads` → presigned R2 PUT → `POST /wallpapers` finalize
-- ⬜ **Server-side validation** Edge Function — re-runs manifest/checksum/size + the metal & web
-  static gates (TS ports of ShaderValidator/WebValidator; keep rules in sync)
-- ⬜ Moderation: gate-before-public queue + minimal admin review view + `moderation_actions`
+- ⬜ Auth: Sign in with Apple (native) + a PocketBase hook to verify Apple's identity token
+- ⬜ In-app self-serve upload → authenticated PocketBase `create` on the `wallpapers` collection
+- ⬜ **Server-side validation** (PocketBase hook) — re-runs manifest/checksum/size + the metal & web
+  static gates (ports of ShaderValidator/WebValidator; keep rules in sync)
+- ⬜ Moderation: gate-before-public via PocketBase's **built-in admin UI** as the review queue
 - ⬜ Ratings + reports (report auto-hide past threshold)
 - ⬜ Bundle signing (server signs content hash to account) → enforceable takedown + author ban
 - ⬜ ToS / content policy / DMCA + upload license terms (before submissions open)

@@ -77,7 +77,13 @@ Sources/LiveWallpaper/
   BuiltInWeb.swift        # embedded HTML for the built-in web wallpaper (M3)
   Preferences.swift       # app settings: launch-at-login, battery behavior, rotation (M6)
   PreferencesPanel.swift  # SwiftUI preferences window (M6)
+  WorkshopConfig.swift    # public PocketBase URL (M4)
+  WorkshopItem.swift      # Codable catalog record + file URLs (M4)
+  WorkshopClient.swift    # PocketBase REST browse/download + --workshop-smoke (M4)
+  WorkshopUI.swift        # SwiftUI workshop browser + window (M4)
+  SampleMaker.swift       # --export / --make-sample package generators
   SelfTest.swift          # `--selftest` headless pipeline check (18 checks)
+scripts/seed-workshop.sh   # seed built-ins into PocketBase (admin; reads .env)
 LiveWallpaper.entitlements # app-sandbox + network.client + user-selected read-write
 scripts/build-app.sh       # assemble .app, generate loop.mp4 (ffmpeg), ad-hoc sign
 dist/LiveWallpaper.app     # build output (gitignored)

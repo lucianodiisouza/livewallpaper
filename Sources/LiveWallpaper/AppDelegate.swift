@@ -13,6 +13,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let library = Library()
     private let settingsController = SettingsWindowController()
     private let prefsController = PreferencesWindowController()
+    private let workshop = WorkshopClient()
+    private let workshopController = WorkshopWindowController()
     private var rotationTimer: Timer?
 
     private var statusItem: NSStatusItem?
@@ -170,6 +172,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         menu.addItem(.separator())
+        addItem(to: menu, "Browse Workshop…", #selector(openWorkshop), key: "b")
         addItem(to: menu, "Import Wallpaper…", #selector(importWallpaper), key: "o")
         addItem(to: menu, "Export Sample Wallpaper…", #selector(exportSample), key: "e")
         let settings = addItem(to: menu, "Wallpaper Settings…", #selector(openSettings), key: "")
@@ -257,6 +260,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openPreferences() { prefsController.show() }
+
+    @objc private func openWorkshop() {
+        workshopController.show(client: workshop) { [weak self] item in
+            guard let self else { return "Internal error." }
+            do {
+                let url = try await self.workshop.downloadBundle(item)
+                let pkg = try self.library.install(fromZipAt: url)
+                await self.workshop.incrementDownload(item.id)
+                self.library.assignToAll(pkg.manifest.id, screens: NSScreen.screens)
+                self.rebuildScreenlets()
+                return nil
+            } catch {
+                return error.localizedDescription
+            }
+        }
+    }
 
     @objc private func quit() {
         for s in screenlets { s.renderer.stop() }
