@@ -134,7 +134,7 @@ Everything below is **Phase 2 — the community workshop** (deliberately deferre
 
 ---
 
-## M4 — Backend + workshop (read) ⬜ · Phase 2  ([scope](docs/PHASE2_BACKEND.md))
+## M4 — Backend + workshop (read) ⬜ · Phase 2  ([scope](docs/PHASE2_BACKEND.md) · [plan](docs/M4_PLAN.md))
 
 - ⬜ Content plane: object store with **zero egress** + CDN (R2) for bundles/previews/thumbnails
 - ⬜ Control plane: Postgres catalog + `GET /wallpapers` search/browse + `/wallpapers/:id`
