@@ -141,14 +141,16 @@ Everything below is **Phase 2 — the community workshop** (deliberately deferre
 - ⬜ Download endpoint (counts) → install via the existing `Library.install`
 - ⬜ In-app Workshop UI: browse → preview → one-click install (verified, no auth needed)
 - ⬜ Seed with first-party content
-- ⬜ **Decision gate**: confirm stack + moderation posture (PHASE2_BACKEND.md §13) before starting
+
+> Decisions locked: in-app self-serve submission · Sign in with Apple · Supabase + R2 ·
+> gate-before-public (see [PHASE2_BACKEND.md](docs/PHASE2_BACKEND.md)).
 
 ---
 
 ## M5 — Publishing + moderation ⬜ · Phase 2  ([scope](docs/PHASE2_BACKEND.md))
 
-- ⬜ Auth: Sign in with Apple (+ GitHub for the dev audience)
-- ⬜ Upload flow: `POST /uploads` → presigned R2 PUT → `POST /wallpapers` finalize
+- ⬜ Auth: Sign in with Apple (Supabase Auth) — one-tap, gates publishing only
+- ⬜ In-app self-serve upload: `POST /uploads` → presigned R2 PUT → `POST /wallpapers` finalize
 - ⬜ **Server-side validation** Edge Function — re-runs manifest/checksum/size + the metal & web
   static gates (TS ports of ShaderValidator/WebValidator; keep rules in sync)
 - ⬜ Moderation: gate-before-public queue + minimal admin review view + `moderation_actions`

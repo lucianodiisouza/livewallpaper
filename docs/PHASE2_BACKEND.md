@@ -4,8 +4,16 @@ The server side that lets people **publish, browse, and install** community wall
 (Phase 1) already renders and sandboxes untrusted content and installs `.livewallpaper` bundles;
 Phase 2 is the network + storage + trust layer around it.
 
-> Status: scoping. Nothing here is built yet. Two decisions (stack, moderation posture) gate the
-> build — see "Open decisions" and confirm before M4.
+> Status: scoping. Nothing here is built yet.
+>
+> **Decisions locked:**
+> - **Submissions:** in-app self-serve upload (creators publish without leaving the app) — chosen to
+>   minimize friction over a GitHub-PR flow.
+> - **Identity:** **Sign in with Apple** — lowest-friction accountability on macOS (Touch ID, no
+>   password). Gates *publishing only*; browsing/installing stays anonymous.
+> - **Stack:** **Supabase** (Apple auth + Postgres + RLS + moderation) **+ Cloudflare R2** (zero-egress
+>   bundle/preview storage + CDN).
+> - **Moderation:** **gate-before-public** — validated uploads sit `pending` until a human approves.
 
 ## 1. Goals & constraints (these shape every choice)
 
@@ -128,7 +136,9 @@ Previews/thumbnails are **required in the bundle** (already in the format), so t
 - **Browse/Install**: Workshop UI lists `GET /wallpapers`, shows preview; Install downloads the
   bundle from the CDN and hands it to the **existing `Library.install(fromZipAt:)`** — which already
   verifies checksum + runs the shader gate. No new render path.
-- **Publish**: sign in (Apple/GitHub) → pack current wallpaper → `POST /uploads` → PUT → finalize.
+- **Publish (in-app, self-serve)**: one-tap **Sign in with Apple** → pack current wallpaper →
+  `POST /uploads` → presigned PUT to R2 → finalize. Never leaves the app. Sign-in is required only
+  here — not for browsing/installing.
 - **Report**: a menu action → `POST /report`.
 - The `.livewallpaper` `signature` field (already in the format) becomes **required** for published
   bundles; the server signs the content hash against the author account.
@@ -168,13 +178,16 @@ signing + takedown/bans.
 
 **M5.5 — Trust & polish.** Trusted-creator tier, abuse limits, report auto-hide, basic analytics.
 
-## 13. Open decisions (confirm before M4)
+## 13. Decisions
 
-1. **Stack**: Supabase + R2 (recommended) vs all-Cloudflare. Egress-free storage is non-negotiable
-   either way.
-2. **Moderation posture**: gate-before-public (recommended, safer) vs publish-then-moderate (faster).
-3. **Validator duplication**: accept a TS re-port of the Swift gates for now, or invest early in a
-   shared rule spec both sides read.
-4. **Preview generation**: require preview/thumbnail in the bundle (recommended, no server compute)
+**Locked** (see top of doc): in-app self-serve submission · Sign in with Apple · Supabase + R2 ·
+gate-before-public moderation.
+
+**Still open (not blocking M4, which is read-only):**
+1. **Validator duplication**: accept a TS re-port of the Swift gates (ShaderValidator/WebValidator)
+   for M5, or invest early in a shared JSON rule spec both sides read.
+2. **Preview generation**: require preview/thumbnail in the bundle (recommended, no server compute)
    vs server-side transcode later.
-5. **Content license/policy**: what rights uploaders grant — needed before submissions open.
+3. **Content license/policy**: what rights uploaders grant — decide before submissions open (M5).
+4. **Friction vs abuse dial**: whether first-time publishers need any extra step beyond Apple
+   sign-in (e.g. a cooldown or lower quota) to blunt spam before it hits the review queue.
