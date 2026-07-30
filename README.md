@@ -56,6 +56,9 @@ architecture.
 - [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) — release, signing, and auto-update plan
 - [CONTRIBUTING.md](CONTRIBUTING.md) — how to contribute
 - [SECURITY.md](SECURITY.md) — reporting vulnerabilities & the untrusted-content model
+- **Backend:** the community workshop server lives in a separate repo —
+  [livewallpaper-workshop](https://github.com/lucianodiisouza/livewallpaper-workshop)
+  (PocketBase on Railway + Cloudflare R2)
 
 ## Contributing
 
