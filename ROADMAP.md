@@ -134,22 +134,31 @@ Everything below is **Phase 2 — the community workshop** (deliberately deferre
 
 ---
 
-## M4 — Backend + workshop (read) ⬜ · Phase 2
+## M4 — Backend + workshop (read) ⬜ · Phase 2  ([scope](docs/PHASE2_BACKEND.md))
 
-- ⬜ Object store + CDN for bundles/previews/thumbnails
-- ⬜ Catalog API (search, browse-by-tag, ratings, downloads, versioning)
-- ⬜ In-app workshop UI: browse → one-click install (verified)
+- ⬜ Content plane: object store with **zero egress** + CDN (R2) for bundles/previews/thumbnails
+- ⬜ Control plane: Postgres catalog + `GET /wallpapers` search/browse + `/wallpapers/:id`
+- ⬜ Download endpoint (counts) → install via the existing `Library.install`
+- ⬜ In-app Workshop UI: browse → preview → one-click install (verified, no auth needed)
 - ⬜ Seed with first-party content
+- ⬜ **Decision gate**: confirm stack + moderation posture (PHASE2_BACKEND.md §13) before starting
 
 ---
 
-## M5 — Publishing + moderation ⬜ · Phase 2
+## M5 — Publishing + moderation ⬜ · Phase 2  ([scope](docs/PHASE2_BACKEND.md))
 
-- ⬜ Auth (Sign in with Apple + email fallback)
-- ⬜ Upload + server-side validation pipeline (manifest, size, static analysis)
-- ⬜ Preview/thumbnail transcode pipeline
-- ⬜ Moderation queue (gate before public) + reporting + takedown via signature
-- ⬜ Bundle signing (ties every package to an account)
+- ⬜ Auth: Sign in with Apple (+ GitHub for the dev audience)
+- ⬜ Upload flow: `POST /uploads` → presigned R2 PUT → `POST /wallpapers` finalize
+- ⬜ **Server-side validation** Edge Function — re-runs manifest/checksum/size + the metal & web
+  static gates (TS ports of ShaderValidator/WebValidator; keep rules in sync)
+- ⬜ Moderation: gate-before-public queue + minimal admin review view + `moderation_actions`
+- ⬜ Ratings + reports (report auto-hide past threshold)
+- ⬜ Bundle signing (server signs content hash to account) → enforceable takedown + author ban
+- ⬜ ToS / content policy / DMCA + upload license terms (before submissions open)
+
+## M5.5 — Trust & polish ⬜ · Phase 2
+
+- ⬜ Trusted-creator tier (lighter review), upload quotas + rate limits, basic analytics
 
 ---
 
