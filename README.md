@@ -6,8 +6,10 @@ way. Free and open-source, built to respect your Mac's battery and GPU rather th
 Inspired by Wallpaper Engine on Windows, rebuilt from scratch for macOS with a hard rule:
 **if you can't see it moving, it isn't rendering.**
 
-> ⚠️ **Status: early development.** The engine is being built Phase 1 first (local playback);
-> the community "workshop" comes later. Not yet ready for daily use.
+> **Status: Phase 1 (the engine) is complete.** Video, Metal-shader, and web wallpapers render
+> from a sandboxed app with a power-aware pause engine, plus a `.livewallpaper` package format with
+> import/export. The community "workshop" (sharing/discovery) is Phase 2, in progress. Signed
+> notarized builds land once an Apple Developer account is set up.
 
 ## Features (planned)
 

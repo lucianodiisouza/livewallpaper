@@ -105,7 +105,10 @@ struct WallpaperPackage {
             let source = try String(contentsOf: entryURL, encoding: .utf8)
             return MetalRenderer(shaderSource: source, configSchema: manifest.configSchema())
         case .web:
-            throw PackageError.unsupportedType(.web)
+            return WebRenderer(diskRoot: entryURL.deletingLastPathComponent(),
+                               entry: entryURL.lastPathComponent,
+                               allowlist: manifest.capabilities?.network ?? [],
+                               schema: manifest.configSchema())
         }
     }
 }

@@ -72,14 +72,18 @@ Sources/LiveWallpaper/
   WallpaperPackage.swift  # load/verify a package (checksum, shader gate) + makeRenderer (M2)
   Library.swift           # installed-package store, import/export, per-screen assignment (M2)
   ShaderValidator.swift   # fragment-only static safety gate for community shaders (M2)
-  SelfTest.swift          # `--selftest` headless pipeline check (M2)
+  WebRenderer.swift       # WKWebView wallpaper + lwp:// scheme + network/nav lockdown (M3)
+  WebValidator.swift      # static import scan for web wallpapers — flags, doesn't reject (M3)
+  BuiltInWeb.swift        # embedded HTML for the built-in web wallpaper (M3)
+  SelfTest.swift          # `--selftest` headless pipeline check (16 checks)
 LiveWallpaper.entitlements # app-sandbox + network.client + user-selected read-write
 scripts/build-app.sh       # assemble .app, generate loop.mp4 (ffmpeg), ad-hoc sign
 dist/LiveWallpaper.app     # build output (gitignored)
 ```
 
-Not yet created (later milestones): `WebRenderer` (M3) and the Phase-2 workshop backend client.
-Add them as their milestones land — don't populate Phase 2 early.
+**Phase 1 (the engine) is complete** — video/metal/web renderers, Governor, package format +
+library. What's left is **Phase 2 — the community workshop** (backend, upload, moderation);
+don't scaffold it until intentionally starting Phase 2.
 
 Handy: `swift build -c release && .build/release/LiveWallpaper --selftest` runs the M2 package
 pipeline checks with no GUI.

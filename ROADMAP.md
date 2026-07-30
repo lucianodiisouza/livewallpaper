@@ -104,13 +104,33 @@ Import/export are the two GUI-panel actions to try by hand.
 
 ---
 
-## M3 — Web renderer + sandbox ⬜
+## M3 — Web renderer + sandbox ✅ (DONE — Phase 1 complete)
 
-- ⬜ `WebRenderer` via `WKWebView` (Canvas/WebGL/Three.js)
-- ⬜ Lockdown: no `file://`, `WKContentRuleList` blocking network except manifest allowlist
-- ⬜ Ephemeral data store, no media-capture/geolocation, block top-level navigation
-- ⬜ Enforce `capabilities.network` allowlist
-- ⬜ Web static checks at import (flag network calls / obfuscation)
+- ✅ `WebRenderer` via `WKWebView` (Canvas/WebGL/Three.js) — built-in "Web · Starfield" demo
+- ✅ No `file://`: content served over a private `lwp://` scheme scoped to the package's web dir
+  (WebSchemeHandler, traversal-rejecting)
+- ✅ `WKContentRuleList` blocks all network except the manifest allowlist (empty = fully offline)
+- ✅ Ephemeral data store; top-level navigation cancelled; media-capture permission denied
+- ✅ Enforce `capabilities.network` allowlist (compiled into the rule list at load)
+- ✅ Web static import scan flags fetch/XHR/WebSocket/eval/external URLs (WebValidator, logged)
+- ✅ Self-test extended to 16 checks (web install/load/makeRenderer, rule JSON, validator flag)
+
+**Verified:** self-test 16/16; runtime log confirms the WebRenderer compiles the rule list, serves
+over `lwp://`, and the Governor pauses/resumes it.
+
+### M3 notes
+- Web pause is best-effort (hide + suspend media; WebKit throttles hidden content) vs. the hard
+  stop for video/metal — noted for a future true-pause hook.
+- Delegate signatures must be `@escaping @MainActor @Sendable` to actually satisfy WKNavigation/UI
+  delegate optionals — otherwise the callbacks silently never fire.
+
+---
+
+## 🏁 Phase 1 (the engine) is COMPLETE
+
+A local, sandboxed macOS wallpaper engine: video + Metal-shader + web wallpapers, a power-aware
+Governor, a frozen `.livewallpaper` package format with import/export, and per-screen assignment.
+Everything below is **Phase 2 — the community workshop** (deliberately deferred until now).
 
 ---
 

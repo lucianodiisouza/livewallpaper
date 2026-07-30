@@ -59,8 +59,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         screenlets.removeAll()
         installed = library.installedPackages()
 
+        // Test hook: LW_DEFAULT overrides the default wallpaper for a fresh launch.
+        let defaultID = ProcessInfo.processInfo.environment["LW_DEFAULT"] ?? WallpaperCatalog.defaultID
         for screen in NSScreen.screens {
-            let id = library.assignedID(for: screen, default: WallpaperCatalog.defaultID)
+            let id = library.assignedID(for: screen, default: defaultID)
             let (renderer, schema, resolvedID) = makeRenderer(forID: id)
 
             let window = DesktopWindow(screen: screen)

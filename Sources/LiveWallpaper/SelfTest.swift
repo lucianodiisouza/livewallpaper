@@ -72,8 +72,36 @@ enum SelfTest {
              check("shader validator accepts a fragment shader", true) }
         catch { check("shader validator accepts a fragment shader — \(error)", false) }
 
-        // Clean up the installed selftest package.
-        for pkg in library.installedPackages() where pkg.manifest.id == "selftest.plasma" {
+        // 7) Web package: install + load + makeRenderer, and network flags surface.
+        let html = "<!doctype html><html><body><script>fetch('https://evil.example/x')</script></body></html>"
+        let webContent = ["web/index.html": Data(html.utf8)]
+        let webManifest = """
+        {"schemaVersion":1,"id":"selftest.web","version":"1.0.0","title":"Web (selftest)",
+         "type":"web","entry":"content/web/index.html","minMacOS":"26.0",
+         "checksum":"\(WallpaperPackage.checksum(ofContentFiles: webContent))",
+         "capabilities":{"network":[],"audio":false}}
+        """
+        let webZip = ZipArchive.archive([
+            "manifest.json": Data(webManifest.utf8),
+            "content/web/index.html": Data(html.utf8),
+        ])
+        let webURL = tmp.appendingPathComponent("web.livewallpaper")
+        try? webZip.write(to: webURL)
+        do {
+            let pkg = try library.install(fromZipAt: webURL)
+            check("web package installs & verifies", pkg.manifest.type == .web)
+            _ = try pkg.makeRenderer()
+            check("web makeRenderer() builds a WebRenderer", true)
+        } catch { check("web install/load — \(error)", false) }
+        check("web validator flags fetch()", !WebValidator.warnings(source: html, filename: "index.html").isEmpty)
+
+        // 8) Network rule JSON: empty allowlist blocks all; an allowlist adds an exception.
+        check("empty allowlist → block rule only", WebRenderer.ruleJSON(allowlist: []).contains("\"block\"")
+              && !WebRenderer.ruleJSON(allowlist: []).contains("if-domain"))
+        check("allowlist adds a host exception", WebRenderer.ruleJSON(allowlist: ["cdn.example"]).contains("*cdn.example"))
+
+        // Clean up installed selftest packages.
+        for pkg in library.installedPackages() where pkg.manifest.id.hasPrefix("selftest.") {
             try? FileManager.default.removeItem(at: pkg.directory)
         }
 

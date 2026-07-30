@@ -25,6 +25,9 @@ enum WallpaperCatalog {
         Item(id: "aurora", title: "Shader · Aurora") {
             MetalRenderer(shaderSource: BuiltInShaders.aurora, configSchema: shaderConfig)
         },
+        Item(id: "web-stars", title: "Web · Starfield") {
+            WebRenderer(inlineHTML: BuiltInWeb.starfield, allowlist: [], schema: [])
+        },
     ]
 
     static let defaultID = "plasma"

@@ -73,6 +73,7 @@ final class Library {
         // including the shader safety gate).
         do {
             let pkg = try WallpaperPackage.load(from: dest)
+            if pkg.manifest.type == .web { _ = WebValidator.scan(directory: dest) }   // flag (logs) network use
             log.notice("Installed '\(pkg.manifest.title, privacy: .public)' (\(pkg.manifest.type.rawValue, privacy: .public)).")
             return pkg
         } catch {
