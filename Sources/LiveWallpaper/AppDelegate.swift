@@ -55,6 +55,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         restartRotation()
 
+        // Test hook: open the workshop window immediately (for screenshots/demos).
+        if ProcessInfo.processInfo.environment["LW_OPEN_WORKSHOP"] != nil {
+            openWorkshop()
+        }
+
         NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
         ) { [weak self] _ in MainActor.assumeIsolated { self?.rebuildScreenlets() } }
