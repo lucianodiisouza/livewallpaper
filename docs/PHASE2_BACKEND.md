@@ -23,6 +23,48 @@ Phase 2 is the network + storage + trust layer around it.
 > Note: §§2–10 below describe the original Supabase+R2 design as reference/rationale; the **locked**
 > choices above supersede them.
 
+## Author accountability & moderation data (M5)
+
+Since anyone can submit for review, the backend must make submitters **accountable** — identify
+repeat offenders, keep evidence of violations, and enforce escalating consequences — while
+collecting the **minimum** personal data.
+
+### Identity (from Sign in with Apple)
+- **`apple_sub`** — Apple's stable per-user identifier. **This is the ban key**: the same Apple ID
+  always maps to the same `sub`, so banning it blocks trivial re-registration. Store + index it and
+  enforce bans against it.
+- **`email`** — Apple often returns a **private relay** (`…@privaterelay.appleid.com`): contactable
+  through Apple's relay, but *not* a real-world identifier. Don't treat it as identifying a person.
+- **`name`** — only supplied on first sign-in; optional.
+
+### `profiles`
+`id, apple_sub (unique), handle (unique), display_name, email, created_at,
+role[user|trusted|admin], status[active|warned|suspended|banned], strike_count,
+ban_reason, banned_at, banned_by`
+
+### `moderation_actions` — the audit trail (this is what handles bad actors)
+Every review decision is logged and tied to the author:
+`id, created_at, author_id, wallpaper_id?, action[approve|reject|remove|warn|suspend|ban|unban],
+reason_category[nsfw|illegal|infringing|malware|spam|other], note, admin_id, evidence_checksum`
+
+Per author you then get their full submission history, every rejection/removal, and a strike trail —
+so you can auto-flag or auto-suspend after N violations and spot patterns across accounts.
+
+### Evidence retention
+For rejected/removed submissions, keep the **manifest + checksum** (optionally the bundle for a fixed
+window) as evidence tied to the author — enough to justify a ban and to recognise re-uploads by hash.
+
+### Proportionality & privacy (get this right)
+- **Collect the minimum.** The Apple `sub` is enough to ban; you do **not** need real names/addresses.
+- **Optional abuse signals** (submission IP, app version) help catch someone cycling Apple IDs, but
+  they're personal data — only with a **privacy-policy disclosure** and a **short retention window**
+  (GDPR/CCPA). Off by default.
+- **Illegal (not merely ToS-violating) content** — e.g. CSAM — carries **mandatory legal reporting**
+  (US: NCMEC) and evidence-preservation duties. Handle via counsel; don't improvise. This is separate
+  from ordinary moderation.
+
+---
+
 ## 1. Goals & constraints (these shape every choice)
 
 - **Free & open-source, solo + AI maintainer.** Minimize build effort *and* ops toil.
