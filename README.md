@@ -11,6 +11,11 @@ Inspired by Wallpaper Engine on Windows, rebuilt from scratch for macOS with a h
 > import/export. The community "workshop" (sharing/discovery) is Phase 2, in progress. Signed
 > notarized builds land once an Apple Developer account is set up.
 
+> **Performance, measured on Apple Silicon (M4 Pro, 12 cores, Metal 4):** renders at desktop
+> refresh rate using **3% of one CPU core, 260 mW of GPU power at 338 MHz (the lowest
+> frequency bin), 130 MB of RAM**, and drops to **0% CPU when occluded**. Energy impact is
+> effectively zero. Full breakdown + reproduction scripts in [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
+
 ## Features (planned)
 
 - 🎬 **Video wallpapers** — looping HEVC, including transparency.
