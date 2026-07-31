@@ -130,11 +130,31 @@ struct WorkshopTile: View {
     }
 
     @ViewBuilder private var preview: some View {
-        if let url = item.thumbURL {
-            AsyncImage(url: url) { $0.resizable().aspectRatio(contentMode: .fill) }
-            placeholder: { PlaceholderThumb(seed: item.title, kind: item.type.rawValue) }
+        if item.thumbURL != nil {
+            CachedThumb(item: item)
         } else {
             PlaceholderThumb(seed: item.title, kind: item.type.rawValue)
+        }
+    }
+}
+
+/// A thumbnail backed by `WorkshopCache` instead of `AsyncImage`, so scrolling the grid serves
+/// repeat views from memory/disk rather than refetching from R2. Falls back to the generated
+/// placeholder while loading and if the fetch ultimately fails.
+struct CachedThumb: View {
+    let item: WorkshopItem
+    @State private var image: NSImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
+            } else {
+                PlaceholderThumb(seed: item.title, kind: item.type.rawValue)
+            }
+        }
+        .task(id: item.id) {
+            if image == nil { image = await WorkshopCache.shared.thumbnail(for: item) }
         }
     }
 }

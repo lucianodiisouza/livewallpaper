@@ -42,19 +42,40 @@ struct WorkshopClient: Sendable {
         ]
         guard let url = comps.url else { throw WorkshopError.badURL }
 
+        // Collapse the burst of identical fetches (load → sort toggle → post-install reload) into one
+        // Railway hit. Short TTL: freshness of the listing still matters more than saving a request.
+        let key = url.absoluteString
+        if let cached = await WorkshopCache.shared.cachedCatalog(forKey: key, maxAge: Self.catalogTTL) {
+            return cached
+        }
+
         let (data, resp) = try await URLSession.shared.data(from: url)
         try Self.check(resp)
-        return try JSONDecoder().decode(PBList.self, from: data).items
+        let items = try JSONDecoder().decode(PBList.self, from: data).items
+        await WorkshopCache.shared.storeCatalog(items, forKey: key)
+        return items
     }
 
-    /// Download a bundle to a temp `.livewallpaper` file (then hand to `Library.install`).
+    /// How long a fetched catalog stays servable from the memo before we re-hit Railway.
+    private static let catalogTTL: TimeInterval = 60
+
+    /// Download a bundle to a temp `.livewallpaper` file (then hand to `Library.install`). Content is
+    /// cached by checksum, so a repeat install of the same wallpaper re-downloads nothing; the caller
+    /// re-verifies the checksum regardless, so a cache hit is never trusted on faith.
     func downloadBundle(_ item: WorkshopItem) async throws -> URL {
+        let dest = FileManager.default.temporaryDirectory.appendingPathComponent("\(item.id).livewallpaper")
+        try? FileManager.default.removeItem(at: dest)
+
+        if let cached = await WorkshopCache.shared.cachedBundle(forChecksum: item.checksum) {
+            try FileManager.default.copyItem(at: cached, to: dest)
+            return dest
+        }
+
         guard let src = item.bundleURL else { throw WorkshopError.badURL }
         let (tmp, resp) = try await URLSession.shared.download(from: src)
         try Self.check(resp)
-        let dest = FileManager.default.temporaryDirectory.appendingPathComponent("\(item.id).livewallpaper")
-        try? FileManager.default.removeItem(at: dest)
         try FileManager.default.moveItem(at: tmp, to: dest)
+        await WorkshopCache.shared.storeBundle(from: dest, checksum: item.checksum)
         return dest
     }
 
