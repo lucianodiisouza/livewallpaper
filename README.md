@@ -33,11 +33,42 @@ Inspired by Wallpaper Engine on Windows, rebuilt from scratch for macOS with a h
 
 ## Install
 
-**Today:** download the latest build from the [Releases](../../releases) page.
+**Today:** download the latest `PrimoEngine-<version>.zip` from the [Releases](../../releases)
+page and unzip it.
 
-Because the app is not yet code-signed, macOS Gatekeeper will warn on first launch. Right-click
-the app → **Open**, or allow it in **System Settings → Privacy & Security**. Signed, notarized
-builds with in-app auto-updates are planned once an Apple Developer account is in place.
+These test builds are **not yet notarized by Apple**, so macOS Gatekeeper blocks the first launch
+("Apple could not verify… is free of malware"). This is expected for an unsigned app — here's how
+to run it:
+
+1. Move **Primo Engine.app** to your `/Applications` folder.
+2. **Right-click** (or Control-click) the app → **Open**.
+3. In the dialog that appears, click **Open** again. macOS remembers this choice, so future
+   launches open normally.
+
+If you don't see an **Open** button (newer macOS sometimes only offers *Done* the first time):
+
+- Open **System Settings → Privacy & Security**, scroll to the **Security** section, and click
+  **Open Anyway** next to the Primo Engine message, then confirm.
+
+Prefer the terminal? Clear the quarantine flag in one command, then open normally:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Primo Engine.app"
+```
+
+Once it's running, look for the 🖼️ icon in the menu bar — that's where you switch wallpapers and
+quit. Signed, notarized builds with in-app auto-updates will remove this step entirely once an
+Apple Developer account is in place.
+
+### Verify your download (optional)
+
+Each release includes a `PrimoEngine-<version>.zip.sha256`. Confirm the zip is intact:
+
+```bash
+shasum -a 256 PrimoEngine-<version>.zip
+```
+
+The output should match the value in the `.sha256` file.
 
 ## Build from source
 
@@ -46,8 +77,8 @@ Requires Xcode 26+ and `ffmpeg` (for the bundled test loop; `brew install ffmpeg
 ```bash
 git clone https://github.com/lucianodiisouza/livewallpaper.git
 cd livewallpaper
-./scripts/build-app.sh        # builds & assembles dist/LiveWallpaper.app
-open dist/LiveWallpaper.app   # runs it — quit from the 🖼️ menu-bar item
+./scripts/build-app.sh          # builds & assembles "dist/Primo Engine.app"
+open "dist/Primo Engine.app"    # runs it — quit from the 🖼️ menu-bar item
 ```
 
 The project is a SwiftPM executable; `swift build` compiles it, and `scripts/build-app.sh`
