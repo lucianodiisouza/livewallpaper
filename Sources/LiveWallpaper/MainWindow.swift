@@ -5,6 +5,9 @@ import SwiftUI
 /// standard "pro" macOS layout. Opened from the menu bar's "Open LiveWallpaper".
 struct MainView: View {
     @ObservedObject var model: AppModel
+    /// Bridges the selected section name to the NSWindow title (navigationTitle doesn't reach the
+    /// hosted window here; only navigationSubtitle does).
+    var onTitle: (String) -> Void = { _ in }
     @State private var section: Section = {
         if let raw = ProcessInfo.processInfo.environment["LW_SECTION"],
            let s = Section(rawValue: raw) { return s }
@@ -31,17 +34,16 @@ struct MainView: View {
             .navigationSplitViewColumnWidth(min: 176, ideal: 196, max: 240)
             .safeAreaInset(edge: .bottom) { activeFooter }
         } detail: {
-            Group {
-                switch section {
-                case .installed: InstalledView(model: model)
-                case .explore: ExploreView(model: model)
-                case .settings: SettingsTab(model: model)
-                }
+            switch section {
+            case .installed: InstalledView(model: model)
+            case .explore: ExploreView(model: model)
+            case .settings: SettingsTab(model: model)
             }
-            .navigationTitle(section.rawValue)
         }
         .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 800, minHeight: 520)
+        .onChange(of: section) { onTitle(section.rawValue) }
+        .task { onTitle(section.rawValue) }
     }
 
     private var activeFooter: some View {
@@ -162,6 +164,7 @@ struct InstalledView: View {
             }
             .padding(20)
         }
+        .navigationTitle("Installed")
         .navigationSubtitle("\(model.available.count) wallpapers · pin up to \(AppModel.maxStars) ★")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -180,6 +183,7 @@ struct ExploreView: View {
         WorkshopView(client: model.workshop) { item in
             await model.onInstall?(item) ?? "Install unavailable."
         }
+        .navigationTitle("Explore")
     }
 }
 
@@ -189,30 +193,57 @@ struct SettingsTab: View {
     @ObservedObject var model: AppModel
     @ObservedObject private var prefs = Preferences.shared
 
+    // A ScrollView (not a Form) so this tab gets the same large inline title as Installed/Explore.
     var body: some View {
-        Form {
-            Section("General") {
-                Toggle("Launch at login", isOn: $prefs.launchAtLogin)
-            }
-            Section("Power") {
-                Picker("On battery", selection: $prefs.batteryBehavior) {
-                    ForEach(BatteryBehavior.allCases, id: \.self) { Text($0.label).tag($0) }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                GroupBox("General") {
+                    Toggle("Launch at login", isOn: $prefs.launchAtLogin)
+                        .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
                 }
-                Text("Wallpapers always pause when covered, on lock, or when the display sleeps.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            Section("Rotation") {
-                Toggle("Rotate through all wallpapers", isOn: $prefs.rotationEnabled)
-                Stepper("Every \(prefs.rotationMinutes) min", value: $prefs.rotationMinutes, in: 1...240)
-                    .disabled(!prefs.rotationEnabled)
-            }
-            if let schema = model.schemas[model.currentID], !schema.isEmpty {
-                Section("Parameters · \(model.title(forID: model.currentID))") {
-                    WallpaperParamRows(model: model, schema: schema).id(model.currentID)
+                GroupBox("Power") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Picker("On battery", selection: $prefs.batteryBehavior) {
+                            ForEach(BatteryBehavior.allCases, id: \.self) { Text($0.label).tag($0) }
+                        }
+                        Text("Wallpapers always pause when covered, on lock, or when the display sleeps.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
                 }
+                GroupBox("Rotation") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle("Rotate through all wallpapers", isOn: $prefs.rotationEnabled)
+                        Stepper("Every \(prefs.rotationMinutes) min", value: $prefs.rotationMinutes, in: 1...240)
+                            .disabled(!prefs.rotationEnabled)
+                    }
+                    .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if let schema = model.schemas[model.currentID], !schema.isEmpty {
+                    GroupBox("Parameters · \(model.title(forID: model.currentID))") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            WallpaperParamRows(model: model, schema: schema).id(model.currentID)
+                        }
+                        .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+            .padding(20)
+            .frame(maxWidth: 660, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .navigationTitle("Settings")
+        .navigationSubtitle("Preferences")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    prefs.batteryBehavior = .throttle
+                    prefs.rotationEnabled = false
+                    prefs.rotationMinutes = 15
+                } label: { Label("Reset", systemImage: "arrow.counterclockwise") }
+                .help("Reset preferences to defaults")
             }
         }
-        .formStyle(.grouped)
     }
 }
 
@@ -242,9 +273,11 @@ final class MainWindowController {
             window.makeKeyAndOrderFront(nil)
             return
         }
-        let hosting = NSHostingController(rootView: MainView(model: model))
+        let hosting = NSHostingController(
+            rootView: MainView(model: model, onTitle: { [weak self] title in self?.window?.title = title }))
         let w = NSWindow(contentViewController: hosting)
-        w.title = "Primo Engine"
+        // Don't set w.title — let each section's SwiftUI navigationTitle drive the title so all
+        // three tabs render an identical "Title · Subtitle" header.
         w.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         w.toolbarStyle = .unified
         w.titlebarSeparatorStyle = .automatic
