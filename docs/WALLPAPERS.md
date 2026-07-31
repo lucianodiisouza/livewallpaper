@@ -25,6 +25,14 @@ The built-in menu only ships a handful of demos (`plasma`, `aurora`, etc.). Ever
 
 Source: `Sources/LiveWallpaper/MoreShaders.swift`.
 
+## Authorship
+
+Every workshop package is signed with the credit `@oprimodev` in
+`manifest.author.handle`. The handle lives in one place —
+`SampleMaker.workshopAuthorHandle` — so re-publishing the catalog under a
+different credit is a one-line change. The original in-app samples
+(`--make-sample`, the built-in menu) keep the legacy `"built-in"` tag.
+
 ## Generating packages
 
 The package uses the same `Library.exportShader` path as the built-in `--export` command, so
