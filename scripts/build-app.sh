@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# Assemble the LiveWallpaper.app bundle from the SwiftPM build, generate a looping test video,
+# Assemble the "Primo Engine.app" bundle from the SwiftPM build, generate a looping test video,
 # and ad-hoc code-sign it — optionally WITH the App Sandbox entitlement (the M0 spike).
 #
 # Usage:
 #   scripts/build-app.sh              # build, sign WITH sandbox (default — this is the M0 spike)
 #   scripts/build-app.sh --no-sandbox # build, sign WITHOUT sandbox (the A/B comparison)
 #
-# Output: dist/LiveWallpaper.app
+# Output: dist/Primo Engine.app
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -27,8 +27,8 @@ echo "▶ Building ($CONFIG)…"
 swift build -c "$CONFIG"
 BIN="$(swift build -c "$CONFIG" --show-bin-path)/LiveWallpaper"
 
-echo "▶ Assembling bundle at dist/LiveWallpaper.app…"
-rm -rf "$APP"
+echo "▶ Assembling bundle at dist/Primo Engine.app…"
+rm -rf "$APP" "$ROOT/dist/LiveWallpaper.app"   # drop the pre-rename bundle if present
 mkdir -p "$MACOS" "$RES"
 cp "$BIN" "$MACOS/LiveWallpaper"
 

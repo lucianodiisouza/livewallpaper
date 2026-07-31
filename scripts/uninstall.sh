@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Uninstall LiveWallpaper and remove all of its data from this Mac.
+# Uninstall Primo Engine and remove all of its data from this Mac.
 #
 # Removes: the app bundle(s), the sandbox container, preferences, caches, WebKit data
 # (compiled content-rule lists), saved state, and the non-sandbox Application Support library.
@@ -13,7 +13,8 @@
 set -euo pipefail
 
 BUNDLE_ID="com.livewallpaper.app"
-APP_NAME="LiveWallpaper"
+APP_NAME="Primo Engine"      # display name → the .app bundle in Finder
+PROC_NAME="LiveWallpaper"    # unchanged: executable/process name and Application Support dir
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 ASSUME_YES=0
@@ -58,7 +59,7 @@ CANDIDATES=(
     "$HOME/Applications/$APP_NAME.app"
     "$REPO_ROOT/dist/$APP_NAME.app"                       # local dev build output
     "$HOME/Library/Containers/$BUNDLE_ID"                 # sandbox container (holds its own prefs/library/WebKit)
-    "$HOME/Library/Application Support/$APP_NAME"         # non-sandbox library (from bare-binary runs)
+    "$HOME/Library/Application Support/$PROC_NAME"        # non-sandbox library (from bare-binary runs)
     "$HOME/Library/Caches/$BUNDLE_ID"
     "$HOME/Library/HTTPStorages/$BUNDLE_ID"
     "$HOME/Library/WebKit/$BUNDLE_ID"
@@ -74,18 +75,18 @@ for p in "${CANDIDATES[@]}"; do
     [ -e "$p" ] && EXISTING+=("$p")
 done
 
-echo "LiveWallpaper uninstaller"
+echo "Primo Engine uninstaller"
 echo "========================="
 
 # 1) Stop any running instance.
-if pgrep -x "$APP_NAME" >/dev/null 2>&1; then
-    echo "• Quitting running $APP_NAME…"
-    [ "$DRY_RUN" -eq 0 ] && pkill -x "$APP_NAME" 2>/dev/null || true
+if pgrep -x "$PROC_NAME" >/dev/null 2>&1; then
+    echo "• Quitting running ${APP_NAME}…"
+    [ "$DRY_RUN" -eq 0 ] && pkill -x "$PROC_NAME" 2>/dev/null || true
     sleep 1
 fi
 
 if [ "${#EXISTING[@]}" -eq 0 ]; then
-    echo "Nothing found — LiveWallpaper data is already gone."
+    echo "Nothing found — Primo Engine data is already gone."
 else
     echo "The following will be removed:"
     for p in "${EXISTING[@]}"; do echo "    $p"; done
