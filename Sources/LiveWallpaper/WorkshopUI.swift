@@ -16,55 +16,56 @@ struct WorkshopView: View {
     @State private var installed: Set<String> = []
     @State private var banner: String?
 
-    private let columns = [GridItem(.adaptive(minimum: 190), spacing: 16)]
+    private let columns = [GridItem(.adaptive(minimum: 200), spacing: 18)]
 
     var body: some View {
-        VStack(spacing: 0) {
-            if !WorkshopConfig.isConfigured {
-                notConfigured
-            } else {
-                toolbar
-                Divider()
-                content
-                if let banner {
-                    Divider()
-                    Text(banner).font(.caption).padding(8).frame(maxWidth: .infinity, alignment: .leading)
+        content
+            .navigationSubtitle(WorkshopConfig.isConfigured ? "\(items.count) wallpapers" : "")
+            .searchable(text: $search, prompt: "Search wallpapers")
+            .toolbar {
+                if WorkshopConfig.isConfigured {
+                    ToolbarItem(placement: .primaryAction) {
+                        Picker("Sort", selection: $sort) {
+                            ForEach(WorkshopClient.Sort.allCases, id: \.self) { Text($0.label).tag($0) }
+                        }
+                    }
+                    ToolbarItem(placement: .primaryAction) {
+                        Button { Task { await load() } } label: { Image(systemName: "arrow.clockwise") }
+                            .help("Refresh")
+                    }
                 }
             }
-        }
-        .task { await load() }
-    }
-
-    private var toolbar: some View {
-        HStack {
-            TextField("Search wallpapers", text: $search)
-                .textFieldStyle(.roundedBorder)
-                .onSubmit { Task { await load() } }
-            Picker("", selection: $sort) {
-                ForEach(WorkshopClient.Sort.allCases, id: \.self) { Text($0.label).tag($0) }
-            }
-            .labelsHidden().frame(width: 110)
+            .onSubmit(of: .search) { Task { await load() } }
+            .onChange(of: search) { if search.isEmpty { Task { await load() } } }
             .onChange(of: sort) { Task { await load() } }
-            Button { Task { await load() } } label: { Image(systemName: "arrow.clockwise") }
-        }
-        .padding(12)
+            .task { await load() }
+            .safeAreaInset(edge: .bottom) {
+                if let banner {
+                    Text(banner).font(.caption).padding(8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.thinMaterial)
+                }
+            }
     }
 
     @ViewBuilder private var content: some View {
-        if loading {
-            Spacer(); ProgressView(); Spacer()
+        if !WorkshopConfig.isConfigured {
+            notConfigured
+        } else if loading {
+            VStack { Spacer(); ProgressView(); Spacer() }.frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if items.isEmpty {
-            Spacer(); Text("No wallpapers found.").foregroundStyle(.secondary); Spacer()
+            VStack { Spacer(); Text("No wallpapers found.").foregroundStyle(.secondary); Spacer() }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollView {
-                LazyVGrid(columns: columns, spacing: 16) {
+                LazyVGrid(columns: columns, spacing: 18) {
                     ForEach(items) { item in
                         WorkshopTile(item: item,
                                      installing: installing.contains(item.id),
                                      installed: installed.contains(item.id)) { install(item) }
                     }
                 }
-                .padding(16)
+                .padding(20)
             }
         }
     }
