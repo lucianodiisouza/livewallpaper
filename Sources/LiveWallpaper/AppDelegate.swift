@@ -158,7 +158,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setUpStatusItem() {
         let status = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        status.button?.title = "🖼️"
+        // Menu-bar glyph: the prism from the app icon. Use a monochrome SF Symbol template so it
+        // auto-tints for the light/dark menu bar; fall back gracefully if a symbol is unavailable.
+        if let img = ["prism.fill", "prism", "triangle.fill"].lazy
+            .compactMap({ NSImage(systemSymbolName: $0, accessibilityDescription: "Primo Engine") })
+            .first {
+            img.isTemplate = true
+            status.button?.image = img
+        } else {
+            status.button?.title = "🔺"
+        }
         status.button?.toolTip = "Primo Engine"
         statusItem = status
         rebuildMenu()
@@ -203,7 +212,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateStatusIcon(_ directive: RenderDirective) {
-        statusItem?.button?.title = directive.paused ? "🖼️⏸" : "🖼️"
+        // Keep the prism glyph the *only* thing in the menu bar — never stack an emoji
+        // title next to the template image. Pause state just dims the same glyph.
+        if let button = statusItem?.button {
+            button.title = ""
+            button.appearsDisabled = directive.paused
+        }
         rebuildMenu()   // refresh the active checkmark
     }
 
