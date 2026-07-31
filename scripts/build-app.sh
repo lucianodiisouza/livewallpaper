@@ -17,7 +17,7 @@ SANDBOX=1
 [[ "${1:-}" == "--no-sandbox" ]] && SANDBOX=0
 
 CONFIG="release"
-APP="$ROOT/dist/LiveWallpaper.app"
+APP="$ROOT/dist/Primo Engine.app"
 CONTENTS="$APP/Contents"
 MACOS="$CONTENTS/MacOS"
 RES="$CONTENTS/Resources"
@@ -32,22 +32,30 @@ rm -rf "$APP"
 mkdir -p "$MACOS" "$RES"
 cp "$BIN" "$MACOS/LiveWallpaper"
 
+# App icon (Prism). Source lives in Resources/AppIcon.icns; regenerate with scripts/make-icon.py.
+if [[ -f "$ROOT/Resources/AppIcon.icns" ]]; then
+    cp "$ROOT/Resources/AppIcon.icns" "$RES/AppIcon.icns"
+else
+    echo "⚠ Resources/AppIcon.icns missing — bundle will use the default icon."
+fi
+
 cat > "$CONTENTS/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key><string>LiveWallpaper</string>
-    <key>CFBundleDisplayName</key><string>LiveWallpaper</string>
+    <key>CFBundleName</key><string>Primo Engine</string>
+    <key>CFBundleDisplayName</key><string>Primo Engine</string>
     <key>CFBundleIdentifier</key><string>com.livewallpaper.app</string>
     <key>CFBundleExecutable</key><string>LiveWallpaper</string>
+    <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>$VERSION</string>
     <key>CFBundleVersion</key><string>$VERSION</string>
     <key>LSMinimumSystemVersion</key><string>26.0</string>
     <key>LSUIElement</key><true/>
     <key>NSHighResolutionCapable</key><true/>
-    <key>NSHumanReadableCopyright</key><string>© LiveWallpaper contributors. MIT.</string>
+    <key>NSHumanReadableCopyright</key><string>© Primo Engine contributors. MIT.</string>
 </dict>
 </plist>
 PLIST
