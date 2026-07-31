@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "9d3c1f7a-2b64-4e19-9a0c-7c1e5f0c8b21",
+  "version": "1.0.0",
+  "title": "Lofi City · Rainy Dusk",
+  "author": { "id": "00000000-0000-0000-0000-000000000000", "handle": "@oprimodev" },
+  "type": "web",
+  "entry": "content/web/index.html",
+  "minMacOS": "26.0",
+  "checksum": "sha256-PLACEHOLDER",
+  "config": [
+    { "key": "speed",   "type": "float", "min": 0.25, "max": 2.5, "default": 1.0, "label": "Speed" },
+    { "key": "rain",    "type": "float", "min": 0.0,  "max": 2.0, "default": 1.0, "label": "Rain intensity" },
+    { "key": "flicker", "type": "bool",  "default": true,  "label": "Neon flicker" },
+    { "key": "tint",    "type": "color", "default": "#5a4a8a", "label": "Mood tint" }
+  ],
+  "capabilities": {
+    "network": [],
+    "audio": false
+  }
+}

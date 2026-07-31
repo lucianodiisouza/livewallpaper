@@ -4,7 +4,7 @@ import os
 
 /// Wires the app together: per-screen rendering, the Governor, the shared `AppModel`, the main
 /// window (Installed/Explore/Settings), and a compact menu bar (app name → pinned wallpapers →
-/// Open LiveWallpaper → Quit → version).
+/// Open Primo Engine → Quit → version).
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
 

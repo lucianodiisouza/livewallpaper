@@ -1,6 +1,6 @@
 # Security Policy
 
-LiveWallpaper runs animated content on the desktop — and eventually **community-contributed
+Primo Engine runs animated content on the desktop — and eventually **community-contributed
 content**, which is untrusted by design. Security is a first-class concern, not a bolt-on.
 
 ## The threat model in one line

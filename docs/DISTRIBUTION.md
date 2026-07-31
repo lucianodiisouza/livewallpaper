@@ -1,6 +1,6 @@
 # Distribution, signing & auto-updates
 
-How LiveWallpaper is shipped — now (unsigned, GitHub Releases) and later (signed, notarized,
+How Primo Engine is shipped — now (unsigned, GitHub Releases) and later (signed, notarized,
 auto-updating) once an Apple Developer account is available.
 
 ## Phase A — now: GitHub Releases, unsigned
@@ -14,7 +14,7 @@ auto-updating) once an Apple Developer account is available.
   attach artifact, write notes.
 
 ### Release artifact naming
-`LiveWallpaper-<version>.zip` (and later `.dmg`). Artifacts are **not** committed to git
+`PrimoEngine-<version>.zip` (and later `.dmg`). Artifacts are **not** committed to git
 (see `.gitignore`); they live only on the Releases page.
 
 ## Phase B — later: Developer ID signing + notarization
@@ -22,12 +22,12 @@ auto-updating) once an Apple Developer account is available.
 Gated on an **Apple Developer Program** account ($99/yr). Once available:
 
 1. **Sign** with a *Developer ID Application* certificate:
-   `codesign --deep --force --options runtime --sign "Developer ID Application: …" LiveWallpaper.app`
+   `codesign --deep --force --options runtime --sign "Developer ID Application: …" Primo Engine.app`
    - Enable **Hardened Runtime** (`--options runtime`). Audit entitlements (see DESIGN.md §10):
      `network.client`, `files.user-selected.read-only`, app-container access.
 2. **Notarize** with `notarytool`:
-   `xcrun notarytool submit LiveWallpaper.zip --apple-id … --team-id … --wait`
-3. **Staple** the ticket: `xcrun stapler staple LiveWallpaper.app`.
+   `xcrun notarytool submit PrimoEngine.zip --apple-id … --team-id … --wait`
+3. **Staple** the ticket: `xcrun stapler staple Primo Engine.app`.
 
 Result: no Gatekeeper warning on launch. Ship the signed+stapled build via GitHub Releases as
 before.

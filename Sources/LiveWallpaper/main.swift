@@ -1,6 +1,6 @@
 import AppKit
 
-// LiveWallpaper — M0 illusion spike.
+// Primo Engine — M0 illusion spike.
 // A menu-bar (accessory) app that paints an animated wallpaper into a desktop-level
 // window on every screen, and pauses rendering whenever nothing can be seen.
 //

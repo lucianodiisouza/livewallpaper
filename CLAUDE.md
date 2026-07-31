@@ -6,7 +6,7 @@ one-off request, surface the conflict rather than silently drifting.
 
 ## What this is
 
-**LiveWallpaper** — a native macOS animated-wallpaper engine (video / Metal shader / web),
+**Primo Engine** — a native macOS animated-wallpaper engine (video / Metal shader / web),
 free and open-source, in the spirit of Wallpaper Engine but built to respect macOS
 performance and battery. Full design: [DESIGN.md](DESIGN.md).
 
@@ -88,7 +88,7 @@ Sources/LiveWallpaper/
 scripts/seed-workshop.sh   # seed built-ins into PocketBase (admin; reads .env)
 LiveWallpaper.entitlements # app-sandbox + network.client + user-selected read-write
 scripts/build-app.sh       # assemble .app, generate loop.mp4 (ffmpeg), ad-hoc sign
-dist/LiveWallpaper.app     # build output (gitignored)
+dist/Primo Engine.app     # build output (gitignored)
 ```
 
 **Phase 1 (the engine) is complete** — video/metal/web renderers, Governor, package format +
@@ -114,7 +114,7 @@ swift build -c release
 ./scripts/build-app.sh --no-sandbox   # comparison build without sandbox
 
 # Run it
-open dist/LiveWallpaper.app           # quit via the 🖼️ menu-bar item → Quit
+open "dist/Primo Engine.app"           # quit via the 🖼️ menu-bar item → Quit
 # Watch the Governor live (info-level os_log isn't persisted; stream it):
 log stream --level info --predicate 'subsystem == "com.livewallpaper.app"'
 ```

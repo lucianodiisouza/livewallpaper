@@ -1,4 +1,4 @@
-# LiveWallpaper
+# Primo Engine
 
 Native animated wallpapers for macOS — video, Metal shaders, and web — that stay out of your
 way. Free and open-source, built to respect your Mac's battery and GPU rather than fight them.
@@ -106,4 +106,4 @@ Contributions welcome. This project is developed largely with AI assistance — 
 
 ## License
 
-[MIT](LICENSE) © LiveWallpaper contributors.
+[MIT](LICENSE) © Primo Engine contributors.

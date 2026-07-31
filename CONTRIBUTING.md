@@ -1,4 +1,4 @@
-# Contributing to LiveWallpaper
+# Contributing to Primo Engine
 
 Thanks for your interest! This project is developed largely with AI assistance, so it leans
 heavily on clear documentation to stay coherent. Please skim these before diving in:

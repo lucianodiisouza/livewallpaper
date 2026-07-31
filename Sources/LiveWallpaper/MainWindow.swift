@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// The main app window: a sidebar (Installed / Explore / Settings) with a detail pane — the
-/// standard "pro" macOS layout. Opened from the menu bar's "Open LiveWallpaper".
+/// standard "pro" macOS layout. Opened from the menu bar's "Open Primo Engine".
 struct MainView: View {
     @ObservedObject var model: AppModel
     /// Bridges the selected section name to the NSWindow title (navigationTitle doesn't reach the

@@ -1,0 +1,457 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lofi City — Rainy Dusk</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0b12; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+/* ---------------------------------------------------------------------------
+   Lofi City — a "lofi girl"-style rainy cyberpunk dusk, drawn procedurally.
+   Self-contained: no assets, no network. Canvas 2D only.
+
+   Layers (back -> front):
+     sky gradient + distant ridgeline + blinking beacon towers
+     3 parallax building bands (foggy depth), each with lit window grids
+     a hero foreground block with a warm glowing storefront + neon signs
+     drifting fog bands, falling rain, vignette + film grain
+
+   Config (from window.LiveWallpaper.config, all optional):
+     speed        float  global time multiplier          (default 1.0)
+     rain         float  rain intensity 0..2              (default 1.0)
+     flicker      bool   neon/window flicker on/off       (default true)
+     tint         color  mood tint, e.g. "#5a4a8a"        (default dusk purple)
+--------------------------------------------------------------------------- */
+
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d', { alpha: false });
+
+// ---- config ---------------------------------------------------------------
+const CFG = {
+  speed: 1.0,
+  rain: 1.0,
+  flicker: true,
+  tint: '#5a4a8a',
+};
+function readConfig(src) {
+  if (!src) return;
+  if (typeof src.speed === 'number')   CFG.speed = src.speed;
+  if (typeof src.rain === 'number')    CFG.rain = src.rain;
+  if (typeof src.flicker === 'boolean')CFG.flicker = src.flicker;
+  if (typeof src.tint === 'string')    CFG.tint = src.tint;
+}
+window.LiveWallpaper = window.LiveWallpaper || {};
+readConfig(window.LiveWallpaper.config);
+window.LiveWallpaper.onConfig = readConfig; // engine calls this on settings change
+
+// ---- deterministic RNG so the city is stable across resizes ---------------
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function hexToRgb(h) {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(h || '');
+  return m ? { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) }
+           : { r: 90, g: 74, b: 138 };
+}
+
+// ---- world state ----------------------------------------------------------
+let W = 0, H = 0, DPR = 1;
+let bands = [];      // parallax building bands
+let hero = null;     // foreground hero block
+let neons = [];      // neon signs
+let beacons = [];    // blinking tower lights
+let ridgeline = [];  // distant mountains
+let rain = [];       // rain drops
+let grain = null;    // pre-rendered noise tile
+
+const NEON_COLORS = ['#ff3b5c', '#ff5ea8', '#b06bff', '#3bd8ff', '#ffd166', '#59ffa0'];
+
+function makeWindows(x, y, w, h, rng, density, litChance) {
+  // grid of little windows; some are lit, a few flicker.
+  const cell = Math.max(7, Math.min(16, w / (6 + Math.floor(rng() * 5))));
+  const pad = cell * 0.28;
+  const wins = [];
+  for (let wy = y + pad; wy < y + h - cell; wy += cell) {
+    for (let wx = x + pad; wx < x + w - cell; wx += cell) {
+      if (rng() > density) continue;
+      const lit = rng() < litChance;
+      wins.push({
+        x: wx, y: wy, w: cell - pad, h: cell * 0.62,
+        lit,
+        flick: lit && rng() < 0.22,        // flickering window
+        phase: rng() * 100,
+        rate: 0.3 + rng() * 2.4,
+        warm: rng() < 0.72,                // warm vs cool light
+        base: 0.35 + rng() * 0.5,
+      });
+    }
+  }
+  return wins;
+}
+
+function buildCity() {
+  const rng = mulberry32(1337);
+
+  // distant ridgeline (mountains behind the city)
+  ridgeline = [];
+  const ry = H * 0.30;
+  let rx = -50;
+  while (rx < W + 50) {
+    ridgeline.push({ x: rx, y: ry + (rng() - 0.5) * H * 0.10 });
+    rx += 60 + rng() * 120;
+  }
+
+  // blinking beacon lights on far towers / cables
+  beacons = [];
+  const nb = 5 + Math.floor(W / 500);
+  for (let i = 0; i < nb; i++) {
+    beacons.push({
+      x: rng() * W,
+      y: H * (0.10 + rng() * 0.22),
+      rate: 0.6 + rng() * 1.6,
+      phase: rng() * 100,
+      hue: rng() < 0.5 ? '#ff6b6b' : '#ffd27a',
+      r: 1.5 + rng() * 1.8,
+    });
+  }
+
+  // three parallax bands, back (foggy, small) -> front (bigger)
+  bands = [];
+  const bandSpec = [
+    { base: 0.62, hMin: 0.16, hMax: 0.34, col: '#3a3f52', fog: 0.55, density: 0.7, lit: 0.30 },
+    { base: 0.72, hMin: 0.22, hMax: 0.44, col: '#333747', fog: 0.32, density: 0.8, lit: 0.42 },
+    { base: 0.86, hMin: 0.30, hMax: 0.55, col: '#282b39', fog: 0.14, density: 0.9, lit: 0.55 },
+  ];
+  for (const spec of bandSpec) {
+    const blds = [];
+    let x = -40;
+    const groundY = H * spec.base;
+    while (x < W + 40) {
+      const bw = 55 + rng() * 120;
+      const bh = H * (spec.hMin + rng() * (spec.hMax - spec.hMin));
+      const bx = x, by = groundY - bh;
+      blds.push({
+        x: bx, y: by, w: bw, h: bh,
+        windows: makeWindows(bx, by, bw, bh, rng, spec.density, spec.lit),
+      });
+      x += bw + rng() * 26;
+    }
+    bands.push({ ...spec, groundY, blds });
+  }
+
+  // hero foreground block: the warm glowing storefront the eye lands on
+  const hw = Math.min(W * 0.34, 560);
+  const hx = W * 0.30;
+  const groundY = H * 0.92;
+  const hh = H * 0.52;
+  hero = {
+    x: hx, y: groundY - hh, w: hw, h: hh, groundY,
+    windows: makeWindows(hx, groundY - hh, hw, hh * 0.72, rng, 0.85, 0.6),
+    // the lit storefront strip at the base
+    shop: { x: hx + hw * 0.08, y: groundY - hh * 0.20, w: hw * 0.84, h: hh * 0.18 },
+  };
+
+  // neon signs mounted on the hero + midground
+  neons = [];
+  const signDefs = [
+    { t: 'CLUB 51', x: hx + hw * 0.55, y: hero.y + hh * 0.10, size: 26, col: '#b06bff' },
+    { t: 'HOTEL',   x: W * 0.60,       y: H * 0.30,           size: 22, col: '#ff5ea8' },
+    { t: 'BAR',     x: hx + hw * 0.10, y: hero.y + hh * 0.26, size: 20, col: '#ff3b5c' },
+    { t: 'CAFE',    x: hx + hw * 0.46, y: hero.groundY - hh * 0.22, size: 16, col: '#ffd166' },
+    { t: 'ARCADE',  x: hx + hw * 1.02, y: hero.y + hh * 0.42, size: 15, col: '#3bd8ff' },
+  ];
+  for (const s of signDefs) {
+    neons.push({ ...s, phase: rng() * 100, rate: 0.4 + rng() * 1.4, glitch: rng() < 0.5 });
+  }
+
+  buildRain();
+  buildGrain();
+}
+
+function buildRain() {
+  rain = [];
+  const count = Math.floor((W * H) / 5200 * clamp(CFG.rain, 0, 2));
+  const rng = mulberry32(99);
+  for (let i = 0; i < count; i++) {
+    rain.push({
+      x: rng() * W,
+      y: rng() * H,
+      len: 9 + rng() * 16,
+      spd: 620 + rng() * 520,
+      w: rng() < 0.15 ? 1.6 : 0.9,
+      a: 0.10 + rng() * 0.22,
+    });
+  }
+}
+
+function buildGrain() {
+  // small tiled noise canvas, scaled up + drifted for a filmic lofi texture
+  const n = 128;
+  const g = document.createElement('canvas');
+  g.width = n; g.height = n;
+  const gc = g.getContext('2d');
+  const img = gc.createImageData(n, n);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = 118 + Math.random() * 60;
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+    img.data[i + 3] = 255;
+  }
+  gc.putImageData(img, 0, 0);
+  grain = g;
+}
+
+function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+
+// ---- resize ---------------------------------------------------------------
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2); // cap DPR for perf
+  W = Math.floor(window.innerWidth);
+  H = Math.floor(window.innerHeight);
+  cv.width = Math.floor(W * DPR);
+  cv.height = Math.floor(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  buildCity();
+}
+window.addEventListener('resize', resize);
+
+// ---- drawing --------------------------------------------------------------
+function drawSky(t) {
+  const tint = hexToRgb(CFG.tint);
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0.00, `rgb(${18 + tint.r * 0.10 | 0}, ${20 + tint.g * 0.08 | 0}, ${34 + tint.b * 0.14 | 0})`);
+  g.addColorStop(0.45, `rgb(${40 + tint.r * 0.16 | 0}, ${38 + tint.g * 0.12 | 0}, ${58 + tint.b * 0.18 | 0})`);
+  g.addColorStop(0.72, '#4a4054');
+  g.addColorStop(1.00, '#241f2e');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  // soft haze glow low on the horizon (city light pollution)
+  const hg = ctx.createRadialGradient(W * 0.5, H * 0.6, 0, W * 0.5, H * 0.6, W * 0.6);
+  hg.addColorStop(0, 'rgba(255,180,140,0.10)');
+  hg.addColorStop(1, 'rgba(255,180,140,0)');
+  ctx.fillStyle = hg;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function drawRidge() {
+  ctx.beginPath();
+  ctx.moveTo(-50, H);
+  for (const p of ridgeline) ctx.lineTo(p.x, p.y);
+  ctx.lineTo(W + 50, H);
+  ctx.closePath();
+  ctx.fillStyle = '#20222f';
+  ctx.fill();
+}
+
+function drawBeacons(t) {
+  for (const b of beacons) {
+    let a = 0.5 + 0.5 * Math.sin(t * b.rate + b.phase);
+    if (CFG.flicker) a *= (0.6 + 0.4 * (Math.sin(t * b.rate * 5.3 + b.phase) > -0.2 ? 1 : 0));
+    ctx.fillStyle = b.hue;
+    ctx.globalAlpha = 0.25 + a * 0.75;
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 6.283); ctx.fill();
+    ctx.globalAlpha = (0.08 + a * 0.12);
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 4, 0, 6.283); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawWindow(win, t) {
+  let level = win.base;
+  if (win.flick && CFG.flicker) {
+    const n = Math.sin(t * win.rate + win.phase) * Math.sin(t * win.rate * 1.7 + win.phase * 0.5);
+    level *= 0.55 + 0.45 * (n * 0.5 + 0.5);
+  }
+  const warm = win.warm;
+  const r = warm ? 255 : 150, g = warm ? 210 : 200, b = warm ? 140 : 255;
+  ctx.fillStyle = `rgba(${r},${g},${b},${level})`;
+  ctx.fillRect(win.x, win.y, win.w, win.h);
+}
+
+function drawBand(band, t) {
+  for (const bl of band.blds) {
+    ctx.fillStyle = band.col;
+    ctx.fillRect(bl.x, bl.y, bl.w, bl.h);
+    // window pass (skip drawing dark windows — cheaper)
+    for (const win of bl.windows) if (win.lit) drawWindow(win, t);
+  }
+  // fog veil over the band for depth
+  if (band.fog > 0) {
+    ctx.fillStyle = `rgba(74,64,84,${band.fog})`;
+    ctx.fillRect(0, band.groundY - H, W, H * 1.2);
+  }
+}
+
+function drawHero(t) {
+  // stepped silhouette: a narrower penthouse tower set back on top of a wide base,
+  // so it reads as a building with character rather than a flat slab.
+  const x = hero.x, y = hero.y, w = hero.w, h = hero.h;
+  const towerW = w * 0.42, towerX = x + w * 0.30, towerTop = y - h * 0.26;
+  ctx.fillStyle = '#181a25';
+  // rooftop tower
+  ctx.fillRect(towerX, towerTop, towerW, y - towerTop + 4);
+  // main body
+  ctx.fillStyle = '#1c1e29';
+  ctx.fillRect(x, y, w, h);
+  // a mid setback ledge (thin lighter line = concrete edge catching light)
+  ctx.fillStyle = 'rgba(255,255,255,0.035)';
+  ctx.fillRect(x, y, w, 2);
+  ctx.fillRect(towerX, towerTop, towerW, 2);
+  // rooftop antenna + its own beacon
+  ctx.strokeStyle = '#0f1018'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(towerX + towerW * 0.5, towerTop);
+  ctx.lineTo(towerX + towerW * 0.5, towerTop - h * 0.10); ctx.stroke();
+  const beat = 0.5 + 0.5 * Math.sin(t * 1.4);
+  ctx.fillStyle = '#ff6b6b';
+  ctx.globalAlpha = 0.35 + beat * 0.65;
+  ctx.beginPath(); ctx.arc(towerX + towerW * 0.5, towerTop - h * 0.10, 2.2, 0, 6.283); ctx.fill();
+  ctx.globalAlpha = 1;
+
+  for (const win of hero.windows) if (win.lit) drawWindow(win, t);
+
+  // warm glowing storefront: a row of lit shop windows behind dark mullions
+  const s = hero.shop;
+  const glow = ctx.createLinearGradient(0, s.y, 0, s.y + s.h);
+  glow.addColorStop(0, 'rgba(255,201,128,0.97)');
+  glow.addColorStop(1, 'rgba(255,150,70,0.80)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(s.x, s.y, s.w, s.h);
+  // mullions / door frames so it reads as glass, not a bar of paint
+  ctx.fillStyle = '#231a16';
+  const panes = Math.max(3, Math.round(s.w / 56));
+  const gap = s.w / panes;
+  for (let i = 1; i < panes; i++) ctx.fillRect(s.x + i * gap - 1.5, s.y, 3, s.h);
+  ctx.fillRect(s.x, s.y, s.w, 3);                 // header beam
+  ctx.fillRect(s.x, s.y + s.h * 0.62, s.w, 2);    // counter line
+  // an awning lip above the shopfront
+  ctx.fillStyle = '#3a2f2a';
+  ctx.fillRect(s.x - 4, s.y - 5, s.w + 8, 6);
+
+  // spill of warm light onto the "street"
+  const spill = ctx.createRadialGradient(s.x + s.w / 2, s.y + s.h, 4,
+                                         s.x + s.w / 2, s.y + s.h, s.w * 0.95);
+  spill.addColorStop(0, 'rgba(255,170,90,0.38)');
+  spill.addColorStop(1, 'rgba(255,170,90,0)');
+  ctx.fillStyle = spill;
+  ctx.fillRect(hero.x - 60, s.y, hero.w + 120, hero.groundY - s.y + 30);
+}
+
+function drawNeon(sign, t) {
+  ctx.save();
+  ctx.font = `700 ${sign.size}px "Trebuchet MS", "Segoe UI", system-ui, sans-serif`;
+  ctx.textBaseline = 'middle';
+  let on = 1;
+  if (CFG.flicker) {
+    const f = Math.sin(t * sign.rate + sign.phase);
+    on = 0.65 + 0.35 * (f * 0.5 + 0.5);
+    if (sign.glitch && Math.sin(t * 13.0 + sign.phase) > 0.93) on *= 0.25; // brief dropout
+  }
+  ctx.globalAlpha = on;
+  ctx.shadowColor = sign.col;
+  ctx.shadowBlur = 18;
+  ctx.fillStyle = sign.col;
+  ctx.fillText(sign.t, sign.x, sign.y);
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.fillText(sign.t, sign.x, sign.y);
+  ctx.restore();
+}
+
+function drawFog(t) {
+  for (let i = 0; i < 3; i++) {
+    const y = H * (0.45 + i * 0.16);
+    const drift = Math.sin(t * (0.06 + i * 0.02) + i) * 60;
+    const g = ctx.createLinearGradient(0, y - 60, 0, y + 90);
+    g.addColorStop(0, 'rgba(120,110,135,0)');
+    g.addColorStop(0.5, `rgba(140,128,150,${0.06 + i * 0.015})`);
+    g.addColorStop(1, 'rgba(120,110,135,0)');
+    ctx.fillStyle = g;
+    ctx.save();
+    ctx.translate(drift, 0);
+    ctx.fillRect(-80, y - 60, W + 160, 150);
+    ctx.restore();
+  }
+}
+
+function drawRain(dt) {
+  ctx.strokeStyle = 'rgba(200,215,255,1)';
+  ctx.lineCap = 'round';
+  const slant = 1.3; // wind
+  for (const d of rain) {
+    d.y += d.spd * dt;
+    d.x += d.spd * dt * slant * 0.18;
+    if (d.y > H + 20) { d.y = -20; d.x = Math.random() * W; }
+    if (d.x > W + 20) d.x = -20;
+    ctx.globalAlpha = d.a;
+    ctx.lineWidth = d.w;
+    ctx.beginPath();
+    ctx.moveTo(d.x, d.y);
+    ctx.lineTo(d.x - d.len * slant * 0.18, d.y - d.len);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawVignette() {
+  const g = ctx.createRadialGradient(W * 0.5, H * 0.52, H * 0.35, W * 0.5, H * 0.5, H * 0.9);
+  g.addColorStop(0, 'rgba(0,0,0,0)');
+  g.addColorStop(1, 'rgba(0,0,0,0.55)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function drawGrain(t) {
+  if (!grain) return;
+  ctx.globalAlpha = 0.035;
+  const ox = (Math.sin(t * 20) * 40) | 0;
+  const oy = (Math.cos(t * 17) * 40) | 0;
+  const scale = 3;
+  for (let x = -128; x < W + 128; x += 128 * scale) {
+    for (let y = -128; y < H + 128; y += 128 * scale) {
+      ctx.drawImage(grain, x + ox, y + oy, 128 * scale, 128 * scale);
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ---- loop -----------------------------------------------------------------
+let last = performance.now();
+let simTime = 0;
+function frame(now) {
+  let dt = (now - last) / 1000;
+  last = now;
+  if (dt > 0.1) dt = 0.1;          // clamp after tab throttling / Governor pause
+  dt *= CFG.speed;
+  simTime += dt;
+  const t = simTime;
+
+  drawSky(t);
+  drawRidge();
+  drawBeacons(t);
+  for (const band of bands) drawBand(band, t);
+  drawFog(t);
+  drawHero(t);
+  for (const n of neons) drawNeon(n, t);
+  drawRain(dt);
+  drawVignette();
+  drawGrain(t);
+
+  requestAnimationFrame(frame);
+}
+
+resize();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

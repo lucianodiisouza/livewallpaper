@@ -1,4 +1,4 @@
-# LiveWallpaper — Product & Architecture Design
+# Primo Engine — Product & Architecture Design
 
 A native macOS animated-wallpaper engine with a community "workshop", in the spirit of
 Wallpaper Engine — but built to respect macOS performance and battery rather than fight it.
