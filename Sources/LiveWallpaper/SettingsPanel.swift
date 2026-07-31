@@ -1,8 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// Holds the live config values for the current wallpaper and notifies on change. The SwiftUI form
-/// below is generated entirely from `schema`, so any wallpaper's parameters get a UI for free.
+/// Holds the live config values for the current wallpaper and notifies on change. The controls are
+/// generated entirely from `schema`, so any wallpaper's parameters get a UI for free.
 @MainActor
 final class ConfigStore: ObservableObject {
     let schema: [ConfigParameter]
@@ -20,18 +20,12 @@ final class ConfigStore: ObservableObject {
     }
 }
 
-/// Auto-generated settings form: one control per `ConfigParameter`, by kind.
-struct ConfigForm: View {
+/// Just the control rows (no Form wrapper) so they can be dropped inside any Form/Section.
+struct ConfigControls: View {
     @ObservedObject var store: ConfigStore
 
     var body: some View {
-        Form {
-            ForEach(store.schema) { param in
-                row(for: param)
-            }
-        }
-        .formStyle(.grouped)
-        .frame(minWidth: 320, minHeight: 120)
+        ForEach(store.schema) { param in row(for: param) }
     }
 
     @ViewBuilder
@@ -58,12 +52,12 @@ struct ConfigForm: View {
         }
     }
 
-    private static func color(fromHex hex: String) -> Color {
+    static func color(fromHex hex: String) -> Color {
         guard let (r, g, b) = MetalRenderer.rgb(fromHex: hex) else { return .white }
         return Color(.sRGB, red: Double(r), green: Double(g), blue: Double(b))
     }
 
-    private static func hex(from color: Color) -> String {
+    static func hex(from color: Color) -> String {
         let ns = NSColor(color).usingColorSpace(.sRGB) ?? .white
         let r = Int((ns.redComponent * 255).rounded())
         let g = Int((ns.greenComponent * 255).rounded())

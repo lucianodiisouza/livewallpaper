@@ -11,6 +11,7 @@ final class AppModel: ObservableObject {
         let title: String
         let kind: String        // video | metal | web
         let isBuiltIn: Bool
+        var previewSource: String? = nil   // shader source for the preview thumbnail (metal only)
     }
 
     /// Everything available locally to use (built-ins + installed packages).
@@ -83,9 +84,15 @@ final class AppModel: ObservableObject {
 
     private func persistStars() { UserDefaults.standard.set(starred, forKey: starKey) }
 
-    /// The wallpapers shown in the menu bar: all of them when ≤5 exist, otherwise the starred set.
+    /// The wallpapers shown in the menu bar (max 5, never empty): the starred set if any, otherwise
+    /// the active one plus the next few available.
     func menuEntries() -> [Entry] {
         if available.count <= Self.maxStars { return available }
-        return available.filter { starred.contains($0.id) }
+        let pinned = available.filter { starred.contains($0.id) }
+        if !pinned.isEmpty { return pinned }
+        // No stars yet: show the active wallpaper first, then fill up to the cap.
+        let active = available.filter { $0.id == currentID }
+        let rest = available.filter { $0.id != currentID }.prefix(Self.maxStars - active.count)
+        return active + rest
     }
 }

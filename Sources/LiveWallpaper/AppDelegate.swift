@@ -125,10 +125,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Rebuild the model's available list + schemas + current id from the library.
     private func syncModel() {
         var entries = WallpaperCatalog.all.map {
-            AppModel.Entry(id: $0.id, title: $0.title, kind: $0.kind, isBuiltIn: true)
+            AppModel.Entry(id: $0.id, title: $0.title, kind: $0.kind, isBuiltIn: true,
+                           previewSource: WallpaperCatalog.shaderSource(forID: $0.id))
         }
-        entries += installed.map {
-            AppModel.Entry(id: $0.manifest.id, title: $0.manifest.title, kind: $0.manifest.type.rawValue, isBuiltIn: false)
+        entries += installed.map { pkg -> AppModel.Entry in
+            var source: String?
+            if pkg.manifest.type == .metal {
+                source = try? String(contentsOf: pkg.directory.appendingPathComponent(pkg.manifest.entry), encoding: .utf8)
+            }
+            return AppModel.Entry(id: pkg.manifest.id, title: pkg.manifest.title,
+                                  kind: pkg.manifest.type.rawValue, isBuiltIn: false, previewSource: source)
         }
         model.available = entries
 

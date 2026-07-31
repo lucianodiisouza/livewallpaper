@@ -1,12 +1,11 @@
 import AppKit
 import SwiftUI
 
-/// The in-app workshop browser: search + sort a list of published wallpapers and install any of
-/// them. Install hands the downloaded bundle to `Library.install` (via the `onInstall` callback),
+/// The in-app workshop browser (Explore tab): search + sort a grid of published wallpapers and
+/// install any of them. Install hands the downloaded bundle to `Library.install` (via `onInstall`),
 /// so checksum + shader-gate verification still apply.
 struct WorkshopView: View {
     let client: WorkshopClient
-    /// Returns nil on success, or an error message. Provided by AppDelegate (does download+install).
     let onInstall: @MainActor (WorkshopItem) async -> String?
 
     @State private var items: [WorkshopItem] = []
@@ -16,6 +15,8 @@ struct WorkshopView: View {
     @State private var installing: Set<String> = []
     @State private var installed: Set<String> = []
     @State private var banner: String?
+
+    private let columns = [GridItem(.adaptive(minimum: 190), spacing: 16)]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -27,11 +28,10 @@ struct WorkshopView: View {
                 content
                 if let banner {
                     Divider()
-                    Text(banner).font(.caption).padding(6).frame(maxWidth: .infinity, alignment: .leading)
+                    Text(banner).font(.caption).padding(8).frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
-        .frame(width: 540, height: 480)
         .task { await load() }
     }
 
@@ -43,12 +43,11 @@ struct WorkshopView: View {
             Picker("", selection: $sort) {
                 ForEach(WorkshopClient.Sort.allCases, id: \.self) { Text($0.label).tag($0) }
             }
-            .labelsHidden()
-            .frame(width: 110)
+            .labelsHidden().frame(width: 110)
             .onChange(of: sort) { Task { await load() } }
             Button { Task { await load() } } label: { Image(systemName: "arrow.clockwise") }
         }
-        .padding(8)
+        .padding(12)
     }
 
     @ViewBuilder private var content: some View {
@@ -57,40 +56,17 @@ struct WorkshopView: View {
         } else if items.isEmpty {
             Spacer(); Text("No wallpapers found.").foregroundStyle(.secondary); Spacer()
         } else {
-            List(items) { item in row(item) }
-                .listStyle(.inset)
-        }
-    }
-
-    private func row(_ item: WorkshopItem) -> some View {
-        HStack(spacing: 10) {
-            AsyncImage(url: item.thumbURL) { img in
-                img.resizable().aspectRatio(contentMode: .fill)
-            } placeholder: {
-                RoundedRectangle(cornerRadius: 6).fill(.quaternary)
-                    .overlay(Image(systemName: "photo").foregroundStyle(.secondary))
-            }
-            .frame(width: 72, height: 44)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.title).fontWeight(.medium)
-                Text("\(item.type.rawValue) · \(item.downloadCount) installs · \(item.authorHandle ?? "unknown")")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer()
-            if installing.contains(item.id) {
-                ProgressView().controlSize(.small)
-            } else if installed.contains(item.id) {
-                Label("Installed", systemImage: "checkmark.circle.fill")
-                    .labelStyle(.titleAndIcon)
-                    .foregroundStyle(.green)
-                    .font(.callout)
-            } else {
-                Button("Install") { install(item) }
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 16) {
+                    ForEach(items) { item in
+                        WorkshopTile(item: item,
+                                     installing: installing.contains(item.id),
+                                     installed: installed.contains(item.id)) { install(item) }
+                    }
+                }
+                .padding(16)
             }
         }
-        .padding(.vertical, 2)
     }
 
     private var notConfigured: some View {
@@ -117,7 +93,47 @@ struct WorkshopView: View {
             installing.remove(item.id)
             if err == nil { installed.insert(item.id) }
             banner = err ?? "Installed “\(item.title)”."
-            await load()   // refresh install counts
+            await load()
+        }
+    }
+}
+
+/// One remote wallpaper card in the Explore grid.
+struct WorkshopTile: View {
+    let item: WorkshopItem
+    let installing: Bool
+    let installed: Bool
+    let onInstall: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            preview
+                .frame(height: 120).frame(maxWidth: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+            HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(item.title).font(.subheadline.weight(.medium)).lineLimit(1)
+                    Text("\(item.type.rawValue) · \(item.downloadCount) installs")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 4)
+                if installing {
+                    ProgressView().controlSize(.small)
+                } else if installed {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                } else {
+                    Button("Install") { onInstall() }.controlSize(.small).buttonStyle(.bordered)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private var preview: some View {
+        if let url = item.thumbURL {
+            AsyncImage(url: url) { $0.resizable().aspectRatio(contentMode: .fill) }
+            placeholder: { PlaceholderThumb(seed: item.title, kind: item.type.rawValue) }
+        } else {
+            PlaceholderThumb(seed: item.title, kind: item.type.rawValue)
         }
     }
 }

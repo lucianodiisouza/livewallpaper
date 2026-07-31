@@ -33,6 +33,15 @@ enum WallpaperCatalog {
 
     static func kind(forID id: String) -> String { all.first { $0.id == id }?.kind ?? "metal" }
 
+    /// Shader source for a built-in metal wallpaper (for preview thumbnails); nil for video/web.
+    static func shaderSource(forID id: String) -> String? {
+        switch id {
+        case "plasma": return BuiltInShaders.plasma
+        case "aurora": return BuiltInShaders.aurora
+        default: return nil
+        }
+    }
+
     static let defaultID = "plasma"
 
     static func item(id: String) -> Item {
