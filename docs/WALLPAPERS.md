@@ -13,14 +13,9 @@ The built-in menu only ships a handful of demos (`plasma`, `aurora`, etc.). Ever
 | `nebula-orion` | Nebula · Orion | astro / nebula |
 | `nebula-milky-way` | Nebula · Milky Way | astro / starfield |
 | `planet-jupiter` | Planet · Jupiter | astro / gas planet |
-| `planet-saturn` | Planet · Saturn | astro / gas planet |
 | `topo-contours` | Topo · Contours | topographic |
-| `topo-isometric` | Topo · Isometric | topographic |
-| `dev-syntax` | Dev · Soft Syntax | dev / code |
-| `dev-git-graph` | Dev · Git Graph | dev / code |
-| `dev-terminal` | Dev · Terminal | dev / code |
+| `topo-isometric` | Topo · Relief | topographic |
 | `elec-pcb` | Electronic · PCB | electronic |
-| `elec-resistor` | Electronic · Resistor | electronic |
 | `elec-oscilloscope` | Electronic · Scope | electronic |
 
 Source: `Sources/LiveWallpaper/MoreShaders.swift`.

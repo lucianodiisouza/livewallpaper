@@ -31,21 +31,16 @@ enum SampleMaker {
         "cells":       Sample(title: "Cells",             source: BuiltInShaders.cells,        authorHandle: nil),
     ]
 
-    /// Phase-2 workshop inventory (astro / topographic / dev / electronic). Exportable via
+    /// Phase-2 workshop inventory (astro / topographic / electronic). Exportable via
     /// `--export-batch <dir>`, but intentionally not in `samples` and not in `WallpaperCatalog.all` —
     /// the goal is to ship them as ready-to-publish packages without bloating the in-app menu.
     static let workshop: [String: Sample] = [
         "nebula-orion":        Sample(title: "Nebula · Orion",        source: MoreShaders.nebulaOrion,        authorHandle: workshopAuthorHandle),
         "nebula-milky-way":    Sample(title: "Nebula · Milky Way",    source: MoreShaders.nebulaMilkyWay,    authorHandle: workshopAuthorHandle),
         "planet-jupiter":      Sample(title: "Planet · Jupiter",      source: MoreShaders.planetJupiter,      authorHandle: workshopAuthorHandle),
-        "planet-saturn":       Sample(title: "Planet · Saturn",       source: MoreShaders.planetSaturn,       authorHandle: workshopAuthorHandle),
         "topo-contours":       Sample(title: "Topo · Contours",       source: MoreShaders.topoContours,       authorHandle: workshopAuthorHandle),
-        "topo-isometric":      Sample(title: "Topo · Isometric",      source: MoreShaders.topoIsometric,      authorHandle: workshopAuthorHandle),
-        "dev-syntax":          Sample(title: "Dev · Soft Syntax",     source: MoreShaders.devSyntax,          authorHandle: workshopAuthorHandle),
-        "dev-git-graph":       Sample(title: "Dev · Git Graph",       source: MoreShaders.devGitGraph,        authorHandle: workshopAuthorHandle),
-        "dev-terminal":        Sample(title: "Dev · Terminal",        source: MoreShaders.devTerminal,        authorHandle: workshopAuthorHandle),
+        "topo-isometric":      Sample(title: "Topo · Relief",         source: MoreShaders.topoIsometric,      authorHandle: workshopAuthorHandle),
         "elec-pcb":            Sample(title: "Electronic · PCB",      source: MoreShaders.elecPCB,            authorHandle: workshopAuthorHandle),
-        "elec-resistor":       Sample(title: "Electronic · Resistor", source: MoreShaders.elecResistor,       authorHandle: workshopAuthorHandle),
         "elec-oscilloscope":   Sample(title: "Electronic · Scope",    source: MoreShaders.elecOscilloscope,   authorHandle: workshopAuthorHandle),
     ]
 
