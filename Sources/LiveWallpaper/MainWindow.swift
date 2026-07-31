@@ -5,7 +5,11 @@ import SwiftUI
 /// standard "pro" macOS layout. Opened from the menu bar's "Open LiveWallpaper".
 struct MainView: View {
     @ObservedObject var model: AppModel
-    @State private var section: Section = .installed
+    @State private var section: Section = {
+        if let raw = ProcessInfo.processInfo.environment["LW_SECTION"],
+           let s = Section(rawValue: raw) { return s }
+        return .installed
+    }()
 
     enum Section: String, CaseIterable, Identifiable {
         case installed = "Installed", explore = "Explore", settings = "Settings"
