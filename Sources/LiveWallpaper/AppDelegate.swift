@@ -2,108 +2,114 @@ import AppKit
 import UniformTypeIdentifiers
 import os
 
-/// Wires the app together: one desktop window + renderer per screen, the Governor, the status-bar
-/// menu (wallpaper switcher + import/export + settings), and the notifications that rebuild windows
-/// on screen-layout changes and report occlusion to the Governor.
+/// Wires the app together: per-screen rendering, the Governor, the shared `AppModel`, the main
+/// window (Installed/Explore/Settings), and a compact menu bar (app name → pinned wallpapers →
+/// Open LiveWallpaper → Quit → version).
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private let log = Logger(subsystem: "com.livewallpaper.app", category: "AppDelegate")
     private let governor = Governor()
     private let library = Library()
-    private let settingsController = SettingsWindowController()
-    private let prefsController = PreferencesWindowController()
-    private let workshop = WorkshopClient()
-    private let workshopController = WorkshopWindowController()
-    private var rotationTimer: Timer?
+    private let model = AppModel()
+    private let mainWindow = MainWindowController()
 
     private var statusItem: NSStatusItem?
-    private var statusStateItem: NSMenuItem?
+    private var rotationTimer: Timer?
 
     private struct Screenlet {
         let screen: NSScreen
         let id: String
         let window: DesktopWindow
         let renderer: any WallpaperRenderer
-        let schema: [ConfigParameter]
     }
     private var screenlets: [Screenlet] = []
-
-    /// Installed packages, refreshed each rebuild.
     private var installed: [WallpaperPackage] = []
-    /// Live config values per wallpaper id.
     private var configByID: [String: [String: ConfigValue]] = [:]
-    /// The wallpaper the settings panel targets (the one on the main screen).
-    private var currentID = WallpaperCatalog.defaultID
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setUpStatusItem()
+        wireModel()
 
         governor.onChange = { [weak self] directive in
             guard let self else { return }
             for s in self.screenlets { s.renderer.apply(directive) }
-            self.updateStatusTitle(directive)
+            self.updateStatusIcon(directive)
         }
         governor.start()
         loadConfig()
         rebuildScreenlets()
 
-        // React to preference changes (battery behavior, rotation).
         Preferences.shared.onChange = { [weak self] in
             self?.governor.preferencesChanged()
             self?.restartRotation()
         }
         restartRotation()
 
-        // Test hook: open the workshop window immediately (for screenshots/demos).
-        if ProcessInfo.processInfo.environment["LW_OPEN_WORKSHOP"] != nil {
-            openWorkshop()
-        }
-
         NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
         ) { [weak self] _ in MainActor.assumeIsolated { self?.rebuildScreenlets() } }
-
         NotificationCenter.default.addObserver(
             forName: NSWindow.didChangeOcclusionStateNotification, object: nil, queue: .main
         ) { [weak self] _ in MainActor.assumeIsolated { self?.reportOcclusion() } }
+
+        if ProcessInfo.processInfo.environment["LW_OPEN_WINDOW"] != nil { openMainWindow() }
     }
 
-    // MARK: - Windows
+    // MARK: - Model wiring
+
+    private func wireModel() {
+        model.onSetActive = { [weak self] id in self?.activate(id) }
+        model.onImport = { [weak self] in self?.importWallpaper() }
+        model.onStarsChanged = { [weak self] in self?.rebuildMenu() }
+        model.onRemove = { [weak self] id in
+            guard let self else { return }
+            self.library.remove(id: id)
+            if self.model.currentID == id { self.library.assignToAll(WallpaperCatalog.defaultID, screens: NSScreen.screens) }
+            self.rebuildScreenlets()
+        }
+        model.onInstall = { [weak self] item in await self?.install(item) ?? "Install unavailable." }
+        model.configFor = { [weak self] id in
+            self?.configByID[id] ?? .defaults(for: self?.model.schemas[id] ?? [])
+        }
+        model.onApplyConfig = { [weak self] id, values in
+            guard let self else { return }
+            self.configByID[id] = values
+            self.saveConfig()
+            for s in self.screenlets where s.id == id { s.renderer.apply(config: values) }
+        }
+    }
+
+    // MARK: - Rendering
+
+    private func activate(_ id: String) {
+        library.assignToAll(id, screens: NSScreen.screens)
+        rebuildScreenlets()
+    }
 
     private func rebuildScreenlets() {
         for s in screenlets { s.renderer.stop(); s.window.orderOut(nil) }
         screenlets.removeAll()
         installed = library.installedPackages()
 
-        // Test hook: LW_DEFAULT overrides the default wallpaper for a fresh launch.
         let defaultID = ProcessInfo.processInfo.environment["LW_DEFAULT"] ?? WallpaperCatalog.defaultID
         for screen in NSScreen.screens {
             let id = library.assignedID(for: screen, default: defaultID)
             let (renderer, schema, resolvedID) = makeRenderer(forID: id)
-
             let window = DesktopWindow(screen: screen)
             window.orderFront(nil)
             if let layer = window.renderLayer { renderer.start(in: layer) }
-
             let values = configByID[resolvedID] ?? .defaults(for: schema)
             configByID[resolvedID] = values
             renderer.apply(config: values)
             renderer.apply(governor.current)
-
-            screenlets.append(Screenlet(screen: screen, id: resolvedID, window: window,
-                                        renderer: renderer, schema: schema))
+            screenlets.append(Screenlet(screen: screen, id: resolvedID, window: window, renderer: renderer))
         }
-
-        let mainScreen = NSScreen.main ?? NSScreen.screens.first
-        currentID = screenlets.first(where: { $0.screen == mainScreen })?.id ?? WallpaperCatalog.defaultID
-        log.notice("Rebuilt \(self.screenlets.count) screen(s); \(self.installed.count) installed package(s).")
+        syncModel()
         reportOcclusion()
         rebuildMenu()
     }
 
-    /// Resolve a wallpaper id to a renderer. Falls back to the default shader if the id is unknown or
-    /// unsupported (e.g. a `web` package before M3).
     private func makeRenderer(forID id: String) -> (any WallpaperRenderer, [ConfigParameter], String) {
         if let item = WallpaperCatalog.all.first(where: { $0.id == id }) {
             let r = item.make(); return (r, r.configSchema, id)
@@ -112,109 +118,109 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             do { let r = try pkg.makeRenderer(); return (r, r.configSchema, id) }
             catch { log.error("Package '\(id, privacy: .public)' failed: \(error.localizedDescription, privacy: .public)") }
         }
-        let fallback = WallpaperCatalog.item(id: WallpaperCatalog.defaultID)
-        let r = fallback.make(); return (r, r.configSchema, fallback.id)
+        let fb = WallpaperCatalog.item(id: WallpaperCatalog.defaultID)
+        let r = fb.make(); return (r, r.configSchema, fb.id)
+    }
+
+    /// Rebuild the model's available list + schemas + current id from the library.
+    private func syncModel() {
+        var entries = WallpaperCatalog.all.map {
+            AppModel.Entry(id: $0.id, title: $0.title, kind: $0.kind, isBuiltIn: true)
+        }
+        entries += installed.map {
+            AppModel.Entry(id: $0.manifest.id, title: $0.manifest.title, kind: $0.manifest.type.rawValue, isBuiltIn: false)
+        }
+        model.available = entries
+
+        var schemas: [String: [ConfigParameter]] = [:]
+        for it in WallpaperCatalog.all {
+            schemas[it.id] = it.kind == "metal" ? WallpaperCatalog.shaderConfig : []
+        }
+        for pkg in installed { schemas[pkg.manifest.id] = pkg.manifest.configSchema() }
+        model.schemas = schemas
+
+        let mainScreen = NSScreen.main ?? NSScreen.screens.first
+        model.currentID = screenlets.first(where: { $0.screen == mainScreen })?.id ?? WallpaperCatalog.defaultID
+        model.pruneStars()
     }
 
     private func reportOcclusion() {
         governor.setAnyWindowVisible(screenlets.contains { $0.window.occlusionState.contains(.visible) })
     }
 
-    // MARK: - Menu
+    // MARK: - Menu bar
 
     private func setUpStatusItem() {
         let status = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         status.button?.title = "🖼️"
         status.button?.toolTip = "LiveWallpaper"
-        self.statusItem = status
+        statusItem = status
         rebuildMenu()
-    }
-
-    /// (id, title) for every selectable wallpaper: built-ins first, then installed packages.
-    private func wallpaperEntries() -> [(id: String, title: String)] {
-        WallpaperCatalog.all.map { ($0.id, $0.title) }
-            + installed.map { ($0.manifest.id, "◆ " + $0.manifest.title) }
     }
 
     private func rebuildMenu() {
         let menu = NSMenu()
 
-        let stateItem = NSMenuItem(title: "State: \(governor.current.description)", action: nil, keyEquivalent: "")
-        stateItem.isEnabled = false
-        menu.addItem(stateItem)
-        self.statusStateItem = stateItem
+        let header = NSMenuItem(title: "LiveWallpaper", action: nil, keyEquivalent: "")
+        header.isEnabled = false
+        menu.addItem(header)
         menu.addItem(.separator())
 
-        let screens = NSScreen.screens
-        let entries = wallpaperEntries()
-
-        if screens.count <= 1 {
-            // Single display: a flat list.
-            let header = NSMenuItem(title: "Wallpaper", action: nil, keyEquivalent: ""); header.isEnabled = false
-            menu.addItem(header)
-            let assigned = screens.first.map { library.assignedID(for: $0, default: WallpaperCatalog.defaultID) }
-            for e in entries {
-                let mi = NSMenuItem(title: e.title, action: #selector(selectWallpaperAll(_:)), keyEquivalent: "")
-                mi.target = self; mi.representedObject = e.id
-                mi.state = (e.id == assigned) ? .on : .off
-                menu.addItem(mi)
-            }
+        let entries = model.menuEntries()
+        if entries.isEmpty {
+            let none = NSMenuItem(title: "No wallpapers", action: nil, keyEquivalent: ""); none.isEnabled = false
+            menu.addItem(none)
         } else {
-            // Multiple displays: one submenu per screen.
-            for screen in screens {
-                let assigned = library.assignedID(for: screen, default: WallpaperCatalog.defaultID)
-                let sub = NSMenu()
-                for e in entries {
-                    let mi = NSMenuItem(title: e.title, action: #selector(selectWallpaperForScreen(_:)), keyEquivalent: "")
-                    mi.target = self
-                    mi.representedObject = ["screen": Library.key(for: screen), "id": e.id]
-                    mi.state = (e.id == assigned) ? .on : .off
-                    sub.addItem(mi)
-                }
-                let item = NSMenuItem(title: "Display: \(screen.localizedName)", action: nil, keyEquivalent: "")
-                menu.addItem(item); menu.setSubmenu(sub, for: item)
+            for e in entries {
+                let mi = NSMenuItem(title: e.title, action: #selector(menuSelect(_:)), keyEquivalent: "")
+                mi.target = self
+                mi.representedObject = e.id
+                mi.state = (e.id == model.currentID) ? .on : .off
+                menu.addItem(mi)
             }
         }
 
         menu.addItem(.separator())
-        addItem(to: menu, "Browse Workshop…", #selector(openWorkshop), key: "b")
-        addItem(to: menu, "Import Wallpaper…", #selector(importWallpaper), key: "o")
-        addItem(to: menu, "Export Sample Wallpaper…", #selector(exportSample), key: "e")
-        let settings = addItem(to: menu, "Wallpaper Settings…", #selector(openSettings), key: "")
-        settings.isEnabled = !(screenlets.first(where: { $0.id == currentID })?.schema.isEmpty ?? true)
-        addItem(to: menu, "Preferences…", #selector(openPreferences), key: ",")
-
+        add(menu, "Open LiveWallpaper", #selector(openMainWindow), key: "o")
+        add(menu, "Quit LiveWallpaper", #selector(quit), key: "q")
         menu.addItem(.separator())
-        addItem(to: menu, "Quit LiveWallpaper", #selector(quit), key: "q")
+        let version = NSMenuItem(title: "v\(model.appVersion)", action: nil, keyEquivalent: ""); version.isEnabled = false
+        menu.addItem(version)
 
         statusItem?.menu = menu
     }
 
-    @discardableResult
-    private func addItem(to menu: NSMenu, _ title: String, _ action: Selector, key: String) -> NSMenuItem {
+    private func add(_ menu: NSMenu, _ title: String, _ action: Selector, key: String) {
         let mi = NSMenuItem(title: title, action: action, keyEquivalent: key)
-        mi.target = self; menu.addItem(mi); return mi
+        mi.target = self
+        menu.addItem(mi)
     }
 
-    private func updateStatusTitle(_ directive: RenderDirective) {
-        statusStateItem?.title = "State: \(directive.description)"
+    private func updateStatusIcon(_ directive: RenderDirective) {
         statusItem?.button?.title = directive.paused ? "🖼️⏸" : "🖼️"
+        rebuildMenu()   // refresh the active checkmark
     }
 
     // MARK: - Actions
 
-    @objc private func selectWallpaperAll(_ sender: NSMenuItem) {
+    @objc private func menuSelect(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String else { return }
-        library.assignToAll(id, screens: NSScreen.screens)
-        rebuildScreenlets()
+        model.setActive(id)
     }
 
-    @objc private func selectWallpaperForScreen(_ sender: NSMenuItem) {
-        guard let dict = sender.representedObject as? [String: String],
-              let id = dict["id"], let key = dict["screen"],
-              let screen = NSScreen.screens.first(where: { Library.key(for: $0) == key }) else { return }
-        library.assign(id, to: screen)
-        rebuildScreenlets()
+    @objc private func openMainWindow() { mainWindow.show(model: model) }
+
+    private func install(_ item: WorkshopItem) async -> String? {
+        do {
+            let url = try await model.workshop.downloadBundle(item)
+            let pkg = try library.install(fromZipAt: url)
+            await model.workshop.incrementDownload(item.id)
+            library.assignToAll(pkg.manifest.id, screens: NSScreen.screens)
+            rebuildScreenlets()
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
     }
 
     @objc private func importWallpaper() {
@@ -230,55 +236,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             rebuildScreenlets()
         } catch {
             presentError("Could not import wallpaper", error)
-        }
-    }
-
-    @objc private func exportSample() {
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [UTType(filenameExtension: "livewallpaper") ?? .zip]
-        panel.nameFieldStringValue = "Plasma.livewallpaper"
-        NSApp.activate(ignoringOtherApps: true)
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            try library.exportShader(
-                id: "sample.plasma", title: "Plasma (sample)",
-                source: BuiltInShaders.plasma,
-                config: Self.manifestConfig(from: WallpaperCatalog.shaderConfig),
-                to: url)
-        } catch {
-            presentError("Could not export wallpaper", error)
-        }
-    }
-
-    @objc private func openSettings() {
-        guard let schema = screenlets.first(where: { $0.id == currentID })?.schema, !schema.isEmpty else { return }
-        let values = configByID[currentID] ?? .defaults(for: schema)
-        let store = ConfigStore(schema: schema, values: values)
-        store.onChange = { [weak self] values in
-            guard let self else { return }
-            self.configByID[self.currentID] = values
-            for s in self.screenlets where s.id == self.currentID { s.renderer.apply(config: values) }
-            self.saveConfig()
-        }
-        let title = wallpaperEntries().first(where: { $0.id == currentID })?.title ?? "Wallpaper"
-        settingsController.show(store: store, title: title)
-    }
-
-    @objc private func openPreferences() { prefsController.show() }
-
-    @objc private func openWorkshop() {
-        workshopController.show(client: workshop) { [weak self] item in
-            guard let self else { return "Internal error." }
-            do {
-                let url = try await self.workshop.downloadBundle(item)
-                let pkg = try self.library.install(fromZipAt: url)
-                await self.workshop.incrementDownload(item.id)
-                self.library.assignToAll(pkg.manifest.id, screens: NSScreen.screens)
-                self.rebuildScreenlets()
-                return nil
-            } catch {
-                return error.localizedDescription
-            }
         }
     }
 
@@ -309,18 +266,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard Preferences.shared.rotationEnabled else { return }
         let interval = TimeInterval(max(1, Preferences.shared.rotationMinutes) * 60)
         rotationTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.rotateWallpaper() }
+            MainActor.assumeIsolated { self?.rotate() }
         }
     }
 
-    private func rotateWallpaper() {
-        let entries = wallpaperEntries()
-        guard entries.count > 1, let main = NSScreen.main ?? NSScreen.screens.first else { return }
-        let current = library.assignedID(for: main, default: WallpaperCatalog.defaultID)
-        let idx = entries.firstIndex { $0.id == current } ?? -1
-        let next = entries[(idx + 1) % entries.count]
-        library.assignToAll(next.id, screens: NSScreen.screens)
-        rebuildScreenlets()
+    private func rotate() {
+        let ids = model.available.map(\.id)
+        guard ids.count > 1 else { return }
+        let idx = ids.firstIndex(of: model.currentID) ?? -1
+        activate(ids[(idx + 1) % ids.count])
     }
 
     // MARK: - Helpers
@@ -333,22 +287,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         alert.alertStyle = .warning
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
-    }
-
-    /// Convert the shared config schema to manifest `config` entries (for export).
-    private static func manifestConfig(from schema: [ConfigParameter]) -> [Manifest.ConfigEntry] {
-        schema.map { p in
-            switch p.kind {
-            case let .float(min, max, def):
-                return Manifest.ConfigEntry(key: p.key, type: "float", label: p.label,
-                                            min: min, max: max, options: nil, defaultValue: .double(def))
-            case let .bool(def):
-                return Manifest.ConfigEntry(key: p.key, type: "bool", label: p.label,
-                                            min: nil, max: nil, options: nil, defaultValue: .bool(def))
-            case let .color(def):
-                return Manifest.ConfigEntry(key: p.key, type: "color", label: p.label,
-                                            min: nil, max: nil, options: nil, defaultValue: .string(def))
-            }
-        }
     }
 }

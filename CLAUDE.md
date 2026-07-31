@@ -57,7 +57,9 @@ CLI, which suits AI-driven development. A shell script assembles the `.app` bund
 Package.swift
 Sources/LiveWallpaper/
   main.swift              # NSApplication bootstrap, .accessory activation policy
-  AppDelegate.swift       # wiring: per-screen windows, Governor, menu (switcher + settings)
+  AppDelegate.swift       # wiring: per-screen windows, Governor, compact menu bar, AppModel
+  AppModel.swift          # shared UI state (available/current/starred) + action callbacks
+  MainWindow.swift        # main window: Installed / Explore / Settings tabs
   DesktopWindow.swift     # borderless click-through window at .desktopWindow level
   WallpaperRenderer.swift # renderer protocol (video/metal/web all conform)
   VideoRenderer.swift     # AVPlayerLooper video (+ animated-gradient fallback)

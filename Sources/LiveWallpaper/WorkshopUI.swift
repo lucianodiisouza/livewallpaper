@@ -121,26 +121,3 @@ struct WorkshopView: View {
         }
     }
 }
-
-/// Hosts the workshop browser in a normal window (the app is otherwise a menu-bar accessory).
-@MainActor
-final class WorkshopWindowController {
-    private var window: NSWindow?
-
-    func show(client: WorkshopClient, onInstall: @escaping @MainActor (WorkshopItem) async -> String?) {
-        if let window {
-            NSApp.activate(ignoringOtherApps: true)
-            window.makeKeyAndOrderFront(nil)
-            return
-        }
-        let hosting = NSHostingController(rootView: WorkshopView(client: client, onInstall: onInstall))
-        let w = NSWindow(contentViewController: hosting)
-        w.title = "Workshop"
-        w.styleMask = [.titled, .closable, .resizable]
-        w.isReleasedWhenClosed = false
-        window = w
-        NSApp.activate(ignoringOtherApps: true)
-        w.center()
-        w.makeKeyAndOrderFront(nil)
-    }
-}

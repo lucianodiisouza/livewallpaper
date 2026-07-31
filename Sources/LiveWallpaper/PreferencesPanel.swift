@@ -28,25 +28,3 @@ struct PreferencesView: View {
         .frame(width: 380, height: 300)
     }
 }
-
-@MainActor
-final class PreferencesWindowController {
-    private var window: NSWindow?
-
-    func show() {
-        if let window {
-            NSApp.activate(ignoringOtherApps: true)
-            window.makeKeyAndOrderFront(nil)
-            return
-        }
-        let hosting = NSHostingController(rootView: PreferencesView(prefs: .shared))
-        let w = NSWindow(contentViewController: hosting)
-        w.title = "LiveWallpaper Preferences"
-        w.styleMask = [.titled, .closable]
-        w.isReleasedWhenClosed = false
-        window = w
-        NSApp.activate(ignoringOtherApps: true)
-        w.center()
-        w.makeKeyAndOrderFront(nil)
-    }
-}

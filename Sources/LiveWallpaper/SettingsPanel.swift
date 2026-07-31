@@ -71,23 +71,3 @@ struct ConfigForm: View {
         return String(format: "#%02X%02X%02X", r, g, b)
     }
 }
-
-/// Presents the settings form in a normal window (the app is otherwise a menu-bar accessory).
-@MainActor
-final class SettingsWindowController {
-    private var window: NSWindow?
-
-    func show(store: ConfigStore, title: String) {
-        window?.close()
-        let hosting = NSHostingController(rootView: ConfigForm(store: store))
-        let w = NSWindow(contentViewController: hosting)
-        w.title = title
-        w.styleMask = [.titled, .closable]
-        w.isReleasedWhenClosed = false
-        w.setContentSize(NSSize(width: 340, height: 180))
-        window = w
-        NSApp.activate(ignoringOtherApps: true)
-        w.center()
-        w.makeKeyAndOrderFront(nil)
-    }
-}

@@ -33,6 +33,14 @@ final class Library {
         }
     }
 
+    /// Uninstall an installed package by its manifest id.
+    func remove(id: String) {
+        for pkg in installedPackages() where pkg.manifest.id == id {
+            try? fm.removeItem(at: pkg.directory)
+            log.notice("Removed package '\(id, privacy: .public)'.")
+        }
+    }
+
     // MARK: - Install
 
     /// Import a `.livewallpaper` file: extract → validate → verify checksum → store unpacked.

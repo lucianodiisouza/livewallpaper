@@ -8,6 +8,7 @@ enum WallpaperCatalog {
     struct Item: Identifiable {
         let id: String
         let title: String
+        let kind: String            // "video" | "metal" | "web"
         let make: () -> WallpaperRenderer
     }
 
@@ -18,17 +19,19 @@ enum WallpaperCatalog {
     ]
 
     static let all: [Item] = [
-        Item(id: "video",  title: "Video Loop") { VideoRenderer() },
-        Item(id: "plasma", title: "Shader · Plasma") {
+        Item(id: "video",  title: "Video Loop", kind: "video") { VideoRenderer() },
+        Item(id: "plasma", title: "Shader · Plasma", kind: "metal") {
             MetalRenderer(shaderSource: BuiltInShaders.plasma, configSchema: shaderConfig)
         },
-        Item(id: "aurora", title: "Shader · Aurora") {
+        Item(id: "aurora", title: "Shader · Aurora", kind: "metal") {
             MetalRenderer(shaderSource: BuiltInShaders.aurora, configSchema: shaderConfig)
         },
-        Item(id: "web-stars", title: "Web · Starfield") {
+        Item(id: "web-stars", title: "Web · Starfield", kind: "web") {
             WebRenderer(inlineHTML: BuiltInWeb.starfield, allowlist: [], schema: [])
         },
     ]
+
+    static func kind(forID id: String) -> String { all.first { $0.id == id }?.kind ?? "metal" }
 
     static let defaultID = "plasma"
 
