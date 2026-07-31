@@ -25,6 +25,16 @@ if let i = CommandLine.arguments.firstIndex(of: "--export"), i + 2 < CommandLine
     exit(SampleMaker.export(id: CommandLine.arguments[i + 1], path: CommandLine.arguments[i + 2]))
 }
 
+// Export the full workshop inventory at once: `--export-batch <dir>`.
+if let i = CommandLine.arguments.firstIndex(of: "--export-batch"), i + 1 < CommandLine.arguments.count {
+    exit(SampleMaker.batchExport(dir: CommandLine.arguments[i + 1]))
+}
+
+// Render 1024px PNG previews for every package in a folder: `--render-thumbs <in> <out>`.
+if let i = CommandLine.arguments.firstIndex(of: "--render-thumbs"), i + 2 < CommandLine.arguments.count {
+    exit(SampleMaker.renderThumbs(inDir: CommandLine.arguments[i + 1], outDir: CommandLine.arguments[i + 2]))
+}
+
 // Verify the workshop catalog is reachable: `--workshop-smoke` (no GUI).
 if CommandLine.arguments.contains("--workshop-smoke") {
     exit(WorkshopSmoke.run())
