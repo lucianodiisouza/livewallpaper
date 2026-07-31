@@ -159,7 +159,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setUpStatusItem() {
         let status = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         status.button?.title = "🖼️"
-        status.button?.toolTip = "LiveWallpaper"
+        status.button?.toolTip = "Primo Engine"
         statusItem = status
         rebuildMenu()
     }
@@ -167,7 +167,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func rebuildMenu() {
         let menu = NSMenu()
 
-        let header = NSMenuItem(title: "LiveWallpaper", action: nil, keyEquivalent: "")
+        let header = NSMenuItem(title: "Primo Engine", action: nil, keyEquivalent: "")
         header.isEnabled = false
         menu.addItem(header)
         menu.addItem(.separator())
@@ -187,8 +187,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         menu.addItem(.separator())
-        add(menu, "Open LiveWallpaper", #selector(openMainWindow), key: "o")
-        add(menu, "Quit LiveWallpaper", #selector(quit), key: "q")
+        add(menu, "Open Primo Engine", #selector(openMainWindow), key: "o")
+        add(menu, "Quit Primo Engine", #selector(quit), key: "q")
         menu.addItem(.separator())
         let version = NSMenuItem(title: "v\(model.appVersion)", action: nil, keyEquivalent: ""); version.isEnabled = false
         menu.addItem(version)

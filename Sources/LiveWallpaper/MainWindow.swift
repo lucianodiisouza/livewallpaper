@@ -240,7 +240,7 @@ final class MainWindowController {
         }
         let hosting = NSHostingController(rootView: MainView(model: model))
         let w = NSWindow(contentViewController: hosting)
-        w.title = "LiveWallpaper"
+        w.title = "Primo Engine"
         w.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         w.toolbarStyle = .unified
         w.titlebarSeparatorStyle = .automatic
