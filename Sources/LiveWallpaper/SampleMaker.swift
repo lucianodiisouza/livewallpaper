@@ -8,35 +8,45 @@ import Metal
 @MainActor
 enum SampleMaker {
 
-    struct Sample { let title: String; let source: String }
+    struct Sample {
+        let title: String
+        let source: String
+        /// Workshop handle that lands in `manifest.author.handle`. Nil = keep the default
+        /// `"built-in"` tag (used by the original in-app samples / `--make-sample`).
+        let authorHandle: String?
+    }
+
+    /// Author handle stamped into every workshop-shipped package's `manifest.author.handle`.
+    /// Change this constant if the catalog gets re-published under a different credit.
+    static let workshopAuthorHandle = "@oprimodev"
 
     static let samples: [String: Sample] = [
-        "plasma": Sample(title: "Plasma", source: BuiltInShaders.plasma),
-        "aurora": Sample(title: "Aurora", source: BuiltInShaders.aurora),
-        "matrix": Sample(title: "Matrix Code Rain", source: BuiltInShaders.matrixRain),
-        "rings": Sample(title: "Rings", source: BuiltInShaders.rings),
-        "interference": Sample(title: "Interference", source: BuiltInShaders.interference),
-        "spiral": Sample(title: "Spiral", source: BuiltInShaders.spiral),
-        "tunnel": Sample(title: "Tunnel", source: BuiltInShaders.tunnel),
-        "cells": Sample(title: "Cells", source: BuiltInShaders.cells),
+        "plasma":      Sample(title: "Plasma",            source: BuiltInShaders.plasma,       authorHandle: nil),
+        "aurora":      Sample(title: "Aurora",            source: BuiltInShaders.aurora,       authorHandle: nil),
+        "matrix":      Sample(title: "Matrix Code Rain",  source: BuiltInShaders.matrixRain,  authorHandle: nil),
+        "rings":       Sample(title: "Rings",             source: BuiltInShaders.rings,        authorHandle: nil),
+        "interference":Sample(title: "Interference",      source: BuiltInShaders.interference, authorHandle: nil),
+        "spiral":      Sample(title: "Spiral",            source: BuiltInShaders.spiral,       authorHandle: nil),
+        "tunnel":      Sample(title: "Tunnel",            source: BuiltInShaders.tunnel,       authorHandle: nil),
+        "cells":       Sample(title: "Cells",             source: BuiltInShaders.cells,        authorHandle: nil),
     ]
 
     /// Phase-2 workshop inventory (astro / topographic / dev / electronic). Exportable via
     /// `--export-batch <dir>`, but intentionally not in `samples` and not in `WallpaperCatalog.all` —
     /// the goal is to ship them as ready-to-publish packages without bloating the in-app menu.
     static let workshop: [String: Sample] = [
-        "nebula-orion":        Sample(title: "Nebula · Orion",        source: MoreShaders.nebulaOrion),
-        "nebula-milky-way":    Sample(title: "Nebula · Milky Way",    source: MoreShaders.nebulaMilkyWay),
-        "planet-jupiter":      Sample(title: "Planet · Jupiter",      source: MoreShaders.planetJupiter),
-        "planet-saturn":       Sample(title: "Planet · Saturn",       source: MoreShaders.planetSaturn),
-        "topo-contours":       Sample(title: "Topo · Contours",       source: MoreShaders.topoContours),
-        "topo-isometric":      Sample(title: "Topo · Isometric",      source: MoreShaders.topoIsometric),
-        "dev-syntax":          Sample(title: "Dev · Soft Syntax",     source: MoreShaders.devSyntax),
-        "dev-git-graph":       Sample(title: "Dev · Git Graph",       source: MoreShaders.devGitGraph),
-        "dev-terminal":        Sample(title: "Dev · Terminal",        source: MoreShaders.devTerminal),
-        "elec-pcb":            Sample(title: "Electronic · PCB",      source: MoreShaders.elecPCB),
-        "elec-resistor":       Sample(title: "Electronic · Resistor", source: MoreShaders.elecResistor),
-        "elec-oscilloscope":   Sample(title: "Electronic · Scope",    source: MoreShaders.elecOscilloscope),
+        "nebula-orion":        Sample(title: "Nebula · Orion",        source: MoreShaders.nebulaOrion,        authorHandle: workshopAuthorHandle),
+        "nebula-milky-way":    Sample(title: "Nebula · Milky Way",    source: MoreShaders.nebulaMilkyWay,    authorHandle: workshopAuthorHandle),
+        "planet-jupiter":      Sample(title: "Planet · Jupiter",      source: MoreShaders.planetJupiter,      authorHandle: workshopAuthorHandle),
+        "planet-saturn":       Sample(title: "Planet · Saturn",       source: MoreShaders.planetSaturn,       authorHandle: workshopAuthorHandle),
+        "topo-contours":       Sample(title: "Topo · Contours",       source: MoreShaders.topoContours,       authorHandle: workshopAuthorHandle),
+        "topo-isometric":      Sample(title: "Topo · Isometric",      source: MoreShaders.topoIsometric,      authorHandle: workshopAuthorHandle),
+        "dev-syntax":          Sample(title: "Dev · Soft Syntax",     source: MoreShaders.devSyntax,          authorHandle: workshopAuthorHandle),
+        "dev-git-graph":       Sample(title: "Dev · Git Graph",       source: MoreShaders.devGitGraph,        authorHandle: workshopAuthorHandle),
+        "dev-terminal":        Sample(title: "Dev · Terminal",        source: MoreShaders.devTerminal,        authorHandle: workshopAuthorHandle),
+        "elec-pcb":            Sample(title: "Electronic · PCB",      source: MoreShaders.elecPCB,            authorHandle: workshopAuthorHandle),
+        "elec-resistor":       Sample(title: "Electronic · Resistor", source: MoreShaders.elecResistor,       authorHandle: workshopAuthorHandle),
+        "elec-oscilloscope":   Sample(title: "Electronic · Scope",    source: MoreShaders.elecOscilloscope,   authorHandle: workshopAuthorHandle),
     ]
 
     /// `--export <id> <path>`
@@ -46,7 +56,8 @@ enum SampleMaker {
             FileHandle.standardError.write(Data("Unknown sample '\(id)'. Known: \(all.keys.sorted().joined(separator: ", "))\n".utf8))
             return 2
         }
-        return write(id: id, title: sample.title, source: sample.source, path: path)
+        return write(id: id, title: sample.title, source: sample.source,
+                     authorHandle: sample.authorHandle, path: path)
     }
 
     /// `--export-batch <dir>` — write every workshop sample as a `.livewallpaper` package into `dir`.
@@ -62,7 +73,8 @@ enum SampleMaker {
         var failed = 0
         for (id, sample) in workshop.sorted(by: { $0.key < $1.key }) {
             let out = url.appendingPathComponent("\(id).livewallpaper")
-            let rc = write(id: id, title: sample.title, source: sample.source, path: out.path)
+            let rc = write(id: id, title: sample.title, source: sample.source,
+                           authorHandle: sample.authorHandle, path: out.path)
             if rc != 0 { failed += 1 }
         }
         let total = workshop.count
@@ -127,10 +139,12 @@ enum SampleMaker {
     /// `--make-sample <path>` (the Matrix rain — kept for quick import testing).
     static func run(path: String) -> Int32 {
         let m = samples["matrix"]!
-        return write(id: "matrix", title: m.title, source: m.source, path: path)
+        return write(id: "matrix", title: m.title, source: m.source,
+                     authorHandle: m.authorHandle, path: path)
     }
 
-    private static func write(id: String, title: String, source: String, path: String) -> Int32 {
+    private static func write(id: String, title: String, source: String,
+                              authorHandle: String?, path: String) -> Int32 {
         let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
 
         if let device = MTLCreateSystemDefaultDevice() {
@@ -141,9 +155,13 @@ enum SampleMaker {
             }
         }
         do {
-            try Library().exportShader(id: "builtin.\(id)", title: title, source: source,
-                                       config: Manifest.configEntries(from: WallpaperCatalog.shaderConfig),
-                                       to: url)
+            try Library().exportShader(
+                id: "builtin.\(id)",
+                title: title,
+                source: source,
+                config: Manifest.configEntries(from: WallpaperCatalog.shaderConfig),
+                to: url,
+                authorHandle: authorHandle ?? "built-in")
             print("Wrote \(url.path)")
             return 0
         } catch {

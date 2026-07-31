@@ -93,15 +93,18 @@ final class Library {
     // MARK: - Export (build a .livewallpaper from a built-in shader)
 
     /// Package an MSL shader into a stored-only `.livewallpaper` at `destination`.
+    /// `authorHandle` lands in `manifest.author.handle` so the workshop can credit the
+    /// actual author. Defaults to `"built-in"` for the legacy sample/import-test path.
     func exportShader(id: String, title: String, source: String,
-                      config: [Manifest.ConfigEntry], to destination: URL) throws {
+                      config: [Manifest.ConfigEntry], to destination: URL,
+                      authorHandle: String = "built-in") throws {
         let entryRel = "shader.metal"
         let contentFiles = [entryRel: Data(source.utf8)]
         let checksum = WallpaperPackage.checksum(ofContentFiles: contentFiles)
 
         let manifest = Manifest(
             schemaVersion: 1, id: id, version: "1.0.0", title: title,
-            author: Manifest.Author(id: nil, handle: "built-in"),
+            author: Manifest.Author(id: nil, handle: authorHandle),
             type: .metal, entry: "content/\(entryRel)", minMacOS: "26.0",
             checksum: checksum, config: config,
             capabilities: Manifest.Capabilities(network: [], audio: false))
