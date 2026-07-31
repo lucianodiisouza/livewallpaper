@@ -1,21 +1,55 @@
 import AppKit
 import SwiftUI
 
-/// The main app window: Installed / Explore / Settings. Opened from the menu bar's
-/// "Open LiveWallpaper". Binds to the shared `AppModel`.
+/// The main app window: a sidebar (Installed / Explore / Settings) with a detail pane — the
+/// standard "pro" macOS layout. Opened from the menu bar's "Open LiveWallpaper".
 struct MainView: View {
     @ObservedObject var model: AppModel
+    @State private var section: Section = .installed
+
+    enum Section: String, CaseIterable, Identifiable {
+        case installed = "Installed", explore = "Explore", settings = "Settings"
+        var id: String { rawValue }
+        var icon: String {
+            switch self {
+            case .installed: return "square.grid.2x2"
+            case .explore: return "safari"
+            case .settings: return "gearshape"
+            }
+        }
+    }
 
     var body: some View {
-        TabView {
-            InstalledView(model: model)
-                .tabItem { Label("Installed", systemImage: "square.grid.2x2") }
-            ExploreView(model: model)
-                .tabItem { Label("Explore", systemImage: "safari") }
-            SettingsTab(model: model)
-                .tabItem { Label("Settings", systemImage: "gearshape") }
+        NavigationSplitView {
+            List(Section.allCases, selection: $section) { s in
+                Label(s.rawValue, systemImage: s.icon).tag(s)
+            }
+            .navigationSplitViewColumnWidth(min: 176, ideal: 196, max: 240)
+            .safeAreaInset(edge: .bottom) { activeFooter }
+        } detail: {
+            Group {
+                switch section {
+                case .installed: InstalledView(model: model)
+                case .explore: ExploreView(model: model)
+                case .settings: SettingsTab(model: model)
+                }
+            }
+            .navigationTitle(section.rawValue)
         }
-        .frame(width: 720, height: 620)
+        .navigationSplitViewStyle(.balanced)
+        .frame(minWidth: 800, minHeight: 520)
+    }
+
+    private var activeFooter: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "sparkles").foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Now playing").font(.caption2).foregroundStyle(.secondary)
+                Text(model.title(forID: model.currentID)).font(.caption.weight(.medium)).lineLimit(1)
+            }
+            Spacer()
+        }
+        .padding(10)
     }
 }
 
@@ -115,23 +149,20 @@ struct WallpaperTile: View {
 
 struct InstalledView: View {
     @ObservedObject var model: AppModel
-    private let columns = [GridItem(.adaptive(minimum: 190), spacing: 16)]
+    private let columns = [GridItem(.adaptive(minimum: 200), spacing: 18)]
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("\(model.available.count) wallpapers · pin up to \(AppModel.maxStars) ★ for the menu bar")
-                    .font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                Button { model.onImport?() } label: { Label("Import…", systemImage: "plus") }
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: 18) {
+                ForEach(model.available) { WallpaperTile(model: model, entry: $0) }
             }
-            .padding(12)
-            Divider()
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 16) {
-                    ForEach(model.available) { WallpaperTile(model: model, entry: $0) }
-                }
-                .padding(16)
+            .padding(20)
+        }
+        .navigationSubtitle("\(model.available.count) wallpapers · pin up to \(AppModel.maxStars) ★")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button { model.onImport?() } label: { Label("Import", systemImage: "plus") }
+                    .help("Import a local .livewallpaper")
             }
         }
     }
@@ -210,7 +241,10 @@ final class MainWindowController {
         let hosting = NSHostingController(rootView: MainView(model: model))
         let w = NSWindow(contentViewController: hosting)
         w.title = "LiveWallpaper"
-        w.styleMask = [.titled, .closable, .miniaturizable]
+        w.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+        w.toolbarStyle = .unified
+        w.titlebarSeparatorStyle = .automatic
+        w.setContentSize(NSSize(width: 860, height: 560))
         w.isReleasedWhenClosed = false
         window = w
         NSApp.activate(ignoringOtherApps: true)
