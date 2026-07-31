@@ -21,7 +21,7 @@ APP="$ROOT/dist/Primo Engine.app"
 CONTENTS="$APP/Contents"
 MACOS="$CONTENTS/MacOS"
 RES="$CONTENTS/Resources"
-VERSION="0.0.1"
+VERSION="${APP_VERSION:-0.0.1}"
 
 echo "▶ Building ($CONFIG)…"
 swift build -c "$CONFIG"

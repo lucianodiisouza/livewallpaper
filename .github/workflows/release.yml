@@ -1,0 +1,112 @@
+name: Release (unsigned)
+
+# Phase A distribution (docs/DISTRIBUTION.md): build the .app on a tag push,
+# zip it, and publish a GitHub Release. Builds are ad-hoc signed only — NOT
+# Developer ID signed or notarized (that is Phase B, gated on an Apple account),
+# so testers must clear Gatekeeper on first launch (see the generated notes).
+
+on:
+  push:
+    tags:
+      - "v*"          # e.g. v0.1.0  → release 0.1.0
+  workflow_dispatch:  # manual dry-run: builds + uploads a prerelease you can delete
+    inputs:
+      version:
+        description: "Version to build (no leading v). Defaults to 0.0.0-dev."
+        required: false
+        default: "0.0.0-dev"
+
+permissions:
+  contents: write     # required for gh release create / upload
+
+jobs:
+  build:
+    runs-on: macos-26   # needs the macOS 26 SDK + Swift 6.2 toolchain (Package.swift)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select latest Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Show toolchain
+        run: swift --version && xcodebuild -version
+
+      - name: Install ffmpeg (bakes the default video wallpaper into the bundle)
+        run: brew install ffmpeg
+
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            V="${GITHUB_REF_NAME#v}"          # strip leading v from the tag
+          else
+            V="${{ github.event.inputs.version }}"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "Building version: $V"
+
+      - name: Build app bundle (Release, sandboxed, ad-hoc signed)
+        env:
+          APP_VERSION: ${{ steps.ver.outputs.version }}
+        run: scripts/build-app.sh
+
+      - name: Run headless self-test
+        run: '"dist/Primo Engine.app/Contents/MacOS/LiveWallpaper" --selftest'
+
+      - name: Package zip artifact
+        id: pkg
+        run: |
+          V="${{ steps.ver.outputs.version }}"
+          ZIP="PrimoEngine-${V}.zip"
+          # ditto -c -k --keepParent preserves the .app bundle + metadata (Apple's recommended zip)
+          ditto -c -k --keepParent "dist/Primo Engine.app" "dist/${ZIP}"
+          shasum -a 256 "dist/${ZIP}" | tee "dist/${ZIP}.sha256"
+          echo "zip=dist/${ZIP}" >> "$GITHUB_OUTPUT"
+          echo "sha=dist/${ZIP}.sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Upload workflow artifact (for manual runs / debugging)
+        uses: actions/upload-artifact@v4
+        with:
+          name: PrimoEngine-${{ steps.ver.outputs.version }}
+          path: |
+            ${{ steps.pkg.outputs.zip }}
+            ${{ steps.pkg.outputs.sha }}
+
+      - name: Write release notes
+        run: |
+          V="${{ steps.ver.outputs.version }}"
+          cat > dist/RELEASE_NOTES.md <<'NOTES'
+          ## Primo Engine __VERSION__ (unsigned test build)
+
+          A power-aware live-wallpaper engine for macOS. This is an **unsigned**
+          build for testers — it is not yet notarized by Apple, so macOS
+          Gatekeeper will block the first launch. This is expected.
+
+          ### Install
+          1. Download `PrimoEngine-__VERSION__.zip` below and unzip it.
+          2. Move **Primo Engine.app** to `/Applications`.
+          3. **First launch:** right-click the app → **Open** → **Open** again.
+             (Or: **System Settings → Privacy & Security → Open Anyway**.)
+          4. Look for the 🖼️ icon in the menu bar. Quit from there.
+
+          Requires **macOS 26** or later.
+
+          ### Verify the download (optional)
+          ```
+          shasum -a 256 PrimoEngine-__VERSION__.zip
+          ```
+          Compare against `PrimoEngine-__VERSION__.zip.sha256` attached below.
+          NOTES
+          sed -i '' "s/__VERSION__/${V}/g" dist/RELEASE_NOTES.md
+
+      - name: Create GitHub Release
+        if: github.event_name == 'push'   # only tag pushes publish a real release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="${{ steps.ver.outputs.version }}"
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "Primo Engine ${V}" \
+            --notes-file dist/RELEASE_NOTES.md \
+            "${{ steps.pkg.outputs.zip }}" \
+            "${{ steps.pkg.outputs.sha }}"

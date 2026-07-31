@@ -49,8 +49,13 @@ A possible *second* channel, **pending the sandbox spike** (DESIGN.md §12): con
 App-Sandbox build can still create the desktop-level window on the target macOS. If it can't,
 stay notarized-direct only. The MAS build would use StoreKit for updates instead of Sparkle.
 
-## CI/CD (add when the project exists)
+## CI/CD
 
-A GitHub Actions workflow can automate: build on tag push → (Phase B) sign + notarize + staple
-→ create the release → (Phase C) update the appcast. Secrets (certificates, notarization creds,
-Sparkle key) live in GitHub Actions secrets, never in the repo.
+**Phase A is live**: [.github/workflows/release.yml](../.github/workflows/release.yml) builds on a
+`vX.Y.Z` tag push (macos-26 runner), runs the headless self-test, zips the `.app` as
+`PrimoEngine-<version>.zip` (+ `.sha256`), and publishes a GitHub Release with install/Gatekeeper
+notes. `workflow_dispatch` gives a no-publish dry run. See [RELEASING.md](RELEASING.md).
+
+Later phases extend the **same** workflow: (Phase B) sign + notarize + staple after the build →
+(Phase C) update the appcast. Secrets (certificates, notarization creds, Sparkle key) live in
+GitHub Actions secrets, never in the repo.

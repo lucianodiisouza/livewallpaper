@@ -188,8 +188,11 @@ Still open (future polish):
 ## Distribution track (parallel, gated externally)
 
 - ✅ Phase A: unsigned builds via GitHub Releases (plan documented)
-- ⬜ Phase A: first actual release artifact + release checklist
+- ✅ Phase A: release pipeline + checklist ([RELEASING.md](docs/RELEASING.md),
+  [.github/workflows/release.yml](.github/workflows/release.yml)) — push a `vX.Y.Z` tag → build,
+  self-test, zip, publish Release with Gatekeeper notes. _(First actual tagged release still to cut.)_
 - ⬜ Phase B: Developer ID signing + notarization — **gated on Apple Developer account**
 - ⬜ Phase C: Sparkle auto-updates (appcast + EdDSA signing) — after Phase B
 - ⬜ Phase D: Mac App Store — pending the M0 sandbox spike
-- ⬜ CI: GitHub Actions build-on-tag → (later) sign/notarize/staple/release
+- ✅ CI: GitHub Actions build-on-tag → self-test → zip → release (Phase A);
+  sign/notarize/staple to be added with Phase B
