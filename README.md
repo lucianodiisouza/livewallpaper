@@ -54,6 +54,9 @@ architecture.
 - [DESIGN.md](DESIGN.md) — architecture and product design (source of truth)
 - [docs/PACKAGE_FORMAT.md](docs/PACKAGE_FORMAT.md) — the `.livewallpaper` bundle spec
 - [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) — release, signing, and auto-update plan
+- [docs/PERFORMANCE.md](docs/PERFORMANCE.md) — measured CPU/GPU/power profile with
+  the scripts to reproduce it on your own Mac ([how-to](docs/PERFORMANCE_REPRODUCE.md),
+  scripts in `docs/perf/`)
 - [CONTRIBUTING.md](CONTRIBUTING.md) — how to contribute
 - [SECURITY.md](SECURITY.md) — reporting vulnerabilities & the untrusted-content model
 - **Backend:** the community workshop server lives in a separate repo —

@@ -1,0 +1,66 @@
+=== Primo Engine built-in comparison ===
+Date: Fri Jul 31 12:12:02 -03 2026
+Total RAM: 0.0 GB
+Arch: arm64  macOS: 26.5.2
+
+============================================================
+Switching to: Shader · Plasma
+============================================================
+menu item Shader · Plasma of menu Primo Engine of menu bar item 1 of menu bar 1 of application process LiveWallpaper
+--- post-switch: Shader · Plasma (12:12:04) ---
+  PID  %CPU %MEM    RSS ELAPSED STAT COMMAND
+20932   7.8  0.5 114080   25:46 S    /Users/lucianodiisouza/Documents/projects/primoengine/livewallpaper/dist/Primo Engine.app/Contents/MacOS/LiveWallpaper
+
+Shader · Plasma 5s-avg CPU%: 6.44
+Shader · Plasma  RSS at end: 114080 KB
+--- after 5s: Shader · Plasma (12:12:09) ---
+  PID  %CPU %MEM    RSS ELAPSED STAT COMMAND
+20932   5.5  0.5 114080   25:51 S    /Users/lucianodiisouza/Documents/projects/primoengine/livewallpaper/dist/Primo Engine.app/Contents/MacOS/LiveWallpaper
+
+
+============================================================
+Switching to: Shader · Aurora
+============================================================
+menu item Shader · Aurora of menu Primo Engine of menu bar item 1 of menu bar 1 of application process LiveWallpaper
+--- post-switch: Shader · Aurora (12:12:11) ---
+  PID  %CPU %MEM    RSS ELAPSED STAT COMMAND
+20932   6.4  0.5 114144   25:53 S    /Users/lucianodiisouza/Documents/projects/primoengine/livewallpaper/dist/Primo Engine.app/Contents/MacOS/LiveWallpaper
+
+Shader · Aurora 5s-avg CPU%: 9.22
+Shader · Aurora  RSS at end: 114496 KB
+--- after 5s: Shader · Aurora (12:12:16) ---
+  PID  %CPU %MEM    RSS ELAPSED STAT COMMAND
+20932  12.4  0.5 114496   25:58 S    /Users/lucianodiisouza/Documents/projects/primoengine/livewallpaper/dist/Primo Engine.app/Contents/MacOS/LiveWallpaper
+
+
+============================================================
+Switching to: Web · Starfield
+============================================================
+menu item Web · Starfield of menu Primo Engine of menu bar item 1 of menu bar 1 of application process LiveWallpaper
+--- post-switch: Web · Starfield (12:12:18) ---
+  PID  %CPU %MEM    RSS ELAPSED STAT COMMAND
+20932   7.3  0.5 131744   26:00 S    /Users/lucianodiisouza/Documents/projects/primoengine/livewallpaper/dist/Primo Engine.app/Contents/MacOS/LiveWallpaper
+
+Web · Starfield 5s-avg CPU%: 5.38
+Web · Starfield  RSS at end: 132528 KB
+--- after 5s: Web · Starfield (12:12:23) ---
+  PID  %CPU %MEM    RSS ELAPSED STAT COMMAND
+20932   5.1  0.5 132528   26:05 R    /Users/lucianodiisouza/Documents/projects/primoengine/livewallpaper/dist/Primo Engine.app/Contents/MacOS/LiveWallpaper
+
+
+============================================================
+Switching to: Video Loop
+============================================================
+menu item Video Loop of menu Primo Engine of menu bar item 1 of menu bar 1 of application process LiveWallpaper
+--- post-switch: Video Loop (12:12:25) ---
+  PID  %CPU %MEM    RSS ELAPSED STAT COMMAND
+20932   3.1  0.6 139936   26:07 R    /Users/lucianodiisouza/Documents/projects/primoengine/livewallpaper/dist/Primo Engine.app/Contents/MacOS/LiveWallpaper
+
+Video Loop 5s-avg CPU%: 2.02
+Video Loop  RSS at end: 139648 KB
+--- after 5s: Video Loop (12:12:30) ---
+  PID  %CPU %MEM    RSS ELAPSED STAT COMMAND
+20932   2.2  0.6 139648   26:12 S    /Users/lucianodiisouza/Documents/projects/primoengine/livewallpaper/dist/Primo Engine.app/Contents/MacOS/LiveWallpaper
+
+
+=== done ===

@@ -1,0 +1,26 @@
+=== Governor occlusion test ===
+Fri Jul 31 12:12:47 -03 2026
+Primo Engine PID: 20932
+
+--- (A) baseline, desktop visible (no occlusion) ---
+  PID  %CPU %MEM    RSS ELAPSED STAT COMMAND
+20932   3.2  0.6 141024   26:29 S    /Users/lucianodiisouza/Documents/projects/primoengine/livewallpaper/dist/Primo Engine.app/Contents/MacOS/LiveWallpaper
+Threads: 21
+Label: visible-A @ 12:12:47
+A avg CPU%: 2.58
+
+--- (B) covering desktop with a fullscreen-style Safari window ---
+  PID  %CPU %MEM    RSS ELAPSED STAT COMMAND
+20932   0.0  0.5 138288   26:37 S    /Users/lucianodiisouza/Documents/projects/primoengine/livewallpaper/dist/Primo Engine.app/Contents/MacOS/LiveWallpaper
+Threads: 19
+Label: covered-B @ 12:12:55
+B avg CPU%: 0.00
+
+--- (C) uncover (Safari Quit) ---
+  PID  %CPU %MEM    RSS ELAPSED STAT COMMAND
+20932   4.2  0.6 138864   26:44 S    /Users/lucianodiisouza/Documents/projects/primoengine/livewallpaper/dist/Primo Engine.app/Contents/MacOS/LiveWallpaper
+Threads: 21
+Label: uncovered-C @ 12:13:02
+C avg CPU%: 2.48
+
+=== done ===

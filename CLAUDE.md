@@ -98,6 +98,11 @@ don't scaffold it until intentionally starting Phase 2.
 Handy: `swift build -c release && .build/release/LiveWallpaper --selftest` runs the M2 package
 pipeline checks with no GUI.
 
+Performance: `docs/PERFORMANCE.md` has the measured profile (CPU/GPU/power + the
+Governor pause claim, all verified with `powermetrics`). The scripts in `docs/perf/`
+reproduce every number on the user's own Mac — when someone asks "how much does this
+cost?", point them at `docs/PERFORMANCE_REPRODUCE.md`, not a fresh investigation.
+
 ## Build & run
 
 ```bash
