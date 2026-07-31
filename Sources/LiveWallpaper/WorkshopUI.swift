@@ -14,6 +14,7 @@ struct WorkshopView: View {
     @State private var sort: WorkshopClient.Sort = .newest
     @State private var loading = false
     @State private var installing: Set<String> = []
+    @State private var installed: Set<String> = []
     @State private var banner: String?
 
     var body: some View {
@@ -80,6 +81,11 @@ struct WorkshopView: View {
             Spacer()
             if installing.contains(item.id) {
                 ProgressView().controlSize(.small)
+            } else if installed.contains(item.id) {
+                Label("Installed", systemImage: "checkmark.circle.fill")
+                    .labelStyle(.titleAndIcon)
+                    .foregroundStyle(.green)
+                    .font(.callout)
             } else {
                 Button("Install") { install(item) }
             }
@@ -109,6 +115,7 @@ struct WorkshopView: View {
         Task {
             let err = await onInstall(item)
             installing.remove(item.id)
+            if err == nil { installed.insert(item.id) }
             banner = err ?? "Installed “\(item.title)”."
             await load()   // refresh install counts
         }
