@@ -12,21 +12,45 @@ import Security
 enum AIConfig {
 
     enum Provider: String, CaseIterable, Identifiable {
+        case backend   // Primo's own relay Worker — provider key stays server-side (production path)
         case anthropic
-        case openai   // any OpenAI-compatible /chat/completions endpoint (incl. local Ollama/LM Studio)
+        case openai    // any OpenAI-compatible /chat/completions endpoint (incl. local Ollama/LM Studio)
 
         var id: String { rawValue }
-        var label: String { self == .anthropic ? "Anthropic" : "OpenAI-compatible" }
-        var defaultBaseURL: String {
-            self == .anthropic ? "https://api.anthropic.com" : "https://api.openai.com/v1"
+        var label: String {
+            switch self {
+            case .backend: return "Primo (backend)"
+            case .anthropic: return "Anthropic"
+            case .openai: return "OpenAI-compatible"
+            }
         }
-        var defaultModel: String { self == .anthropic ? "claude-opus-5" : "gpt-4o" }
-        /// Whether an API key is strictly required (local OpenAI-compatible runtimes need none).
+        var defaultBaseURL: String {
+            switch self {
+            case .backend: return "https://primo-ai.primo-ai.workers.dev"
+            case .anthropic: return "https://api.anthropic.com"
+            case .openai: return "https://api.openai.com/v1"
+            }
+        }
+        var defaultModel: String {
+            switch self {
+            case .backend: return ""            // the server picks the model
+            case .anthropic: return "claude-opus-5"
+            case .openai: return "gpt-4o"
+            }
+        }
+        /// Whether the client needs an API key (the backend and local runtimes don't).
         var requiresKey: Bool { self == .anthropic }
+        /// Whether the client sets the model (the backend decides server-side).
+        var usesModel: Bool { self != .backend }
         var hint: String {
-            self == .anthropic
-                ? "Uses the Anthropic Messages API."
-                : "Any OpenAI-compatible endpoint. For a local, offline, unblockable setup use Ollama (http://localhost:11434/v1) or LM Studio (http://localhost:1234/v1) — no key needed."
+            switch self {
+            case .backend:
+                return "Routes generation through Primo's backend — no key needed, works even where a provider is blocked. This device must be activated for Premium."
+            case .anthropic:
+                return "Uses the Anthropic Messages API directly with your key."
+            case .openai:
+                return "Any OpenAI-compatible endpoint. For a local, offline, unblockable setup use Ollama (http://localhost:11434/v1) or LM Studio (http://localhost:1234/v1) — no key needed."
+            }
         }
     }
 

@@ -602,18 +602,26 @@ struct AISettings: View {
                 }
                 .onChange(of: provider) { AIConfig.provider = provider; load() }
 
-                TextField("Base URL", text: $baseURL)
+                TextField(provider == .backend ? "Backend URL" : "Base URL", text: $baseURL)
                     .textFieldStyle(.roundedBorder)
                     .onChange(of: baseURL) { AIConfig.setBaseURL(baseURL, for: provider) }
-                TextField("Model", text: $model)
-                    .textFieldStyle(.roundedBorder)
-                    .onChange(of: model) { AIConfig.setModel(model, for: provider) }
-                SecureField(provider.requiresKey ? "API key" : "API key (optional for local)", text: $apiKey)
-                    .textFieldStyle(.roundedBorder)
-                    .onChange(of: apiKey) { AIConfig.setAPIKey(apiKey.isEmpty ? nil : apiKey, for: provider) }
+                if provider.usesModel {
+                    TextField("Model", text: $model)
+                        .textFieldStyle(.roundedBorder)
+                        .onChange(of: model) { AIConfig.setModel(model, for: provider) }
+                }
+                if provider != .backend {
+                    SecureField(provider.requiresKey ? "API key" : "API key (optional for local)", text: $apiKey)
+                        .textFieldStyle(.roundedBorder)
+                        .onChange(of: apiKey) { AIConfig.setAPIKey(apiKey.isEmpty ? nil : apiKey, for: provider) }
+                }
 
                 Text(provider.hint).font(.caption).foregroundStyle(.secondary)
-                Text("Pre-release: the app calls the provider directly with your key (stored in the Keychain). Production will route through our backend, so no key is needed and it works even where a provider is blocked. Premium feature.")
+                if provider == .backend {
+                    Text("This device: \(Device.id)")
+                        .font(.caption2).foregroundStyle(.secondary).textSelection(.enabled)
+                }
+                Text("Pre-release: the app calls the provider directly with your key (stored in the Keychain). Production routes through our backend, so no key is needed and it works even where a provider is blocked. Premium feature.")
                     .font(.caption2).foregroundStyle(.secondary)
             }
             .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
