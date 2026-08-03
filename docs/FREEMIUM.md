@@ -4,27 +4,28 @@ Decision date: **2026-08-02**. Turns [COMPETITIVE.md](COMPETITIVE.md) into a pla
 **supersedes the "community workshop / open user submission" framing** in DESIGN.md §1.2, §8,
 §11 and ROADMAP Phase 2 — those need the owner's revision (flagged at the end).
 
-> **⚠️ Monetization update (2026-08-03) — this doc's "pay-once, no subscription" is now stale.**
-> The model is freemium with **plans**: a **7-day free trial** (one-time per machine, no card),
-> **monthly / annual subscriptions**, and a **lifetime** one-time purchase — sold via Stripe
-> (worldwide) and InfinitePay (Brazil). Licensing is still **device-bound, per machine**.
+> **Monetization model (reconciled 2026-08-03).** Freemium with **plans**, not a single one-time
+> unlock: a **7-day free trial** (one-time per machine, no card), **monthly** and **annual**
+> subscriptions, and a **lifetime** one-time purchase — sold via **Stripe** (worldwide) and
+> **InfinitePay** (Brazil), with **Apple IAP** to come for a future Mac App Store build. Licensing is
+> **device-bound, per machine**: trial + subscriptions bind **1 Mac**, lifetime up to **3**.
 >
-> **AI generation is now FREE and bring-your-own-key** — it is *not* a premium feature and Primo does
-> *not* host or pay for it. Users plug in their own Anthropic (Claude) / OpenRouter / OpenAI-compatible
-> key, or run a local Ollama / LM Studio for free. Premium gates the **curated catalog** and pro
-> features, not generation. (The old server-side "Primo backend" AI relay was removed.)
+> **AI generation is free and bring-your-own-key** — *not* a paywalled feature, and Primo neither
+> hosts nor pays for inference. Users supply their own Anthropic (Claude) / OpenRouter /
+> OpenAI-compatible key, or run a local Ollama / LM Studio at no cost. Premium gates the **curated
+> catalog** and pro features, not generation.
 >
-> The authoritative pricing/licensing/trial/refund details live in the **backend repo** (never here —
-> this repo is public): `livewallpaper-workshop/docs/BILLING.md`. The capability table and prose below
-> still say AI-gen is premium — that needs the owner's pass; treat this note + BILLING.md as current.
+> The prose and table below have been updated to match. **Operational details** (exact prices, caps,
+> trial rules, refunds, support flows) live in the **private backend repo** —
+> `livewallpaper-workshop/docs/BILLING.md` — never here, since this repo is public.
 
 ## The pivot in one paragraph
 
 Primo Engine stops being a *UGC platform* and becomes a *curated freemium app*. Users no
 longer submit wallpapers. Instead we ship a curated catalog, give a genuinely useful **free**
-tier, and gate the rest behind a one-time **premium** unlock — matching the market ($7.99–12.99,
-pay-once, no subscription). Our differentiator vs. the all-video field is **Metal shader + web
-wallpapers** and (later) **AI-generated** shader/web wallpapers, which no video-only competitor
+tier, and gate the rest behind **Premium** — a 7-day free trial, then a subscription or a lifetime
+purchase. Our differentiator vs. the all-video field is **Metal shader + web wallpapers** and
+**AI-generated** shader/web wallpapers (free, bring-your-own-key), which no video-only competitor
 can copy.
 
 ## What changes
@@ -41,18 +42,21 @@ can copy.
   between Macs. Full scheme + honest DRM limits in [LICENSING.md](LICENSING.md).
 - **Video is local-only** — "import your own MP4" (free). We don't host/sell video, so DRM
   applies only to premium shader/web packs.
-- **Added:** a paywall/entitlement layer, a device-bound licensing layer, and an AI shader/web
-  generation path as the marquee premium feature.
+- **Added:** a paywall/entitlement layer and a device-bound licensing layer (7-day trial +
+  monthly/annual subscriptions + lifetime, per machine). **AI shader/web generation** is a headline
+  feature but **free and bring-your-own-key** — the un-copyable differentiator, without us hosting
+  or paying for inference.
 
 ## Free vs. Premium (proposed split — needs owner sign-off)
 
 Goal: free tier is *actually useful* (so people run it daily and hit the gate naturally),
 premium is *clearly worth it*.
 
-| Capability | Free | Premium (one-time unlock) |
+| Capability | Free | Premium (trial · subscription · lifetime) |
 |---|---|---|
 | Import your own MP4 (local video) | ✅ | ✅ |
 | Import / share community `.livewallpaper` (P2P) | ✅ | ✅ |
+| **AI shader/web generation** (bring-your-own-key) | ✅ free | ✅ free |
 | Built-in wallpapers | a curated handful (e.g. 2 shaders, 1 web) | full catalog |
 | Our premium shader packs (device-bound) | sampler | all |
 | Our premium web wallpapers (device-bound) | sampler | all |
@@ -60,15 +64,20 @@ premium is *clearly worth it*.
 | Multi-monitor: **per-display playlists / rotation** | ❌ | ✅ |
 | Power Governor (occlusion/battery/thermal pause) | ✅ (never paywall the good-citizen behavior) | ✅ |
 | Config editor (tweak shader/web params) | basic | full |
-| **AI shader/web generation** | trial / limited | ✅ (marquee) |
 | Lock-screen / screen-saver video | — (deferred, see below) | — |
 
-Pricing intent: **one-time purchase**, priced at/under the market ($7.99–12.99). No subscription
-unless AI generation costs force a metered tier later.
+**AI generation sits in the free column deliberately:** the user brings their own provider key (they
+pay their own API costs, or nothing with a local Ollama/LM Studio), so paywalling it would be
+charging for something we don't provide. It stays a headline draw for the *product*, not a paid gate.
 
-Entitlement mechanism: TBD — likely a license check gated on distribution channel. Direct-notarized
-build can use a license-key/StoreKit-external flow; a future MAS build would use StoreKit IAP.
-Keep the check behind one module so the rest of the app stays channel-agnostic.
+Pricing (as shipped): after a **7-day free trial** — **monthly $5 / R$5**, **annual $50 / R$50**,
+**lifetime $150 / R$150**. Stripe (worldwide) + InfinitePay (Brazil); Apple IAP for a future MAS
+build. Canonical figures/caps live in the backend `docs/BILLING.md`.
+
+Entitlement mechanism (built): a device-bound license issued by the backend and verified **offline**
+against an embedded public key (`Licensing.swift` / `Entitlement.swift`). The billing rail (Stripe /
+InfinitePay / Apple) is just how an *order* gets created; the app stays channel-agnostic behind that
+one module. Full scheme in [LICENSING.md](LICENSING.md).
 
 ## Build order (post-decision)
 
@@ -84,9 +93,10 @@ Priority reflects "double down on our moat + make the gate exist", cheapest-high
    an "export to share" affordance so users can send local wallpapers to each other.
 3. **Entitlement/paywall + device-bound licensing.** One module. Free vs. premium per the table
    above; device-bound activation for premium downloads per [LICENSING.md](LICENSING.md).
-4. **AI shader/web generation.** The marquee premium feature and the un-copyable differentiator:
-   generate Metal/web wallpapers from a prompt (vs. competitors' MP4-search). Runs through the
-   existing `ShaderValidator`/`WebValidator` gates before install.
+4. **AI shader/web generation (free, bring-your-own-key).** The un-copyable differentiator: generate
+   Metal/web wallpapers from a prompt (vs. competitors' MP4-search). Users bring their own provider
+   key (Anthropic / OpenAI-compatible / local Ollama) — we never proxy or pay for inference. Runs
+   through the existing `ShaderValidator`/`WebValidator` gates before install. **Done.**
 5. **Surface performance + onboarding.** Turn PERFORMANCE.md into an in-app/marketing claim;
    add the M6 onboarding.
 

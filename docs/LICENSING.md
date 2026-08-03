@@ -3,11 +3,12 @@
 Decision date: **2026-08-02**. Companion to [FREEMIUM.md](FREEMIUM.md). Defines how content
 is distributed and protected now that there is **no user-upload server**.
 
-> **⚠️ 2026-08-03:** entitlement now supports a free trial + subscription + lifetime plans (not just a
-> one-time unlock), all still **device-bound per machine**. The operational licensing model — plans,
-> caps, trial rules, machine re-registration, refunds — lives in the **backend repo** at
-> `livewallpaper-workshop/docs/BILLING.md` and must stay there (this repo is public). Keep DRM
-> mechanics here; keep billing/ops there.
+> **Updated 2026-08-03.** Entitlement now spans a **7-day free trial**, **monthly/annual
+> subscriptions**, and a **lifetime** purchase — all **device-bound, per machine** (trial + subs bind
+> **1 Mac**, lifetime up to **3**). The DRM *mechanics* are documented here; the *billing/operations*
+> (exact prices, caps, trial rules, machine re-registration, refunds, support flows) live in the
+> private backend repo at `livewallpaper-workshop/docs/BILLING.md` and stay there (this repo is
+> public). Keep DRM mechanics here; keep billing/ops there.
 
 ## Two content worlds
 
@@ -93,26 +94,36 @@ once decrypted, is ordinary v1 and flows through the normal validators. v1 is no
 
 Landed 2026-08-03 in the Worker (`livewallpaper-workshop/worker/src/index.ts`) and client
 (`Licensing.swift` / `Entitlement.swift`). Everything here works **without** an Apple Developer
-account — StoreKit only replaces how an *order* is created.
+account — Apple IAP only adds another way an *order* gets created.
 
-- **Orders + device cap.** An **order** = one purchase; it owns a capped device set
-  (`DEFAULT_DEVICE_CAP = 3`). `POST /admin/order {order_id, cap?}` provisions one (bearer
-  `ADMIN_TOKEN`). Later a StoreKit webhook creates the same record keyed on Apple's
-  `originalTransactionId`.
+- **Orders + per-plan device cap.** An **order** = one entitlement; it owns a capped device set.
+  The cap is **per plan** (`PLAN_DEVICE_CAP`): **trial / monthly / annual = 1 Mac**, **lifetime = 3**.
+  Payment webhooks (Stripe subs + lifetime, InfinitePay Pix/boleto) mint orders automatically;
+  `POST /admin/order {order_id, cap?}` still provisions one manually (bearer `ADMIN_TOKEN`). A future
+  Apple webhook keys the same record on `originalTransactionId`.
+- **Free trial.** `POST /trial {device_id}` grants a 7-day, no-card trial — **one-time per machine
+  ever** (a permanent marker on the hardware id; reinstalling can't reset it). In the app:
+  **Settings → Premium → Start 7-day free trial**.
 - **Activation.** `POST /activate {device_id, order_id}` binds this Mac to an order, enforcing the
-  cap (`409 device_cap_reached` when full), then premium is granted. In the app: **Settings →
-  Premium → enter a license code → Activate**. This is a real sales path before StoreKit — sell an
-  order code, the buyer activates up to 3 Macs.
-- **Self-serve deactivation.** `POST /deactivate {device_id}` frees the device's slot so a user can
-  move to another Mac. In the app: **Settings → Premium → Deactivate this device**.
-- **Short TTL + auto-renew.** Licenses now expire in **`LICENSE_TTL_DAYS = 14`** (was 30). The
-  client silently renews on launch only when the cached token is missing or within ~5 days of expiry
-  (`Licensing.refreshIfNeeded`). This bounds how long a deactivated/over-cap device keeps premium
-  **offline** — the deliberate offline-DRM window (deactivation isn't instant offline; it takes
-  effect once the cached license lapses).
+  per-plan cap (`409` when full), then premium is granted. In the app: **Settings → Premium → enter a
+  license code → Activate**. Selling an order code (buyer activates their Mac) is a real sales path
+  independent of any store.
+- **Moving machines.** **Lifetime** buyers self-serve: `POST /deactivate {device_id}` frees a slot to
+  move to another of their ≤3 Macs (**Settings → Premium → Deactivate this Mac**). **Trial and
+  subscription** users are bound to one Mac — moving needs support, which registers the new machine
+  via `POST /admin/order/device` (see backend `docs/BILLING.md`). The app tells the user this and
+  shows their machine id for support.
+- **Cancellation.** `POST /cancel {order_id, reason?, feedback?}` — a 3-step in-app flow that records
+  exit feedback and, for a Stripe subscription, cancels at period end (access continues until then).
+- **Short TTL + auto-renew.** Licenses expire in **`LICENSE_TTL_DAYS = 14`**; the client silently
+  renews on launch only when the cached token is missing or within ~5 days of expiry
+  (`Licensing.refreshIfNeeded`). This also bounds how long a canceled/expired plan or a
+  deactivated/over-cap device keeps premium **offline** — the deliberate offline-DRM window.
 
-**Still gated on Apple:** the StoreKit purchase that *creates* an order automatically (today an admin
-provisions it), plus signing/notarization. See [PRE_APPLE_PLAN.md](PRE_APPLE_PLAN.md) A2.
+**Still gated on Apple:** **Apple IAP** for a Mac App Store build — the StoreKit purchase +
+App Store Server Notifications v2 that *create* an order automatically, plus signing/notarization.
+Prepared as a draft PR to merge when the Developer account lands. See
+[PRE_APPLE_PLAN.md](PRE_APPLE_PLAN.md) A2.
 
 ## Relationship to the old roadmap
 
