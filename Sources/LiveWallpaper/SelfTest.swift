@@ -133,12 +133,13 @@ enum SelfTest {
         let em = AppModel()
         let premiumEntry = AppModel.Entry(id: "selftest.premium", title: "Premium", kind: "metal",
                                           isBuiltIn: true, isPremium: true)
-        Entitlement.shared.lock()
+        Entitlement.shared.setPremiumForTesting(false)
         check("premium wallpaper is gated when locked", em.attemptApply(premiumEntry) == false && em.paywall != nil)
         em.paywall = nil
-        Entitlement.shared.unlockForNow()
+        Entitlement.shared.setPremiumForTesting(true)
         check("premium wallpaper applies when unlocked", em.attemptApply(premiumEntry) == true && em.paywall == nil)
-        if wasPremium { Entitlement.shared.unlockForNow() } else { Entitlement.shared.lock() }
+        _ = wasPremium // restore real license-based state (non-destructive: cache untouched)
+        Entitlement.shared.setPremiumForTesting(nil)
 
         // 13) AI generation: the model reply parser strips code fences and passes raw text through.
         let fenced = ShaderGenerator.extractMetal(from: "Here you go:\n```metal\nfragment float4 f_main() {}\n```\ndone")

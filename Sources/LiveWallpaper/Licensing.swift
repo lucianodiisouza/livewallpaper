@@ -12,7 +12,23 @@ enum Licensing {
     /// Embedded Ed25519 public key (raw 32 bytes, base64). The matching private key is a backend secret.
     private static let publicKeyB64 = "WRdb+9fB4Ge4pdeIus+07RppuXBTP0lzzgx8gDhg750="
 
-    struct Claims { let deviceId: String; let premium: Bool; let exp: Int }
+    struct Claims {
+        let deviceId: String
+        let premium: Bool
+        let exp: Int
+        /// Plan of the backing order: `trial` | `monthly` | `annual` | `lifetime` | nil.
+        let plan: String?
+        /// Which rail minted the order: `trial` | `stripe` | `infinitepay` | `apple` | `admin` | nil.
+        let source: String?
+        /// When the plan's paid window ends (unix seconds), or nil for perpetual (lifetime).
+        let planEnds: Int?
+
+        /// A lifetime buyer may self-serve multiple machines; everyone else is bound to this Mac.
+        var isLifetime: Bool { plan == "lifetime" }
+        var isTrial: Bool { source == "trial" || plan == "trial" }
+        /// Monthly/annual — the only plans that can be canceled (Stripe) or will simply not renew.
+        var isSubscription: Bool { plan == "monthly" || plan == "annual" }
+    }
 
     private static var publicKey: Curve25519.Signing.PublicKey? {
         guard let raw = Data(base64Encoded: publicKeyB64) else { return nil }
@@ -30,7 +46,9 @@ enum Licensing {
               let obj = try? JSONSerialization.jsonObject(with: payload) as? [String: Any],
               let deviceId = obj["device_id"] as? String,
               let exp = obj["exp"] as? Int, exp > Int(Date().timeIntervalSince1970) else { return nil }
-        return Claims(deviceId: deviceId, premium: (obj["premium"] as? Bool) ?? false, exp: exp)
+        return Claims(deviceId: deviceId, premium: (obj["premium"] as? Bool) ?? false, exp: exp,
+                      plan: obj["plan"] as? String, source: obj["source"] as? String,
+                      planEnds: obj["plan_ends"] as? Int)
     }
 
     /// Verify + require the token to be bound to THIS machine.
@@ -73,14 +91,16 @@ enum Licensing {
     }
 
     enum ActivationError: LocalizedError {
-        case backendUnavailable, orderNotFound, capReached(Int), http(Int), unusable
+        case backendUnavailable, orderNotFound, capReached(Int), http(Int), unusable, trialUsed, noOrder
         var errorDescription: String? {
             switch self {
             case .backendUnavailable: return "Set the backend URL first (Settings → AI Generation → Backend URL)."
             case .orderNotFound: return "That license code wasn't found. Check it and try again."
-            case let .capReached(cap): return "This license is already active on \(cap) devices. Deactivate one first."
-            case let .http(code): return "Activation failed (HTTP \(code))."
-            case .unusable: return "Activation succeeded but no license came back — try again."
+            case let .capReached(cap): return "This license is already active on \(cap) machine(s). To use another Mac, contact support."
+            case let .http(code): return "Request failed (HTTP \(code))."
+            case .unusable: return "Succeeded but no license came back — try again."
+            case .trialUsed: return "This Mac has already used its free trial. Choose a plan to continue."
+            case .noOrder: return "No active plan found on this Mac to cancel."
             }
         }
     }
@@ -121,8 +141,49 @@ enum Licensing {
         case 409: throw ActivationError.capReached(DEFAULT_DEVICE_CAP)
         default: throw ActivationError.http(code)
         }
+        cacheOrderCode(orderCode) // remember it so /cancel can reference this machine's order
         guard let claims = await fetch() else { throw ActivationError.unusable }
         return claims
+    }
+
+    /// Start the one-time, no-card free trial for THIS machine, then fetch the signed license. The
+    /// backend enforces one trial per machine, ever — a repeat returns `trialUsed`.
+    @discardableResult
+    static func startTrial() async throws -> Claims {
+        guard let base = backendBase(), let url = URL(string: base + "/trial") else {
+            throw ActivationError.backendUnavailable
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["device_id": Device.id])
+
+        let (_, resp) = try await URLSession.shared.data(for: req)
+        switch (resp as? HTTPURLResponse)?.statusCode ?? 0 {
+        case 200: break
+        case 409: throw ActivationError.trialUsed
+        case let code: throw ActivationError.http(code)
+        }
+        guard let claims = await fetch() else { throw ActivationError.unusable }
+        return claims
+    }
+
+    /// Cancel the current plan and send exit feedback. For a Stripe subscription the backend cancels
+    /// at period end (access continues until then); for other plans it records feedback and the plan
+    /// simply won't renew. Needs the order code cached from activation.
+    static func cancel(reason: String, feedback: String) async throws {
+        guard let base = backendBase() else { throw ActivationError.backendUnavailable }
+        guard let orderCode = cachedOrderCode(), !orderCode.isEmpty else { throw ActivationError.noOrder }
+        guard let url = URL(string: base + "/cancel") else { throw ActivationError.backendUnavailable }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "order_id": orderCode, "reason": reason, "feedback": feedback,
+        ])
+        let (_, resp) = try await URLSession.shared.data(for: req)
+        let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        guard code == 200 else { throw ActivationError.http(code) }
     }
 
     /// Client-side mirror of the server's default device cap (for the cap-reached message).
@@ -160,11 +221,19 @@ enum Licensing {
 
     private static let service = "com.livewallpaper.app.license"
     private static let account = "license-token"
+    private static let orderAccount = "order-code"
 
-    static func clearCache() { keychainSet(nil) }
-    private static func cache(_ token: String) { keychainSet(token) }
+    /// Clear the cached license AND the remembered order code — returns the app to Free.
+    static func clearCache() { keychainSet(nil, account: account); keychainSet(nil, account: orderAccount) }
+    private static func cache(_ token: String) { keychainSet(token, account: account) }
 
-    private static func cachedToken() -> String? {
+    /// The order code this machine activated with (needed by `/cancel`). Nil for trials/unactivated.
+    static func cachedOrderCode() -> String? { keychainGet(account: orderAccount) }
+    private static func cacheOrderCode(_ code: String) { keychainSet(code, account: orderAccount) }
+
+    private static func cachedToken() -> String? { keychainGet(account: account) }
+
+    private static func keychainGet(account: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service, kSecAttrAccount as String: account,
@@ -176,7 +245,7 @@ enum Licensing {
         return String(data: data, encoding: .utf8)
     }
 
-    private static func keychainSet(_ value: String?) {
+    private static func keychainSet(_ value: String?, account: String) {
         let base: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service, kSecAttrAccount as String: account,

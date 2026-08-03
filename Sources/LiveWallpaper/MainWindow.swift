@@ -638,65 +638,136 @@ struct AISettings: View {
     }
 }
 
-/// The Premium status + activation panel in Settings. Handles license-code activation, this-device
-/// deactivation (frees a slot on the order), and the dev-only local override. Real StoreKit purchase
-/// lands later; until then a license code (an order id) activates a device up to the device cap.
+/// The Premium status + activation panel in Settings. Licensing is **per machine**: a free trial or
+/// a license code binds this Mac. Lifetime buyers self-serve extra Macs; trial/subscription users who
+/// change machines contact support (see docs/BILLING.md in the backend repo). No client-side unlock
+/// override — dev/staging premium is granted via the backend admin token.
 struct PremiumSettings: View {
     @ObservedObject private var entitlement = Entitlement.shared
     @State private var code = ""
     @State private var busy = false
     @State private var error: String?
     @State private var info: String?
+    @State private var showCancel = false
 
     var body: some View {
         GroupBox("Premium") {
             VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 12) {
-                    Image(systemName: entitlement.isPremium ? "checkmark.seal.fill" : "sparkles")
-                        .font(.title2).foregroundStyle(entitlement.isPremium ? Color.green : Color.accentColor)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(entitlement.isPremium ? "Premium active" : "Free").font(.headline)
-                        Text(entitlement.isPremium
-                             ? "The full catalog and all features are unlocked on this device."
-                             : "Unlock the full catalog, per-display rotation, AI generation, and more.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    if busy { ProgressView().controlSize(.small) }
-                }
-
-                if entitlement.isPremium {
-                    HStack {
-                        Button("Deactivate this device") { run { await entitlement.deactivate(); info = "This device was deactivated." } }
-                            .help("Free this device's slot so you can activate another Mac")
-                        Spacer()
-                        Button("Lock (test)") { entitlement.lock() }
-                            .help("Developer: relock to test the free experience")
-                    }
-                } else {
-                    HStack {
-                        TextField("License code", text: $code)
-                            .textFieldStyle(.roundedBorder)
-                            .onSubmit(activate)
-                        Button("Activate", action: activate)
-                            .buttonStyle(.borderedProminent)
-                            .disabled(busy || code.trimmingCharacters(in: .whitespaces).isEmpty)
-                    }
-                    HStack {
-                        Button("Check activation") { run { await entitlement.refresh(); if !entitlement.isPremium { info = "No active license for this device yet." } } }
-                            .help("Fetch a device-bound license from the backend")
-                        Spacer()
-                        Button("Unlock (test)") { entitlement.unlockForNow() }
-                            .help("Developer: local override — not a real purchase or device-bound license")
-                    }
-                    Text("Enter a license code to activate this Mac (up to \(Licensing.DEFAULT_DEVICE_CAP) devices per license). One-time purchase — no subscription.")
-                        .font(.caption2).foregroundStyle(.secondary)
-                }
-
+                header
+                if entitlement.isPremium { premiumBody } else { freeBody }
                 if let error { Text(error).font(.caption).foregroundStyle(.red) }
                 if let info { Text(info).font(.caption).foregroundStyle(.secondary) }
+                Divider().padding(.vertical, 1)
+                Text("This Mac: \(Device.id)")
+                    .font(.caption2).foregroundStyle(.tertiary).textSelection(.enabled)
+                    .help("Your machine id — give this to support to register or move a license.")
             }
             .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .sheet(isPresented: $showCancel) {
+            CancellationSheet { didCancel in
+                showCancel = false
+                if didCancel { entitlement.recompute(); info = "Subscription canceled. You keep Premium until it ends." }
+            }
+        }
+    }
+
+    // MARK: Header
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            Image(systemName: entitlement.isPremium ? "checkmark.seal.fill" : "sparkles")
+                .font(.title2).foregroundStyle(entitlement.isPremium ? Color.green : Color.accentColor)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(statusTitle).font(.headline)
+                Text(statusSubtitle).font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            if busy { ProgressView().controlSize(.small) }
+        }
+    }
+
+    private var statusTitle: String {
+        guard entitlement.isPremium else { return "Free" }
+        if entitlement.isTrial { return "Free trial" }
+        if entitlement.isLifetime { return "Premium — Lifetime" }
+        if entitlement.isSubscription { return "Premium — \(entitlement.claims?.plan == "annual" ? "Annual" : "Monthly")" }
+        return "Premium active"
+    }
+
+    private var statusSubtitle: String {
+        guard entitlement.isPremium else {
+            return "Unlock the full catalog, per-display rotation, AI generation, and more."
+        }
+        if let ends = entitlement.planEndsDate {
+            let d = ends.formatted(date: .abbreviated, time: .omitted)
+            if entitlement.isTrial {
+                let days = max(0, Calendar.current.dateComponents([.day], from: Date(), to: ends).day ?? 0)
+                return "\(days) day\(days == 1 ? "" : "s") left — ends \(d). Choose a plan to keep Premium."
+            }
+            return "Licensed to this Mac. Renews/ends \(d)."
+        }
+        return "Unlocked on this Mac."
+    }
+
+    // MARK: Premium state
+
+    @ViewBuilder private var premiumBody: some View {
+        if entitlement.isLifetime {
+            HStack {
+                Button("Deactivate this Mac") { run { await entitlement.deactivate(); info = "This Mac was deactivated." } }
+                    .help("Free this Mac's slot so you can activate another")
+                Spacer()
+            }
+            Text("Lifetime covers up to \(Licensing.DEFAULT_DEVICE_CAP) Macs. Deactivate one here to move to another.")
+                .font(.caption2).foregroundStyle(.secondary)
+        } else if entitlement.isSubscription {
+            HStack {
+                Button("Cancel subscription…", role: .destructive) { showCancel = true }
+                Spacer()
+            }
+            Text("Your plan is licensed to this Mac. To use Premium on a different Mac, contact support.")
+                .font(.caption2).foregroundStyle(.secondary)
+        } else if entitlement.isTrial {
+            Text("Your free trial is licensed to this Mac. Choose a plan before it ends to keep Premium — it won't renew automatically.")
+                .font(.caption2).foregroundStyle(.secondary)
+        } else {
+            Text("Premium is active on this Mac.").font(.caption2).foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: Free state
+
+    @ViewBuilder private var freeBody: some View {
+        HStack(spacing: 8) {
+            Button("Start 7-day free trial") { startTrial() }
+                .buttonStyle(.borderedProminent)
+                .disabled(busy)
+            Text("No card required").font(.caption2).foregroundStyle(.secondary)
+            Spacer()
+        }
+        Divider().padding(.vertical, 2)
+        HStack {
+            TextField("License code", text: $code)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit(activate)
+            Button("Activate", action: activate)
+                .buttonStyle(.bordered)
+                .disabled(busy || code.trimmingCharacters(in: .whitespaces).isEmpty)
+        }
+        HStack {
+            Button("Check activation") { run { await entitlement.refresh(); if !entitlement.isPremium { info = "No active license for this Mac yet." } } }
+                .help("Fetch a device-bound license from the backend")
+            Spacer()
+        }
+        Text("After buying a plan you'll get a license code — enter it to unlock this Mac. Each license is tied to your machine.")
+            .font(.caption2).foregroundStyle(.secondary)
+    }
+
+    private func startTrial() {
+        run {
+            do { try await entitlement.startTrial(); info = "Your 7-day free trial is active on this Mac." }
+            catch { self.error = error.localizedDescription }
         }
     }
 
@@ -704,7 +775,7 @@ struct PremiumSettings: View {
         let c = code.trimmingCharacters(in: .whitespaces)
         guard !c.isEmpty else { return }
         run {
-            do { try await entitlement.activate(code: c); code = ""; info = "Premium activated on this device." }
+            do { try await entitlement.activate(code: c); code = ""; info = "Premium activated on this Mac." }
             catch { self.error = error.localizedDescription }
         }
     }

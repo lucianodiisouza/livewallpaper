@@ -4,6 +4,14 @@ Decision date: **2026-08-02**. Turns [COMPETITIVE.md](COMPETITIVE.md) into a pla
 **supersedes the "community workshop / open user submission" framing** in DESIGN.md §1.2, §8,
 §11 and ROADMAP Phase 2 — those need the owner's revision (flagged at the end).
 
+> **⚠️ Monetization update (2026-08-03) — this doc's "pay-once, no subscription" is now stale.**
+> The model is freemium with **plans**: a **7-day free trial** (one-time per machine, no card),
+> **monthly / annual subscriptions**, and a **lifetime** one-time purchase — sold via Stripe
+> (worldwide) and InfinitePay (Brazil). Licensing is still **device-bound, per machine**. The
+> authoritative pricing/licensing/trial/refund details live in the **backend repo** (never here —
+> this repo is public): `livewallpaper-workshop/docs/BILLING.md`. The prose below needs a pass to
+> match; treat BILLING.md as the source of truth for anything billing-related.
+
 ## The pivot in one paragraph
 
 Primo Engine stops being a *UGC platform* and becomes a *curated freemium app*. Users no

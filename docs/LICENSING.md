@@ -3,6 +3,12 @@
 Decision date: **2026-08-02**. Companion to [FREEMIUM.md](FREEMIUM.md). Defines how content
 is distributed and protected now that there is **no user-upload server**.
 
+> **⚠️ 2026-08-03:** entitlement now supports a free trial + subscription + lifetime plans (not just a
+> one-time unlock), all still **device-bound per machine**. The operational licensing model — plans,
+> caps, trial rules, machine re-registration, refunds — lives in the **backend repo** at
+> `livewallpaper-workshop/docs/BILLING.md` and must stay there (this repo is public). Keep DRM
+> mechanics here; keep billing/ops there.
+
 ## Two content worlds
 
 | | **Community (local, P2P)** | **Premium (our server)** |

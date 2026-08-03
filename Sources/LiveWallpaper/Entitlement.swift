@@ -8,28 +8,39 @@ import Foundation
 /// flag is flipped server-side (today via the admin route; StoreKit purchase later). `refresh()`
 /// fetches a fresh license; the result is cached so gating works offline afterwards.
 ///
-/// `unlockForNow()`/`lock()` remain a **pre-release local dev override** for exercising the gated UI
-/// without a live backend. That override is NOT device-bound DRM — never ship a build relying on it.
+/// Dev/staging premium is granted **server-side** via the backend admin token (see
+/// docs/BILLING.md in the backend repo) — there is deliberately no client-side "unlock" override,
+/// since this app is open-source and any such override would ship to users. The only in-app override
+/// is `setPremiumForTesting`, an in-memory, non-persisted hook used solely by `--selftest`.
 @MainActor
 final class Entitlement: ObservableObject {
     static let shared = Entitlement()
 
     @Published private(set) var isPremium: Bool = false
-    private let overrideKey = "entitlementDevOverride"
 
-    private var devOverride: Bool {
-        get { UserDefaults.standard.bool(forKey: overrideKey) }
-        set { UserDefaults.standard.set(newValue, forKey: overrideKey) }
-    }
+    /// In-memory only, never persisted, no UI surface. `nil` = use the real license; `true`/`false`
+    /// = force premium on/off for headless test runs (`--selftest`), without touching the cache.
+    private var testPremiumOverride: Bool?
 
     private init() { recompute() }
 
-    /// Recompute from a valid device-bound license OR the local dev override.
+    /// Recompute premium from a valid device-bound license (or the in-memory test override).
     func recompute() {
         let licensed = Licensing.cachedClaims()?.premium == true
-        let value = licensed || devOverride
+        let value = testPremiumOverride ?? licensed
         if value != isPremium { isPremium = value }
     }
+
+    // MARK: - Plan info (drives the per-machine UI copy)
+
+    /// Claims from the current valid, this-machine license, if any.
+    var claims: Licensing.Claims? { Licensing.cachedClaims() }
+    /// A lifetime buyer may self-serve extra machines; everyone else is bound to this Mac.
+    var isLifetime: Bool { claims?.isLifetime == true }
+    var isTrial: Bool { claims?.isTrial == true }
+    var isSubscription: Bool { claims?.isSubscription == true }
+    /// When the current plan's paid window ends (trial/sub), or nil for perpetual/none.
+    var planEndsDate: Date? { claims?.planEnds.map { Date(timeIntervalSince1970: TimeInterval($0)) } }
 
     /// Fetch a fresh device-bound license from the backend, then recompute. Safe to call on launch.
     func refresh() async {
@@ -50,15 +61,25 @@ final class Entitlement: ObservableObject {
         recompute()
     }
 
-    /// Release this device on the backend and return to Free.
-    func deactivate() async {
-        _ = await Licensing.deactivate()
-        devOverride = false
+    /// Start the one-time free trial on this machine, then recompute. Throws `.trialUsed` if this
+    /// Mac already used it.
+    func startTrial() async throws {
+        _ = try await Licensing.startTrial()
         recompute()
     }
 
-    /// Pre-release local dev override (NOT a purchase, NOT device-bound). For testing the gated UI.
-    func unlockForNow() { devOverride = true; recompute() }
-    /// Clear the dev override AND the cached license — returns to the free experience.
-    func lock() { devOverride = false; Licensing.clearCache(); recompute() }
+    /// Cancel the current plan and send exit feedback (reason + free text). See `Licensing.cancel`.
+    func cancel(reason: String, feedback: String) async throws {
+        try await Licensing.cancel(reason: reason, feedback: feedback)
+    }
+
+    /// Release this device on the backend and return to Free (lifetime buyers moving machines).
+    func deactivate() async {
+        _ = await Licensing.deactivate()
+        recompute()
+    }
+
+    /// Headless-test hook ONLY (`--selftest`): forces premium in memory (`nil` restores real license
+    /// state). Never persisted, no UI, doesn't touch the cache.
+    func setPremiumForTesting(_ on: Bool?) { testPremiumOverride = on; recompute() }
 }
