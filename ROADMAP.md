@@ -237,7 +237,12 @@ Done in the first polish slice:
   `--check-updates` CLI. Phase-A bridge until Sparkle (Phase C) does real in-place updates.
 
 Still open (future polish):
-- ⬜ Per-space wallpapers
+- ⏸️ Per-space wallpapers — **deferred (2026-08-03)**. Stable per-Space assignment is impossible with
+  public APIs: `activeSpaceDidChange` carries no Space identifier, and windows can't be pinned to a
+  Space without private **SkyLight/CGS** (`CGSCopyManagedDisplaySpaces`, `CGSAddWindowsToSpaces`).
+  Those break the Mac App Store channel (just validated viable in C2) and are fragile across OS
+  updates — same call as the deferred lock-screen video. Per-**display** already covers multi-target.
+  Revisit after first revenue or if MAS is dropped. (See [PRE_APPLE_PLAN.md](docs/PRE_APPLE_PLAN.md) B4.)
 - ✅ Schedules (time-of-day wallpaper changes) — a daily program of "at HH:MM → wallpaper" rows
   (Settings → Schedule), Premium-gated, applied by a 30s timer; independent of rotation. Pure
   resolver `WallpaperScheduleLogic` (+5 self-test checks). (`Schedule.swift`)

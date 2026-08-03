@@ -98,8 +98,17 @@ video < web < metal and scaled by fps + rendered pixels, grounded in the measure
 labelled an estimate with a pointer to `docs/PERFORMANCE_REPRODUCE.md`. Free (a trust feature, not
 paywalled). +6 self-test checks; 55/55 pass.
 
-### B4. Per-space wallpapers  ⬜  *(heavier — Spaces APIs are fiddly)*
-Do after B1–B3.
+### B4. Per-space wallpapers  ⏸️  *(deferred 2026-08-03 — design discussion held)*
+Not "fiddly but doable" — **real per-Space assignment is impossible with public APIs**:
+`NSWorkspace.activeSpaceDidChangeNotification` carries no Space identifier, and a window can't be
+pinned to a Space (`.canJoinAllSpaces` draws one instance on all Spaces). The only implementation
+uses private **SkyLight/CGS** (`CGSCopyManagedDisplaySpaces`, `CGSAddWindowsToSpaces`, `CGSGetActiveSpace`),
+which **kills the Mac App Store channel** (validated viable in C2), is fragile across OS updates, and
+contradicts the repo's "no private APIs" rule — the same strategic call as the deferred lock-screen
+video. A public-API approximation exists ("Space rotation": advance the wallpaper on each Space
+switch) but it's not a stable per-Space mapping, so it was set aside to avoid overpromising.
+**Decision: defer.** Per-**display** already covers multi-target; revisit after first revenue or if
+MAS is abandoned.
 
 ### B5. Explicit fullscreen-app / active-space Governor signal  ✅  *(done 2026-08-03)*
 The desktop windows use `.canJoinAllSpaces`, so `isOnActiveSpace` is useless and occlusion was the
