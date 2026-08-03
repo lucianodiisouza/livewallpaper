@@ -68,6 +68,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.onSetActive = { [weak self] id in self?.activate(id) }
         model.onAssign = { [weak self] id, screenKey in self?.assign(id, toScreenKey: screenKey) }
         model.onImport = { [weak self] in self?.importWallpaper() }
+        model.onExport = { [weak self] id in self?.exportWallpaper(id) }
+        model.makePreviewRenderer = { [weak self] id in self?.makeRenderer(forID: id).0 }
         model.onStarsChanged = { [weak self] in self?.rebuildMenu() }
         model.onRemove = { [weak self] id in
             guard let self else { return }
@@ -400,6 +402,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             presentError("Could not import wallpaper", error)
         }
+    }
+
+    /// Export an installed wallpaper to a `.livewallpaper` the user can hand to someone else (P2P).
+    private func exportWallpaper(_ id: String) {
+        let title = model.title(forID: id)
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [UTType(filenameExtension: "livewallpaper") ?? .data]
+        panel.nameFieldStringValue = "\(title).livewallpaper"
+        panel.canCreateDirectories = true
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do { try library.exportPackage(id: id, to: url) }
+        catch { presentError("Could not export wallpaper", error) }
     }
 
     @objc private func quit() {

@@ -15,12 +15,12 @@ struct MainView: View {
     }()
 
     enum Section: String, CaseIterable, Identifiable {
-        case installed = "Installed", explore = "Explore", settings = "Settings"
+        case installed = "Installed", explore = "Catalog", settings = "Settings"
         var id: String { rawValue }
         var icon: String {
             switch self {
             case .installed: return "square.grid.2x2"
-            case .explore: return "safari"
+            case .explore: return "square.stack"
             case .settings: return "gearshape"
             }
         }
@@ -97,6 +97,8 @@ struct WallpaperTile: View {
     let entry: AppModel.Entry
     /// The selected monitor from the strip (nil ⇒ act on all displays).
     var target: String? = nil
+    /// Open the live preview sheet for this wallpaper (tap the thumbnail).
+    var onOpen: (AppModel.Entry) -> Void = { _ in }
     @State private var thumb: NSImage?
 
     private var isStarred: Bool { model.isStarred(entry.id) }
@@ -165,6 +167,9 @@ struct WallpaperTile: View {
         }
         .frame(height: 120).frame(maxWidth: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: 10))
+        .contentShape(RoundedRectangle(cornerRadius: 10))
+        .onTapGesture { onOpen(entry) }
+        .help("Preview")
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(appliesHere ? Color.accentColor : .clear, lineWidth: 2))
         .overlay(alignment: .topLeading) {
             if appliesHere {
@@ -188,12 +193,104 @@ struct WallpaperTile: View {
     }
 }
 
+// MARK: - Live preview
+
+/// Hosts a real renderer (video/metal/web) in a layer-backed view so the preview sheet shows the
+/// wallpaper actually running, not a static thumbnail. Starts once the view has a real size and is
+/// torn down when the sheet closes.
+struct LiveWallpaperView: NSViewRepresentable {
+    let makeRenderer: () -> (any WallpaperRenderer)?
+
+    func makeNSView(context: Context) -> RendererHostView {
+        let v = RendererHostView()
+        v.wantsLayer = true
+        v.layer?.backgroundColor = NSColor.black.cgColor
+        v.makeRenderer = makeRenderer
+        return v
+    }
+    func updateNSView(_ nsView: RendererHostView, context: Context) {}
+    static func dismantleNSView(_ nsView: RendererHostView, coordinator: ()) { nsView.teardown() }
+}
+
+/// Backing view for `LiveWallpaperView`: starts the renderer on first non-zero layout.
+final class RendererHostView: NSView {
+    var makeRenderer: (() -> (any WallpaperRenderer)?)?
+    private var renderer: (any WallpaperRenderer)?
+    private var started = false
+
+    override func layout() {
+        super.layout()
+        guard !started, bounds.width > 1, bounds.height > 1, let layer, let r = makeRenderer?() else { return }
+        started = true
+        renderer = r
+        r.start(in: layer)
+        r.resume()
+        r.setFrameRate(window?.screen?.maximumFramesPerSecond ?? 60)
+    }
+
+    func teardown() { renderer?.stop(); renderer = nil }
+}
+
+/// A larger, live preview of one wallpaper with apply + share actions — the "preview before apply"
+/// step. Live-renders the wallpaper; applies to all displays or one chosen monitor; shares (P2P).
+struct WallpaperPreviewSheet: View {
+    @ObservedObject var model: AppModel
+    let entry: AppModel.Entry
+    var target: String?
+    @Environment(\.dismiss) private var dismiss
+
+    private var multiMonitor: Bool { model.screens.count > 1 }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            LiveWallpaperView { model.makePreviewRenderer?(entry.id) }
+                .frame(width: 660, height: 372)
+                .background(Color.black)
+
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(entry.title).font(.headline).lineLimit(1)
+                    Text(entry.isBuiltIn ? "built-in · \(entry.kind)" : entry.kind)
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                if !entry.isBuiltIn {
+                    Button { model.onExport?(entry.id) } label: { Label("Share…", systemImage: "square.and.arrow.up") }
+                        .help("Export a .livewallpaper to share with someone")
+                }
+                if multiMonitor {
+                    Menu("Apply to…") {
+                        Button("All displays") { apply(nil) }
+                        Divider()
+                        ForEach(model.screens) { s in Button(s.name) { apply(s.id) } }
+                    }
+                    .fixedSize()
+                }
+                Button("Apply") { apply(target) }
+                    .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.borderedProminent)
+                Button("Close") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+            }
+            .padding(16)
+        }
+        .frame(width: 660)
+    }
+
+    private func apply(_ key: String?) {
+        if let key { model.assign(entry.id, toScreen: key) } else { model.setActive(entry.id) }
+        dismiss()
+    }
+}
+
 // MARK: - Installed
 
 struct InstalledView: View {
     @ObservedObject var model: AppModel
     /// The monitor the plain "Set" button targets (nil ⇒ all displays). Chosen in the strip.
     @State private var target: String?
+    /// The wallpaper being previewed in the sheet (nil ⇒ no sheet).
+    @State private var preview: AppModel.Entry?
     private let columns = [GridItem(.adaptive(minimum: 200), spacing: 18)]
 
     /// Ignore a target that points at a display that's no longer connected.
@@ -214,7 +311,9 @@ struct InstalledView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 LazyVGrid(columns: columns, spacing: 18) {
-                    ForEach(model.available) { WallpaperTile(model: model, entry: $0, target: effectiveTarget) }
+                    ForEach(model.available) {
+                        WallpaperTile(model: model, entry: $0, target: effectiveTarget) { preview = $0 }
+                    }
                 }
             }
             .padding(20)
@@ -226,6 +325,9 @@ struct InstalledView: View {
                 Button { model.onImport?() } label: { Label("Import", systemImage: "plus") }
                     .help("Import a local .livewallpaper")
             }
+        }
+        .sheet(item: $preview) { entry in
+            WallpaperPreviewSheet(model: model, entry: entry, target: effectiveTarget)
         }
     }
 }
@@ -331,7 +433,7 @@ struct ExploreView: View {
             onInstall: { item in await model.onInstall?(item) ?? "Install unavailable." },
             screens: model.screens,
             onInstallToScreen: { item, key in await model.onInstallToScreen?(item, key) ?? "Install unavailable." })
-        .navigationTitle("Explore")
+        .navigationTitle("Catalog")
     }
 }
 

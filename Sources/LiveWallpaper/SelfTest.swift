@@ -48,6 +48,16 @@ enum SelfTest {
             check("makeRenderer() builds a renderer", true)
         } catch { check("install + load — \(error)", false) }
 
+        // 3b) Export an installed package back out (the peer-to-peer share path) → re-zips into a
+        // readable .livewallpaper carrying the manifest + content.
+        do {
+            let shared = tmp.appendingPathComponent("Plasma-shared.livewallpaper")
+            try library.exportPackage(id: "selftest.plasma", to: shared)
+            let files = (try? Data(contentsOf: shared)).flatMap { try? ZipArchive.extract($0) } ?? [:]
+            check("exportPackage re-zips manifest.json", files["manifest.json"] != nil)
+            check("exportPackage keeps content/", files.keys.contains { $0.hasPrefix("content/") })
+        } catch { check("exportPackage round-trip — \(error)", false) }
+
         // 4) Tamper detection: wrong checksum must be rejected.
         let badManifest = """
         {"schemaVersion":1,"id":"tampered","version":"1.0.0","title":"Bad","type":"metal",

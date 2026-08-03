@@ -164,13 +164,17 @@ becomes the premium catalog; M5 is re-scoped away from moderation to licensing.
 moderation/review queue, ratings/reports, DMCA, author bans, upload quotas, creator payouts.
 
 New Phase-2 scope instead:
-- ⬜ Peer-to-peer sharing UX (export/share a local `.livewallpaper`, easy import)
-- ⬜ Read-only premium catalog (repurpose the M4 client; our own content only)
+- ✅ Peer-to-peer sharing UX — "Share…" in the preview sheet exports any installed wallpaper to a
+  `.livewallpaper` (`Library.exportPackage`, re-zips the unpacked package); import already existed
+- ✅ Preview-before-apply — tapping a wallpaper opens a live-rendered preview sheet (real renderer,
+  not a thumbnail) with Apply / Apply-to-display / Share
+- 🟡 Read-only premium catalog — the M4 client is repurposed (Explore renamed **Catalog**); still
+  points at our own PocketBase feed (backend now private)
 - ⬜ Paywall / entitlement layer (free vs. premium — see [FREEMIUM.md](docs/FREEMIUM.md))
 - ⬜ Device-bound licensing for premium downloads (`IOPlatformUUID`, device cap, signed license,
   self-serve deactivation) — see [LICENSING.md](docs/LICENSING.md). Reuses the "bundle signing"
   idea, repurposed from moderation to DRM.
-- ⬜ Make the backend repo **private** (client stays MIT); scrub git history first
+- ✅ Make the backend repo **private** (client stays MIT) — done; git history scanned, no secrets
 - ⬜ AI shader/web generation (marquee premium feature)
 
 ---

@@ -121,6 +121,36 @@ final class Library {
         log.notice("Exported '\(title, privacy: .public)' → \(destination.lastPathComponent, privacy: .public)")
     }
 
+    // MARK: - Export an installed package (peer-to-peer sharing)
+
+    enum ExportError: LocalizedError {
+        case notFound
+        var errorDescription: String? {
+            switch self { case .notFound: return "That wallpaper isn't installed." }
+        }
+    }
+
+    /// Re-archive an installed package back into a shareable `.livewallpaper` at `destination`.
+    /// This is the peer-to-peer path: a user exports a wallpaper and sends the file to someone else,
+    /// who imports it — no server involved. Works for any medium (video/metal/web).
+    func exportPackage(id: String, to destination: URL) throws {
+        guard let pkg = installedPackages().first(where: { $0.manifest.id == id }) else {
+            throw ExportError.notFound
+        }
+        let dir = pkg.directory
+        let prefix = dir.path.hasSuffix("/") ? dir.path : dir.path + "/"
+        var files: [String: Data] = [:]
+        if let walker = fm.enumerator(at: dir, includingPropertiesForKeys: [.isRegularFileKey]) {
+            for case let url as URL in walker {
+                guard (try? url.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true else { continue }
+                let rel = url.path.hasPrefix(prefix) ? String(url.path.dropFirst(prefix.count)) : url.lastPathComponent
+                files[rel] = try Data(contentsOf: url)
+            }
+        }
+        try ZipArchive.archive(files).write(to: destination)
+        log.notice("Exported '\(pkg.manifest.title, privacy: .public)' → \(destination.lastPathComponent, privacy: .public)")
+    }
+
     // MARK: - Per-screen assignments
 
     /// Which wallpaper id renders on which screen. Ids may be built-ins or package ids.

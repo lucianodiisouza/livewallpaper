@@ -45,6 +45,10 @@ final class AppModel: ObservableObject {
     var onAssign: ((String, String) -> Void)?
     var onRemove: ((String) -> Void)?
     var onImport: (() -> Void)?
+    /// Export an installed package to a `.livewallpaper` (opens a save panel) for peer-to-peer sharing.
+    var onExport: ((String) -> Void)?
+    /// Build a fresh, standalone renderer for a wallpaper id — used to render the live preview sheet.
+    var makePreviewRenderer: ((String) -> (any WallpaperRenderer)?)?
     var onStarsChanged: (() -> Void)?
     var onInstall: ((WorkshopItem) async -> String?)?
     /// Install a workshop item, then assign it to one display (nil ⇒ all). Returns an error string.
