@@ -240,6 +240,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                   isShareable: library.isImported(pkg.manifest.id))
         }
         model.available = entries
+        model.installedChecksums = Set(installed.compactMap { $0.manifest.checksum })
 
         var schemas: [String: [ConfigParameter]] = [:]
         for it in WallpaperCatalog.all {

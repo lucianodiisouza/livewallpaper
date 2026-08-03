@@ -580,7 +580,8 @@ struct ExploreView: View {
             onInstall: { item in await model.onInstall?(item) ?? "Install unavailable." },
             screens: model.screens,
             onInstallToScreen: { item, key in await model.onInstallToScreen?(item, key) ?? "Install unavailable." },
-            onLocked: { item in model.showPaywall("“\(item.title)” is a Premium wallpaper.") })
+            onLocked: { item in model.showPaywall("“\(item.title)” is a Premium wallpaper.") },
+            installedChecksums: model.installedChecksums)
         .navigationTitle("Catalog")
     }
 }

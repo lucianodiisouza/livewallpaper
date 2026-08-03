@@ -12,6 +12,10 @@ struct WorkshopView: View {
     var onInstallToScreen: (@MainActor (WorkshopItem, String?) async -> String?)? = nil
     /// Called when a locked Premium item is tapped by a non-entitled user — opens the paywall.
     var onLocked: ((WorkshopItem) -> Void)? = nil
+    /// Content checksums of packages already in the local library. A catalog item whose checksum is
+    /// here is already installed (persists across launches), so its tile shows the installed state
+    /// instead of an Install button.
+    var installedChecksums: Set<String> = []
     @ObservedObject private var entitlement = Entitlement.shared
 
     @State private var items: [WorkshopItem] = []
@@ -68,7 +72,7 @@ struct WorkshopView: View {
                     ForEach(items) { item in
                         WorkshopTile(item: item,
                                      installing: installing.contains(item.id),
-                                     installed: installed.contains(item.id),
+                                     installed: isInstalled(item),
                                      locked: item.isPremium && !entitlement.isPremium,
                                      screens: screens) { key in
                             if item.isPremium && !entitlement.isPremium { onLocked?(item) }
@@ -96,6 +100,12 @@ struct WorkshopView: View {
         do { items = try await client.fetchCatalog(search: search, sort: sort) }
         catch { banner = error.localizedDescription }
         loading = false
+    }
+
+    /// Already in the library? True for something installed this session or a prior one — the latter
+    /// matched by content checksum (a catalog item's `checksum` equals its manifest checksum).
+    private func isInstalled(_ item: WorkshopItem) -> Bool {
+        installed.contains(item.id) || installedChecksums.contains(item.checksum)
     }
 
     private func install(_ item: WorkshopItem, toScreen key: String? = nil) {

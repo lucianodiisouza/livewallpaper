@@ -43,6 +43,10 @@ final class AppModel: ObservableObject {
 
     /// Everything available locally to use (built-ins + installed packages).
     @Published var available: [Entry] = []
+    /// Content checksums of every installed package. The catalog (Explore) matches items against this
+    /// (an item's `checksum` equals its manifest checksum, per the seed) to mark already-installed
+    /// wallpapers as installed across launches — not just ones installed in the current session.
+    @Published var installedChecksums: Set<String> = []
     /// Connected displays + per-screen assignment (drives the in-Installed monitor strip).
     @Published var screens: [ScreenInfo] = []
     /// The currently-rendering wallpaper id.
