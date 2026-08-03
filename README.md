@@ -33,15 +33,15 @@ Inspired by Wallpaper Engine on Windows, rebuilt from scratch for macOS with a h
 
 ## Install
 
-**Today:** download the latest `PrimoEngine-<version>.zip` from the [Releases](../../releases)
-page and unzip it.
+**Today:** download the latest `PrimoEngine-<version>.dmg` from the [Releases](../../releases)
+page and open it.
 
 These test builds are **not yet notarized by Apple**, so macOS Gatekeeper blocks the first launch
 ("Apple could not verify… is free of malware"). This is expected for an unsigned app — here's how
 to run it:
 
-1. Move **Primo Engine.app** to your `/Applications` folder.
-2. **Right-click** (or Control-click) the app → **Open**.
+1. In the DMG window, drag **Primo Engine** onto the **Applications** shortcut.
+2. Open `/Applications`, **right-click** (or Control-click) **Primo Engine** → **Open**.
 3. In the dialog that appears, click **Open** again. macOS remembers this choice, so future
    launches open normally.
 
@@ -62,10 +62,10 @@ Apple Developer account is in place.
 
 ### Verify your download (optional)
 
-Each release includes a `PrimoEngine-<version>.zip.sha256`. Confirm the zip is intact:
+Each release includes a `PrimoEngine-<version>.dmg.sha256`. Confirm the download is intact:
 
 ```bash
-shasum -a 256 PrimoEngine-<version>.zip
+shasum -a 256 PrimoEngine-<version>.dmg
 ```
 
 The output should match the value in the `.sha256` file.

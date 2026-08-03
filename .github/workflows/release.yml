@@ -1,7 +1,7 @@
 name: Release (unsigned)
 
 # Phase A distribution (docs/DISTRIBUTION.md): build the .app on a tag push,
-# zip it, and publish a GitHub Release. Builds are ad-hoc signed only — NOT
+# package it as a drag-to-Applications .dmg, and publish a GitHub Release. Builds are ad-hoc only — NOT
 # Developer ID signed or notarized (that is Phase B, gated on an Apple account),
 # so testers must clear Gatekeeper on first launch (see the generated notes).
 
@@ -53,23 +53,27 @@ jobs:
       - name: Run headless self-test
         run: '"dist/Primo Engine.app/Contents/MacOS/LiveWallpaper" --selftest'
 
-      - name: Package zip artifact
+      - name: Package .dmg artifact
         id: pkg
         run: |
           V="${{ steps.ver.outputs.version }}"
-          ZIP="PrimoEngine-${V}.zip"
-          # ditto -c -k --keepParent preserves the .app bundle + metadata (Apple's recommended zip)
-          ditto -c -k --keepParent "dist/Primo Engine.app" "dist/${ZIP}"
-          shasum -a 256 "dist/${ZIP}" | tee "dist/${ZIP}.sha256"
-          echo "zip=dist/${ZIP}" >> "$GITHUB_OUTPUT"
-          echo "sha=dist/${ZIP}.sha256" >> "$GITHUB_OUTPUT"
+          DMG="PrimoEngine-${V}.dmg"
+          # Stage the app + a symlink to /Applications so the DMG opens to a drag-and-drop installer.
+          STAGE="$(mktemp -d)/dmgroot"
+          mkdir -p "$STAGE"
+          cp -R "dist/Primo Engine.app" "$STAGE/"
+          ln -s /Applications "$STAGE/Applications"
+          hdiutil create -volname "Primo Engine" -srcfolder "$STAGE" -ov -format UDZO "dist/${DMG}"
+          shasum -a 256 "dist/${DMG}" | tee "dist/${DMG}.sha256"
+          echo "dmg=dist/${DMG}" >> "$GITHUB_OUTPUT"
+          echo "sha=dist/${DMG}.sha256" >> "$GITHUB_OUTPUT"
 
       - name: Upload workflow artifact (for manual runs / debugging)
         uses: actions/upload-artifact@v4
         with:
           name: PrimoEngine-${{ steps.ver.outputs.version }}
           path: |
-            ${{ steps.pkg.outputs.zip }}
+            ${{ steps.pkg.outputs.dmg }}
             ${{ steps.pkg.outputs.sha }}
 
       - name: Write release notes
@@ -83,9 +87,9 @@ jobs:
           Gatekeeper will block the first launch. This is expected.
 
           ### Install
-          1. Download `PrimoEngine-__VERSION__.zip` below and unzip it.
-          2. Move **Primo Engine.app** to `/Applications`.
-          3. **First launch:** right-click the app → **Open** → **Open** again.
+          1. Download `PrimoEngine-__VERSION__.dmg` below and open it.
+          2. Drag **Primo Engine** onto the **Applications** shortcut in the window.
+          3. **First launch:** open `/Applications`, right-click **Primo Engine** → **Open** → **Open** again.
              (Or: **System Settings → Privacy & Security → Open Anyway**.)
           4. Look for the 🖼️ icon in the menu bar. Quit from there.
 
@@ -93,9 +97,9 @@ jobs:
 
           ### Verify the download (optional)
           ```
-          shasum -a 256 PrimoEngine-__VERSION__.zip
+          shasum -a 256 PrimoEngine-__VERSION__.dmg
           ```
-          Compare against `PrimoEngine-__VERSION__.zip.sha256` attached below.
+          Compare against `PrimoEngine-__VERSION__.dmg.sha256` attached below.
           NOTES
           sed -i '' "s/__VERSION__/${V}/g" dist/RELEASE_NOTES.md
 
@@ -108,5 +112,5 @@ jobs:
           gh release create "${GITHUB_REF_NAME}" \
             --title "Primo Engine ${V}" \
             --notes-file dist/RELEASE_NOTES.md \
-            "${{ steps.pkg.outputs.zip }}" \
+            "${{ steps.pkg.outputs.dmg }}" \
             "${{ steps.pkg.outputs.sha }}"
