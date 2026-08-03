@@ -10,6 +10,9 @@ struct WorkshopView: View {
     /// Connected displays + a per-display install path — enables the "…" per-monitor menu.
     var screens: [AppModel.ScreenInfo] = []
     var onInstallToScreen: (@MainActor (WorkshopItem, String?) async -> String?)? = nil
+    /// Called when a locked Premium item is tapped by a non-entitled user — opens the paywall.
+    var onLocked: ((WorkshopItem) -> Void)? = nil
+    @ObservedObject private var entitlement = Entitlement.shared
 
     @State private var items: [WorkshopItem] = []
     @State private var search = ""
@@ -66,7 +69,11 @@ struct WorkshopView: View {
                         WorkshopTile(item: item,
                                      installing: installing.contains(item.id),
                                      installed: installed.contains(item.id),
-                                     screens: screens) { key in install(item, toScreen: key) }
+                                     locked: item.isPremium && !entitlement.isPremium,
+                                     screens: screens) { key in
+                            if item.isPremium && !entitlement.isPremium { onLocked?(item) }
+                            else { install(item, toScreen: key) }
+                        }
                     }
                 }
                 .padding(20)
@@ -110,8 +117,11 @@ struct WorkshopTile: View {
     let item: WorkshopItem
     let installing: Bool
     let installed: Bool
+    /// True for a Premium item when the user isn't entitled — install becomes an "Unlock" action.
+    var locked: Bool = false
     var screens: [AppModel.ScreenInfo] = []
-    /// Install the item, then apply it to one display (key) or all (nil).
+    /// Install the item, then apply it to one display (key) or all (nil). For a locked item the
+    /// parent intercepts this and opens the paywall instead of installing.
     let onInstall: (String?) -> Void
 
     var body: some View {
@@ -119,6 +129,15 @@ struct WorkshopTile: View {
             preview
                 .frame(height: 120).frame(maxWidth: .infinity)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(alignment: .topLeading) {
+                    if item.isPremium {
+                        Label("Premium", systemImage: "lock.fill")
+                            .labelStyle(.titleAndIcon).font(.caption2.weight(.bold))
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(.black.opacity(0.6)).foregroundStyle(.yellow)
+                            .clipShape(Capsule()).padding(8)
+                    }
+                }
             HStack(spacing: 6) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(item.title).font(.subheadline.weight(.medium)).lineLimit(1)
@@ -130,6 +149,9 @@ struct WorkshopTile: View {
                     ProgressView().controlSize(.small)
                 } else if installed {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                } else if locked {
+                    Button("Unlock") { onInstall(nil) }
+                        .controlSize(.small).buttonStyle(.borderedProminent).tint(.yellow)
                 } else {
                     Button("Install") { onInstall(nil) }.controlSize(.small).buttonStyle(.bordered)
                     if screens.count > 1 { perDisplayMenu }

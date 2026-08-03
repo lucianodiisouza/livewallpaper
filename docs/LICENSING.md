@@ -83,6 +83,31 @@ once decrypted, is ordinary v1 and flows through the normal validators. v1 is no
 - True hardware serial needs more entitlement; not worth it. Don't use a Keychain-stored random
   UUID as the binding (it's per-install and copyable — defeats the point).
 
+## Implemented so far (pre-StoreKit)
+
+Landed 2026-08-03 in the Worker (`livewallpaper-workshop/worker/src/index.ts`) and client
+(`Licensing.swift` / `Entitlement.swift`). Everything here works **without** an Apple Developer
+account — StoreKit only replaces how an *order* is created.
+
+- **Orders + device cap.** An **order** = one purchase; it owns a capped device set
+  (`DEFAULT_DEVICE_CAP = 3`). `POST /admin/order {order_id, cap?}` provisions one (bearer
+  `ADMIN_TOKEN`). Later a StoreKit webhook creates the same record keyed on Apple's
+  `originalTransactionId`.
+- **Activation.** `POST /activate {device_id, order_id}` binds this Mac to an order, enforcing the
+  cap (`409 device_cap_reached` when full), then premium is granted. In the app: **Settings →
+  Premium → enter a license code → Activate**. This is a real sales path before StoreKit — sell an
+  order code, the buyer activates up to 3 Macs.
+- **Self-serve deactivation.** `POST /deactivate {device_id}` frees the device's slot so a user can
+  move to another Mac. In the app: **Settings → Premium → Deactivate this device**.
+- **Short TTL + auto-renew.** Licenses now expire in **`LICENSE_TTL_DAYS = 14`** (was 30). The
+  client silently renews on launch only when the cached token is missing or within ~5 days of expiry
+  (`Licensing.refreshIfNeeded`). This bounds how long a deactivated/over-cap device keeps premium
+  **offline** — the deliberate offline-DRM window (deactivation isn't instant offline; it takes
+  effect once the cached license lapses).
+
+**Still gated on Apple:** the StoreKit purchase that *creates* an order automatically (today an admin
+provisions it), plus signing/notarization. See [PRE_APPLE_PLAN.md](PRE_APPLE_PLAN.md) A2.
+
 ## Relationship to the old roadmap
 
 ROADMAP M5 already listed *"Bundle signing (server signs content hash to account)"* — conceived

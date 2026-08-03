@@ -63,6 +63,99 @@ enum Licensing {
         return claims
     }
 
+    // MARK: - Activation / deactivation / auto-renew
+
+    /// The backend base URL (trimmed), or nil if unconfigured.
+    static func backendBase() -> String? {
+        let raw = AIConfig.baseURL(for: .backend)
+        let base = raw.hasSuffix("/") ? String(raw.dropLast()) : raw
+        return base.isEmpty ? nil : base
+    }
+
+    enum ActivationError: LocalizedError {
+        case backendUnavailable, orderNotFound, capReached(Int), http(Int), unusable
+        var errorDescription: String? {
+            switch self {
+            case .backendUnavailable: return "Set the backend URL first (Settings → AI Generation → Backend URL)."
+            case .orderNotFound: return "That license code wasn't found. Check it and try again."
+            case let .capReached(cap): return "This license is already active on \(cap) devices. Deactivate one first."
+            case let .http(code): return "Activation failed (HTTP \(code))."
+            case .unusable: return "Activation succeeded but no license came back — try again."
+            }
+        }
+    }
+
+    /// Build the `/activate` POST (pure; testable). Ties this device to an order (license code).
+    static func activateRequest(base: String, deviceID: String, orderCode: String) -> URLRequest? {
+        guard let url = URL(string: base + "/activate") else { return nil }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["device_id": deviceID, "order_id": orderCode])
+        return req
+    }
+
+    /// Build the `/deactivate` POST (pure; testable). Frees this device's slot on its order.
+    static func deactivateRequest(base: String, deviceID: String) -> URLRequest? {
+        guard let url = URL(string: base + "/deactivate") else { return nil }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["device_id": deviceID])
+        return req
+    }
+
+    /// Activate this device against a license code, then fetch + cache the signed license. Throws a
+    /// friendly `ActivationError` on cap/unknown-order/etc.
+    @discardableResult
+    static func activate(orderCode: String) async throws -> Claims {
+        guard let base = backendBase(),
+              let req = activateRequest(base: base, deviceID: Device.id, orderCode: orderCode)
+        else { throw ActivationError.backendUnavailable }
+
+        let (_, resp) = try await URLSession.shared.data(for: req)
+        let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        switch code {
+        case 200: break
+        case 404: throw ActivationError.orderNotFound
+        case 409: throw ActivationError.capReached(DEFAULT_DEVICE_CAP)
+        default: throw ActivationError.http(code)
+        }
+        guard let claims = await fetch() else { throw ActivationError.unusable }
+        return claims
+    }
+
+    /// Client-side mirror of the server's default device cap (for the cap-reached message).
+    static let DEFAULT_DEVICE_CAP = 3
+
+    /// Release this device from its order on the backend and drop the local license. Best-effort:
+    /// the cache is cleared regardless so the app returns to Free immediately.
+    @discardableResult
+    static func deactivate() async -> Bool {
+        defer { clearCache() }
+        guard let base = backendBase(),
+              let req = deactivateRequest(base: base, deviceID: Device.id) else { return false }
+        let ok = (try? await URLSession.shared.data(for: req)).map {
+            (($0.1 as? HTTPURLResponse)?.statusCode ?? 0) == 200
+        } ?? false
+        return ok
+    }
+
+    /// Whether a cached license should be renewed: no token, or it expires within `within` seconds.
+    /// Pure so it's unit-testable.
+    static func shouldRenew(exp: Int?, now: Int, within: Int) -> Bool {
+        guard let exp else { return true }
+        return exp - now <= within
+    }
+
+    /// Refresh the license only when it's missing or near expiry — cheap to call on every launch.
+    /// Keeps a valid device premium alive across the short server TTL without hammering the backend.
+    static func refreshIfNeeded(renewWithinDays days: Int = 5) async {
+        let now = Int(Date().timeIntervalSince1970)
+        guard shouldRenew(exp: cachedClaims()?.exp, now: now, within: days * 24 * 3600) else { return }
+        await fetch()
+    }
+
     // MARK: - Cache (Keychain)
 
     private static let service = "com.livewallpaper.app.license"

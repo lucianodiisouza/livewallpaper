@@ -167,6 +167,85 @@ enum SelfTest {
         check("license: tampered token rejected", Licensing.verify(licPayload + "AA." + licSig) == nil)
         check("license: not bound to this device", Licensing.claimsForThisDevice(licToken) == nil)
 
+        // 16) Onboarding first-pick offer: free built-ins only (no premium, no imported packages).
+        let obEntries = [
+            AppModel.Entry(id: "b.free", title: "Free", kind: "metal", isBuiltIn: true),
+            AppModel.Entry(id: "b.prem", title: "Prem", kind: "metal", isBuiltIn: true, isPremium: true),
+            AppModel.Entry(id: "u.imported", title: "Imported", kind: "web", isBuiltIn: false),
+        ]
+        check("onboarding first-picks are free built-ins only",
+              Onboarding.firstPicks(from: obEntries).map(\.id) == ["b.free"])
+
+        // 17) Premium catalog delivery: tier decodes (default free), and the device-bound bundle
+        // request targets the backend `/catalog/bundle` with the expected key. Free items build no
+        // premium request (they download from their public URL instead).
+        func decodeItem(_ json: String) -> WorkshopItem? {
+            try? JSONDecoder().decode(WorkshopItem.self, from: Data(json.utf8))
+        }
+        let freeItem = decodeItem(#"{"id":"a","title":"Free","type":"metal","checksum":"sha256-x","bundle_url":"https://r2/pub/a.livewallpaper"}"#)
+        let premItem = decodeItem(#"{"id":"b","title":"Prem","type":"metal","checksum":"sha256-y","tier":"premium","bundle_key":"premium/b.livewallpaper"}"#)
+        check("catalog: missing tier decodes as free", freeItem?.isPremium == false)
+        check("catalog: tier=premium decodes as premium", premItem?.isPremium == true)
+        check("catalog: free item builds no premium request",
+              freeItem.flatMap { WorkshopClient.premiumBundleRequest(backendBase: "https://api", deviceID: "dev", item: $0) } == nil)
+        if let p = premItem,
+           let req = WorkshopClient.premiumBundleRequest(backendBase: "https://api/", deviceID: "dev", item: p),
+           let body = req.httpBody.flatMap({ try? JSONSerialization.jsonObject(with: $0) as? [String: String] }) {
+            check("catalog: premium request hits /catalog/bundle",
+                  req.url?.absoluteString == "https://api/catalog/bundle" && req.httpMethod == "POST")
+            check("catalog: premium request carries device + bundle_key",
+                  body["device_id"] == "dev" && body["bundle_key"] == "premium/b.livewallpaper" && body["item_id"] == "b")
+        } else { check("catalog: premium request builds", false) }
+
+        // 18) Licensing auto-renew decision (pure): renew when missing or within the window; not when
+        // comfortably valid.
+        check("license: renew when no token", Licensing.shouldRenew(exp: nil, now: 1000, within: 100))
+        check("license: renew when near expiry", Licensing.shouldRenew(exp: 1050, now: 1000, within: 100))
+        check("license: no renew when far from expiry", !Licensing.shouldRenew(exp: 5000, now: 1000, within: 100))
+
+        // 19) Activate / deactivate requests target the right routes with the device + order.
+        if let a = Licensing.activateRequest(base: "https://api", deviceID: "dev", orderCode: "ORDER-1"),
+           let ab = a.httpBody.flatMap({ try? JSONSerialization.jsonObject(with: $0) as? [String: String] }) {
+            check("license: activate hits /activate with device+order",
+                  a.url?.absoluteString == "https://api/activate" && ab["device_id"] == "dev" && ab["order_id"] == "ORDER-1")
+        } else { check("license: activate request builds", false) }
+        if let d = Licensing.deactivateRequest(base: "https://api", deviceID: "dev"),
+           let db = d.httpBody.flatMap({ try? JSONSerialization.jsonObject(with: $0) as? [String: String] }) {
+            check("license: deactivate hits /deactivate with device",
+                  d.url?.absoluteString == "https://api/deactivate" && db["device_id"] == "dev")
+        } else { check("license: deactivate request builds", false) }
+
+        // 20) Schedule resolution (pure daily program): empty → nil; before first → wraps to last;
+        // between entries → the earlier one; after last → last.
+        let sched = [
+            ScheduleEntry(hour: 8, minute: 0, wallpaperID: "morning"),
+            ScheduleEntry(hour: 20, minute: 0, wallpaperID: "night"),
+        ]
+        check("schedule: empty → nil", WallpaperScheduleLogic.activeWallpaperID(entries: [], minutesNow: 600) == nil)
+        check("schedule: before first wraps to last (night)",
+              WallpaperScheduleLogic.activeWallpaperID(entries: sched, minutesNow: 7 * 60) == "night")
+        check("schedule: midday picks morning",
+              WallpaperScheduleLogic.activeWallpaperID(entries: sched, minutesNow: 12 * 60) == "morning")
+        check("schedule: evening picks night",
+              WallpaperScheduleLogic.activeWallpaperID(entries: sched, minutesNow: 22 * 60) == "night")
+        check("schedule: unsorted input still resolves",
+              WallpaperScheduleLogic.activeWallpaperID(entries: sched.reversed(), minutesNow: 12 * 60) == "morning")
+
+        // 21) Energy estimate: paused ≈ 0; ordering matches the measured profile (video < web < metal
+        // at the same fps/resolution); throttling and lower resolution reduce the score.
+        let refPx = EnergyModel.referencePixels
+        check("energy: paused is zero",
+              EnergyModel.estimate(kind: "metal", fps: 60, paused: true, pixels: refPx).level == .paused)
+        let metalFull = EnergyModel.estimate(kind: "metal", fps: 60, paused: false, pixels: refPx)
+        let webFull = EnergyModel.estimate(kind: "web", fps: 60, paused: false, pixels: refPx)
+        let videoFull = EnergyModel.estimate(kind: "video", fps: 60, paused: false, pixels: refPx)
+        check("energy: video < web < metal", videoFull.score < webFull.score && webFull.score < metalFull.score)
+        check("energy: full-res shader is the priciest tier", metalFull.level == .high)
+        check("energy: throttling lowers the score",
+              EnergyModel.estimate(kind: "metal", fps: 30, paused: false, pixels: refPx).score < metalFull.score)
+        check("energy: lower resolution lowers the score",
+              EnergyModel.estimate(kind: "metal", fps: 60, paused: false, pixels: refPx / 4).score < metalFull.score)
+
         // Clean up installed selftest packages.
         for pkg in library.installedPackages() where pkg.manifest.id.hasPrefix("selftest.") {
             try? FileManager.default.removeItem(at: pkg.directory)

@@ -118,6 +118,23 @@ final class Governor {
         onChange?(next)
     }
 
+    /// A short, human explanation of the current directive — why we're paused or throttled — for the
+    /// energy panel. Mirrors the precedence in `recompute()`.
+    var statusReason: String {
+        if !anyWindowVisible { return "Paused — the desktop is covered" }
+        if screensAsleep { return "Paused — the display is asleep" }
+        if locked { return "Paused — the screen is locked" }
+        if thermal == .critical { return "Paused — the device is too hot" }
+        if onBattery && Preferences.shared.batteryBehavior == .pause { return "Paused — on battery" }
+
+        var reasons: [String] = []
+        if onBattery && Preferences.shared.batteryBehavior == .throttle { reasons.append("on battery") }
+        if lowPower { reasons.append("Low Power Mode") }
+        if thermal == .serious { reasons.append("running warm") }
+        if reasons.isEmpty { return "Running at full frame rate" }
+        return "Throttled — " + reasons.joined(separator: ", ")
+    }
+
     // MARK: - Battery
 
     private static func isOnBattery() -> Bool {

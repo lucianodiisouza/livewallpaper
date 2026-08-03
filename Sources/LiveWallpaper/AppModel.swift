@@ -27,6 +27,10 @@ final class AppModel: ObservableObject {
         var label: String { self == .shader ? "Shader" : "Web" }
     }
 
+    /// Live render state from the Governor, shown in the energy panel. `reason` explains why we're
+    /// paused or throttled right now.
+    struct RenderState: Equatable { var paused: Bool; var fps: Int; var reason: String }
+
     /// One physical display and what's assigned to it. `id` is the Library screen key.
     struct ScreenInfo: Identifiable {
         let id: String          // Library.key(for:) — stable NSScreenNumber string
@@ -43,6 +47,8 @@ final class AppModel: ObservableObject {
     @Published var screens: [ScreenInfo] = []
     /// The currently-rendering wallpaper id.
     @Published var currentID: String = ""
+    /// Live render state (paused/fps + reason) mirrored from the Governor for the energy panel.
+    @Published var renderState = RenderState(paused: false, fps: 60, reason: "Running at full frame rate")
     /// When non-nil, the paywall sheet is shown with this context.
     @Published var paywall: PaywallContext?
     /// True while an AI wallpaper is being generated.
@@ -75,6 +81,8 @@ final class AppModel: ObservableObject {
     var onInstallToScreen: ((WorkshopItem, String?) async -> String?)?
     var configFor: ((String) -> [String: ConfigValue])?
     var onApplyConfig: ((String, [String: ConfigValue]) -> Void)?
+    /// Present the first-run onboarding walkthrough (also used by Settings → "Show welcome again").
+    var onShowOnboarding: (() -> Void)?
 
     private let starKey = "starredIDs"
     static let maxStars = 5

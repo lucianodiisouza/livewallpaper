@@ -170,8 +170,12 @@ New Phase-2 scope instead:
   premium will be device-bound). Provenance tracked via `Library.isImported`.
 - ✅ Preview-before-apply — tapping a wallpaper opens a live-rendered preview sheet (real renderer,
   not a thumbnail) with Apply / Apply-to-display / Share
-- 🟡 Read-only premium catalog — the M4 client is repurposed (Explore renamed **Catalog**); still
-  points at our own PocketBase feed (backend now private)
+- 🟡 Read-only premium catalog — the M4 client is repurposed (Explore renamed **Catalog**); points
+  at our own PocketBase feed (backend now private). **Premium items are now device-bound**: a
+  `tier`/`bundle_key` on each record + a Worker `/catalog/bundle` route stream premium bundles from a
+  private R2 bucket only to premium devices (free items stay on the public URL). Client shows a lock
+  badge + paywall on locked items. Code landed 2026-08-03; live infra (private bucket + collection
+  fields + deploy) still to provision — see [PRE_APPLE_PLAN.md](docs/PRE_APPLE_PLAN.md) A1.
 - 🟡 Paywall / entitlement layer — `Entitlement` (single `isPremium` source of truth) + gating:
   premium built-ins (lock badge → paywall on apply), rotation is Premium-gated, a `PaywallSheet`
   upsell, and a Premium section in Settings. **Activation is a pre-release local placeholder**
@@ -182,9 +186,14 @@ New Phase-2 scope instead:
   key and checks the id matches this machine (`Licensing`, `Device` = `IOPlatformUUID`). `Entitlement`
   now derives premium from a valid device-bound license (dev override kept for UI testing). Validated
   end-to-end (Worker Web-Crypto sign ↔ CryptoKit verify) + 3 self-test checks.
-  - Remaining: **StoreKit purchase** flips the server-side `premium` flag (gated on an Apple Developer
-    account; today it's the admin route), plus device cap + self-serve deactivation + shorter expiry.
-    See [LICENSING.md](docs/LICENSING.md).
+  - ✅ **Orders + device cap + activation** (2026-08-03): an *order* = one purchase owning a capped
+    device set (default 3). `/admin/order` provisions, `/activate {device_id, order_id}` binds a Mac
+    (409 when the cap is hit), `/deactivate` frees a slot. In-app **Settings → Premium**: enter a
+    license code to Activate, or Deactivate this device — a real sales path before StoreKit. License
+    TTL shortened to 14 days with silent near-expiry auto-renew (`Licensing.refreshIfNeeded`).
+    +5 self-test checks. See [LICENSING.md](docs/LICENSING.md).
+  - Remaining (Apple-gated): **StoreKit purchase** auto-creates the order (today an admin provisions
+    it via `/admin/order`); needs the Developer account. See [PRE_APPLE_PLAN.md](docs/PRE_APPLE_PLAN.md) A2.
 - ✅ Make the backend repo **private** (client stays MIT) — done; git history scanned, no secrets
 - ✅ AI shader **and web** generation (marquee premium feature), provider-agnostic: prompt →
   selected provider → generate → validate → package + install + apply. Premium-gated; keys in the
@@ -221,7 +230,7 @@ Done in the first polish slice:
   the user never glimpses their own wallpaper behind/around ours; captures + restores the original
   (`DesktopBackground`), toggle in Settings, on by default
 - ✅ Preferences window (SwiftUI) — general / power / rotation
-- ✅ Self-test extended to 23 checks (config Codable round-trip, battery-behavior parse, update
+- ✅ Self-test extended to 55 checks (config Codable round-trip, battery-behavior parse, update
   version-compare)
 - ✅ Update notifications — lightweight GitHub Releases check (`UpdateChecker`): auto-check on
   launch (throttled, opt-out in Preferences) lights up a menu banner + "Check for Updates…";
@@ -229,10 +238,19 @@ Done in the first polish slice:
 
 Still open (future polish):
 - ⬜ Per-space wallpapers
-- ⬜ Schedules (time-of-day wallpaper changes)
-- ⬜ Energy dashboard (show measured cost per wallpaper)
+- ✅ Schedules (time-of-day wallpaper changes) — a daily program of "at HH:MM → wallpaper" rows
+  (Settings → Schedule), Premium-gated, applied by a 30s timer; independent of rotation. Pure
+  resolver `WallpaperScheduleLogic` (+5 self-test checks). (`Schedule.swift`)
+- ✅ Energy dashboard (Settings → Energy) — shows the **live** render state from the Governor
+  (running/paused + why) plus a coarse per-medium cost **estimate** (video < web < metal, scaled by
+  fps + resolution), honestly labelled *not* a live measurement and pointing at
+  `docs/PERFORMANCE_REPRODUCE.md` for real numbers. The app can't read per-process GPU energy
+  cheaply on Apple Silicon, so this is a model grounded in `docs/PERFORMANCE.md`, not fabricated
+  telemetry. Pure `EnergyModel` (+6 self-test checks). Free (a trust feature).
 - ⬜ Explicit fullscreen-app / active-space Governor signal (occlusion covers the common case)
-- ⬜ Onboarding
+- ✅ Onboarding — first-run walkthrough (welcome → pick a first wallpaper live → multi-monitor &
+  rotation → Premium), skippable, re-runnable from Settings. Gated on `hasCompletedOnboarding`;
+  force with `LW_ONBOARDING=1`. (`Onboarding.swift`, +1 self-test check)
 
 ---
 
@@ -241,7 +259,10 @@ Still open (future polish):
 - ✅ Phase A: unsigned builds via GitHub Releases (plan documented)
 - ✅ Phase A: release pipeline + checklist ([RELEASING.md](docs/RELEASING.md),
   [.github/workflows/release.yml](.github/workflows/release.yml)) — push a `vX.Y.Z` tag → build,
-  self-test, zip, publish Release with Gatekeeper notes. _(First actual tagged release still to cut.)_
+  self-test, zip, publish Release with Gatekeeper notes. _(Live: **v0.1.0** and **v0.2.0** are
+  published on the Releases page. v0.2.0 = commit `4ec7d8a`; the freemium work from 2026-08-03
+  (onboarding, device-bound catalog, licensing hardening, schedules, energy panel) is unreleased —
+  next tag **v0.3.0**.)_
 - ⬜ Phase B: Developer ID signing + notarization — **gated on Apple Developer account**
 - ⬜ Phase C: Sparkle auto-updates (appcast + EdDSA signing) — after Phase B
 - ⬜ Phase D: Mac App Store — pending the M0 sandbox spike

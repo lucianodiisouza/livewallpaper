@@ -37,6 +37,13 @@ final class Preferences: ObservableObject {
     /// Paint a neutral solid colour as the macOS desktop picture so the user never glimpses their
     /// own wallpaper behind/around our window. Default on; restores the original when turned off.
     @Published var solidBackdrop: Bool { didSet { persist(); onChange?() } }
+    /// Whether the first-run onboarding walkthrough has been seen. Set once it's dismissed (any way);
+    /// gates the launch-time presentation so it never re-nags. Re-runnable from Settings regardless.
+    @Published var hasCompletedOnboarding: Bool { didSet { persist() } }
+    /// Time-of-day wallpaper schedule (Premium). When enabled, the app switches wallpapers at each
+    /// entry's time. Independent of rotation — both can run.
+    @Published var scheduleEnabled: Bool { didSet { persist(); onChange?() } }
+    @Published var scheduleEntries: [ScheduleEntry] { didSet { persistSchedule(); onChange?() } }
 
     private init() {
         launchAtLogin = d.bool(forKey: "launchAtLogin")
@@ -46,6 +53,9 @@ final class Preferences: ObservableObject {
         // Default on: opt-out, not opt-in — testers should hear about new builds by default.
         checkForUpdatesAutomatically = d.object(forKey: "checkForUpdatesAutomatically") as? Bool ?? true
         solidBackdrop = d.object(forKey: "solidBackdrop") as? Bool ?? true
+        hasCompletedOnboarding = d.bool(forKey: Onboarding.completedKey)
+        scheduleEnabled = d.bool(forKey: "scheduleEnabled")
+        scheduleEntries = Self.loadSchedule(d)
         // Reconcile the actual login-item state with the stored preference on launch.
         syncLoginItemState()
     }
@@ -57,6 +67,20 @@ final class Preferences: ObservableObject {
         d.set(rotationMinutes, forKey: "rotationMinutes")
         d.set(checkForUpdatesAutomatically, forKey: "checkForUpdatesAutomatically")
         d.set(solidBackdrop, forKey: "solidBackdrop")
+        d.set(hasCompletedOnboarding, forKey: Onboarding.completedKey)
+        d.set(scheduleEnabled, forKey: "scheduleEnabled")
+    }
+
+    private func persistSchedule() {
+        if let data = try? JSONEncoder().encode(scheduleEntries) {
+            d.set(data, forKey: "scheduleEntries")
+        }
+    }
+
+    private static func loadSchedule(_ d: UserDefaults) -> [ScheduleEntry] {
+        guard let data = d.data(forKey: "scheduleEntries"),
+              let arr = try? JSONDecoder().decode([ScheduleEntry].self, from: data) else { return [] }
+        return arr
     }
 
     // MARK: - Launch at login (SMAppService)

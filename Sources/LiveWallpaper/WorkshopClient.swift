@@ -13,11 +13,16 @@ struct WorkshopClient: Sendable {
 
     enum WorkshopError: LocalizedError {
         case notConfigured, badURL, http(Int)
+        case premiumBackendUnavailable, premiumLocked
         var errorDescription: String? {
             switch self {
             case .notConfigured: return "The workshop isn't configured yet (set WorkshopConfig.pocketBaseURL)."
             case .badURL: return "Bad workshop URL."
             case let .http(code): return "Workshop request failed (HTTP \(code))."
+            case .premiumBackendUnavailable:
+                return "This is a Premium wallpaper, but the backend isn't configured (Settings → AI Generation → Backend URL)."
+            case .premiumLocked:
+                return "This wallpaper is Premium — unlock Premium to install it."
             }
         }
     }
@@ -62,6 +67,10 @@ struct WorkshopClient: Sendable {
     /// Download a bundle to a temp `.livewallpaper` file (then hand to `Library.install`). Content is
     /// cached by checksum, so a repeat install of the same wallpaper re-downloads nothing; the caller
     /// re-verifies the checksum regardless, so a cache hit is never trusted on faith.
+    ///
+    /// Free items come straight from their public R2 URL. Premium items are **device-bound**: their
+    /// bytes live in a private bucket and are streamed by the backend `/catalog/bundle` route only to
+    /// devices whose premium flag is set (see the Worker + docs/LICENSING.md).
     func downloadBundle(_ item: WorkshopItem) async throws -> URL {
         let dest = FileManager.default.temporaryDirectory.appendingPathComponent("\(item.id).livewallpaper")
         try? FileManager.default.removeItem(at: dest)
@@ -71,12 +80,44 @@ struct WorkshopClient: Sendable {
             return dest
         }
 
-        guard let src = item.bundleURL else { throw WorkshopError.badURL }
-        let (tmp, resp) = try await URLSession.shared.download(from: src)
-        try Self.check(resp)
-        try FileManager.default.moveItem(at: tmp, to: dest)
+        if item.isPremium {
+            try await downloadPremiumBundle(item, to: dest)
+        } else {
+            guard let src = item.bundleURL else { throw WorkshopError.badURL }
+            let (tmp, resp) = try await URLSession.shared.download(from: src)
+            try Self.check(resp)
+            try FileManager.default.moveItem(at: tmp, to: dest)
+        }
         await WorkshopCache.shared.storeBundle(from: dest, checksum: item.checksum)
         return dest
+    }
+
+    /// Build the device-gated POST for a premium bundle. Pure + side-effect-free so it can be unit
+    /// tested; returns nil if the backend base URL or the item's bundle key is missing.
+    static func premiumBundleRequest(backendBase: String, deviceID: String, item: WorkshopItem) -> URLRequest? {
+        let base = backendBase.hasSuffix("/") ? String(backendBase.dropLast()) : backendBase
+        guard !base.isEmpty, let key = item.bundleKey, !key.isEmpty,
+              let url = URL(string: base + "/catalog/bundle") else { return nil }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "device_id": deviceID, "item_id": item.id, "bundle_key": key,
+        ])
+        return req
+    }
+
+    /// Stream a premium bundle from the backend to `dest`. A 402 means this device isn't entitled —
+    /// surfaced as a friendly "unlock Premium" message rather than a raw HTTP error.
+    private func downloadPremiumBundle(_ item: WorkshopItem, to dest: URL) async throws {
+        guard let req = Self.premiumBundleRequest(
+            backendBase: AIConfig.baseURL(for: .backend), deviceID: Device.id, item: item)
+        else { throw WorkshopError.premiumBackendUnavailable }
+
+        let (tmp, resp) = try await URLSession.shared.download(for: req)
+        if let http = resp as? HTTPURLResponse, http.statusCode == 402 { throw WorkshopError.premiumLocked }
+        try Self.check(resp)
+        try FileManager.default.moveItem(at: tmp, to: dest)
     }
 
     /// Best-effort download counter. Requires a small PocketBase hook route (see M4_PLAN §5);

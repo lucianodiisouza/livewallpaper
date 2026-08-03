@@ -14,9 +14,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let library = Library()
     private let model = AppModel()
     private let mainWindow = MainWindowController()
+    private let onboarding = OnboardingWindowController()
 
     private var statusItem: NSStatusItem?
     private var rotationTimer: Timer?
+    private var scheduleTimer: Timer?
+    /// The wallpaper the schedule last applied — so we don't re-apply every tick, and the user can
+    /// manually override until the next scheduled time.
+    private var lastScheduleWallpaperID: String?
     private var cancellables = Set<AnyCancellable>()
     /// Set once a launch-time (or manual) check finds a newer release; surfaces in the menu.
     private var availableUpdate: UpdateChecker.Outcome?
@@ -39,8 +44,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             for s in self.screenlets { s.renderer.apply(directive) }
             self.updateStatusIcon(directive)
+            self.model.renderState = AppModel.RenderState(
+                paused: directive.paused, fps: directive.fps, reason: self.governor.statusReason)
         }
         governor.start()
+        model.renderState = AppModel.RenderState(
+            paused: governor.current.paused, fps: governor.current.fps, reason: governor.statusReason)
         loadConfig()
         rebuildScreenlets()
         applyBackdropIfEnabled()
@@ -48,16 +57,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Preferences.shared.onChange = { [weak self] in
             self?.governor.preferencesChanged()
             self?.restartRotation()
+            self?.restartSchedule()
             self?.applyBackdropIfEnabled()
         }
         restartRotation()
+        restartSchedule()
 
-        // Rotation is Premium-gated; re-evaluate whenever the entitlement flips.
+        // Rotation + schedule are Premium-gated; re-evaluate whenever the entitlement flips.
         Entitlement.shared.$isPremium
-            .sink { [weak self] _ in self?.restartRotation() }
+            .sink { [weak self] _ in self?.restartRotation(); self?.restartSchedule() }
             .store(in: &cancellables)
-        // Pull a fresh device-bound license from the backend (no-op if unconfigured/offline).
-        Task { await Entitlement.shared.refresh() }
+        // Renew the device-bound license if it's missing or near expiry (no-op if unconfigured/
+        // offline, or if the cached license is still comfortably valid).
+        Task { await Entitlement.shared.refreshIfNeeded() }
 
         NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
@@ -67,6 +79,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] _ in MainActor.assumeIsolated { self?.reportOcclusion() } }
 
         if ProcessInfo.processInfo.environment["LW_OPEN_WINDOW"] != nil { openMainWindow() }
+
+        // First run (or forced via LW_ONBOARDING=1): show the walkthrough. `available` is already
+        // populated by rebuildScreenlets() above, so the "pick a wallpaper" step has content.
+        if ProcessInfo.processInfo.environment["LW_ONBOARDING"] == "1" || !Preferences.shared.hasCompletedOnboarding {
+            showOnboarding()
+        }
 
         maybeAutoCheckForUpdates()
     }
@@ -98,6 +116,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.saveConfig()
             for s in self.screenlets where s.id == id { s.renderer.apply(config: values) }
         }
+        model.onShowOnboarding = { [weak self] in self?.showOnboarding() }
+    }
+
+    /// Present the first-run walkthrough. "Get Started" opens the main window; any dismissal marks
+    /// onboarding complete (handled inside the controller via `Preferences`).
+    private func showOnboarding() {
+        onboarding.show(model: model, openMain: { [weak self] in self?.openMainWindow() })
     }
 
     // MARK: - Rendering
@@ -554,6 +579,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         rotationTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.rotate() }
         }
+    }
+
+    // MARK: - Schedule
+
+    /// (Re)arm the time-of-day schedule. Premium-gated like rotation. Applies the currently-due
+    /// wallpaper immediately, then ticks every 30s to catch each entry's time.
+    private func restartSchedule() {
+        scheduleTimer?.invalidate(); scheduleTimer = nil
+        lastScheduleWallpaperID = nil
+        guard Preferences.shared.scheduleEnabled, Entitlement.shared.isPremium,
+              !Preferences.shared.scheduleEntries.isEmpty else { return }
+        applyScheduleNow()
+        scheduleTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.applyScheduleNow() }
+        }
+    }
+
+    /// Apply the wallpaper due at the current time of day, if it isn't already the one the schedule
+    /// set. Skips missing/uninstalled ids so a stale entry never blanks the desktop.
+    private func applyScheduleNow() {
+        let minutes = WallpaperScheduleLogic.minutesOfDay(for: Date())
+        guard let id = WallpaperScheduleLogic.activeWallpaperID(
+                entries: Preferences.shared.scheduleEntries, minutesNow: minutes),
+              id != lastScheduleWallpaperID,
+              model.available.contains(where: { $0.id == id })
+        else { return }
+        lastScheduleWallpaperID = id
+        activate(id)
     }
 
     /// Advance every display to *its own* next wallpaper, so monitors that started on different

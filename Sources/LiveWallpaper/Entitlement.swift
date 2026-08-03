@@ -37,6 +37,26 @@ final class Entitlement: ObservableObject {
         recompute()
     }
 
+    /// Refresh only when the cached license is missing or near expiry — the launch-time path.
+    func refreshIfNeeded() async {
+        await Licensing.refreshIfNeeded()
+        recompute()
+    }
+
+    /// Activate this device with a license code (ties it to an order under the device cap), then
+    /// recompute. Throws a friendly `Licensing.ActivationError` on failure.
+    func activate(code: String) async throws {
+        _ = try await Licensing.activate(orderCode: code.trimmingCharacters(in: .whitespacesAndNewlines))
+        recompute()
+    }
+
+    /// Release this device on the backend and return to Free.
+    func deactivate() async {
+        _ = await Licensing.deactivate()
+        devOverride = false
+        recompute()
+    }
+
     /// Pre-release local dev override (NOT a purchase, NOT device-bound). For testing the gated UI.
     func unlockForNow() { devOverride = true; recompute() }
     /// Clear the dev override AND the cached license — returns to the free experience.

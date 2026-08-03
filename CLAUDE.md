@@ -88,13 +88,16 @@ Sources/LiveWallpaper/
   BuiltInWeb.swift        # embedded HTML for the built-in web wallpaper (M3)
   Preferences.swift       # app settings: launch-at-login, battery behavior, rotation (M6)
   PreferencesPanel.swift  # SwiftUI preferences window (M6)
+  Onboarding.swift        # first-run walkthrough + window controller (M6)
+  Schedule.swift          # time-of-day wallpaper schedule model + pure resolver (M6)
+  EnergyEstimate.swift    # coarse per-medium energy *estimate* model for the Energy panel (M6)
   WorkshopConfig.swift    # public PocketBase URL (M4)
   WorkshopItem.swift      # Codable catalog record + file URLs (M4)
   WorkshopClient.swift    # PocketBase REST browse/download + --workshop-smoke (M4)
   WorkshopUI.swift        # SwiftUI workshop browser + window (M4)
   SampleMaker.swift       # --export / --make-sample package generators
   UpdateChecker.swift     # GitHub Releases "new version?" check + notify (Phase A bridge to Sparkle)
-  SelfTest.swift          # `--selftest` headless pipeline check (23 checks)
+  SelfTest.swift          # `--selftest` headless pipeline check (55 checks)
 scripts/seed-workshop.sh   # seed built-ins into PocketBase (admin; reads .env)
 LiveWallpaper.entitlements # app-sandbox + network.client + user-selected read-write
 scripts/build-app.sh       # assemble .app, generate loop.mp4 (ffmpeg), ad-hoc sign

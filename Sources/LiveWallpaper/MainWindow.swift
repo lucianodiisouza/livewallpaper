@@ -579,7 +579,8 @@ struct ExploreView: View {
             client: model.workshop,
             onInstall: { item in await model.onInstall?(item) ?? "Install unavailable." },
             screens: model.screens,
-            onInstallToScreen: { item, key in await model.onInstallToScreen?(item, key) ?? "Install unavailable." })
+            onInstallToScreen: { item, key in await model.onInstallToScreen?(item, key) ?? "Install unavailable." },
+            onLocked: { item in model.showPaywall("“\(item.title)” is a Premium wallpaper.") })
         .navigationTitle("Catalog")
     }
 }
@@ -636,6 +637,224 @@ struct AISettings: View {
     }
 }
 
+/// The Premium status + activation panel in Settings. Handles license-code activation, this-device
+/// deactivation (frees a slot on the order), and the dev-only local override. Real StoreKit purchase
+/// lands later; until then a license code (an order id) activates a device up to the device cap.
+struct PremiumSettings: View {
+    @ObservedObject private var entitlement = Entitlement.shared
+    @State private var code = ""
+    @State private var busy = false
+    @State private var error: String?
+    @State private var info: String?
+
+    var body: some View {
+        GroupBox("Premium") {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 12) {
+                    Image(systemName: entitlement.isPremium ? "checkmark.seal.fill" : "sparkles")
+                        .font(.title2).foregroundStyle(entitlement.isPremium ? Color.green : Color.accentColor)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(entitlement.isPremium ? "Premium active" : "Free").font(.headline)
+                        Text(entitlement.isPremium
+                             ? "The full catalog and all features are unlocked on this device."
+                             : "Unlock the full catalog, per-display rotation, AI generation, and more.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if busy { ProgressView().controlSize(.small) }
+                }
+
+                if entitlement.isPremium {
+                    HStack {
+                        Button("Deactivate this device") { run { await entitlement.deactivate(); info = "This device was deactivated." } }
+                            .help("Free this device's slot so you can activate another Mac")
+                        Spacer()
+                        Button("Lock (test)") { entitlement.lock() }
+                            .help("Developer: relock to test the free experience")
+                    }
+                } else {
+                    HStack {
+                        TextField("License code", text: $code)
+                            .textFieldStyle(.roundedBorder)
+                            .onSubmit(activate)
+                        Button("Activate", action: activate)
+                            .buttonStyle(.borderedProminent)
+                            .disabled(busy || code.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                    HStack {
+                        Button("Check activation") { run { await entitlement.refresh(); if !entitlement.isPremium { info = "No active license for this device yet." } } }
+                            .help("Fetch a device-bound license from the backend")
+                        Spacer()
+                        Button("Unlock (test)") { entitlement.unlockForNow() }
+                            .help("Developer: local override — not a real purchase or device-bound license")
+                    }
+                    Text("Enter a license code to activate this Mac (up to \(Licensing.DEFAULT_DEVICE_CAP) devices per license). One-time purchase — no subscription.")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+
+                if let error { Text(error).font(.caption).foregroundStyle(.red) }
+                if let info { Text(info).font(.caption).foregroundStyle(.secondary) }
+            }
+            .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func activate() {
+        let c = code.trimmingCharacters(in: .whitespaces)
+        guard !c.isEmpty else { return }
+        run {
+            do { try await entitlement.activate(code: c); code = ""; info = "Premium activated on this device." }
+            catch { self.error = error.localizedDescription }
+        }
+    }
+
+    /// Run an async action with the busy spinner and a cleared message area.
+    private func run(_ action: @escaping () async -> Void) {
+        busy = true; error = nil; info = nil
+        Task { await action(); busy = false }
+    }
+}
+
+/// Time-of-day wallpaper schedule editor (Premium). A list of "at HH:MM → wallpaper" rows the app
+/// applies through the day. Independent of rotation.
+struct ScheduleSettings: View {
+    @ObservedObject var model: AppModel
+    @ObservedObject private var prefs = Preferences.shared
+    @ObservedObject private var entitlement = Entitlement.shared
+
+    var body: some View {
+        GroupBox("Schedule") {
+            VStack(alignment: .leading, spacing: 8) {
+                Toggle("Change wallpaper on a schedule", isOn: $prefs.scheduleEnabled)
+                    .disabled(!entitlement.isPremium)
+
+                if !entitlement.isPremium {
+                    Button { model.showPaywall("Scheduling is a Premium feature.") } label: {
+                        Label("Premium feature — Unlock", systemImage: "lock.fill")
+                    }
+                    .buttonStyle(.link).font(.caption)
+                } else {
+                    ForEach($prefs.scheduleEntries) { $entry in
+                        HStack(spacing: 8) {
+                            DatePicker("", selection: timeBinding($entry), displayedComponents: .hourAndMinute)
+                                .labelsHidden().fixedSize()
+                            Picker("", selection: $entry.wallpaperID) {
+                                ForEach(model.available) { Text($0.title).tag($0.id) }
+                            }
+                            .labelsHidden()
+                            Spacer(minLength: 0)
+                            Button(role: .destructive) { remove(entry) } label: { Image(systemName: "trash") }
+                                .buttonStyle(.borderless)
+                        }
+                    }
+                    Button { addEntry() } label: { Label("Add time", systemImage: "plus") }
+                        .disabled(model.available.isEmpty)
+                    Text(prefs.scheduleEntries.isEmpty
+                         ? "Add times to switch wallpapers automatically through the day."
+                         : "Switches at each time, every day. Manual changes hold until the next scheduled time.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    /// Bridge an entry's hour/minute to the `Date` a `DatePicker` wants (today's date, that time).
+    private func timeBinding(_ entry: Binding<ScheduleEntry>) -> Binding<Date> {
+        Binding(
+            get: {
+                var c = DateComponents(); c.hour = entry.wrappedValue.hour; c.minute = entry.wrappedValue.minute
+                return Calendar.current.date(from: c) ?? Date()
+            },
+            set: { newDate in
+                let c = Calendar.current.dateComponents([.hour, .minute], from: newDate)
+                entry.wrappedValue.hour = c.hour ?? 0
+                entry.wrappedValue.minute = c.minute ?? 0
+            })
+    }
+
+    private func addEntry() {
+        let id = model.available.contains(where: { $0.id == model.currentID })
+            ? model.currentID : (model.available.first?.id ?? "")
+        guard !id.isEmpty else { return }
+        let hour = Calendar.current.component(.hour, from: Date())
+        prefs.scheduleEntries.append(ScheduleEntry(hour: hour, minute: 0, wallpaperID: id))
+    }
+
+    private func remove(_ entry: ScheduleEntry) {
+        prefs.scheduleEntries.removeAll { $0.id == entry.id }
+    }
+}
+
+/// Energy panel: the live render state (real, from the Governor) plus a coarse per-medium cost
+/// *estimate* (the app can't read GPU energy directly — honest wording matters here). Free for all;
+/// it's a trust feature, not a paywalled one.
+struct EnergySettings: View {
+    @ObservedObject var model: AppModel
+
+    private var pixels: Int {
+        let screen = model.screens.first { $0.assignedID == model.currentID } ?? model.screens.first
+        return screen.map { max(1, $0.width * $0.height) } ?? EnergyModel.referencePixels
+    }
+    private var currentKind: String { model.available.first { $0.id == model.currentID }?.kind ?? "metal" }
+    private var estimate: EnergyEstimate {
+        EnergyModel.estimate(kind: currentKind, fps: model.renderState.fps,
+                             paused: model.renderState.paused, pixels: pixels)
+    }
+
+    var body: some View {
+        GroupBox("Energy") {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
+                    Circle().fill(model.renderState.paused ? Color.gray : Color.green)
+                        .frame(width: 10, height: 10)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(model.renderState.paused ? "Paused" : "Running @ \(model.renderState.fps)fps")
+                            .font(.subheadline.weight(.medium))
+                        Text(model.renderState.reason).font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Text(estimate.level.rawValue)
+                        .font(.caption.weight(.semibold)).foregroundStyle(color(estimate.level))
+                }
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Estimated cost by type (this display, full rate)")
+                        .font(.caption).foregroundStyle(.secondary)
+                    ForEach(["metal", "web", "video"], id: \.self) { kind in
+                        let est = EnergyModel.estimate(kind: kind, fps: 60, paused: false, pixels: pixels)
+                        HStack(spacing: 8) {
+                            Text(label(kind)).font(.caption).frame(width: 56, alignment: .leading)
+                            ProgressView(value: Double(est.score), total: 100)
+                                .tint(color(est.level))
+                            Text(est.level.rawValue).font(.caption2).foregroundStyle(.secondary)
+                                .frame(width: 68, alignment: .trailing)
+                        }
+                    }
+                }
+
+                Text("Estimates, not live measurements — the app can't read GPU energy directly. Reproduce real CPU/GPU/power numbers with the scripts in docs/perf (see docs/PERFORMANCE_REPRODUCE.md). The biggest real saving is automatic: wallpapers drop to ~0 when covered.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func label(_ kind: String) -> String {
+        switch kind { case "video": return "Video"; case "web": return "Web"; default: return "Shader" }
+    }
+    private func color(_ level: EnergyEstimate.Level) -> Color {
+        switch level {
+        case .paused: return .gray
+        case .low: return .green
+        case .moderate: return .yellow
+        case .high: return .orange
+        }
+    }
+}
+
 struct SettingsTab: View {
     @ObservedObject var model: AppModel
     @ObservedObject private var prefs = Preferences.shared
@@ -645,38 +864,16 @@ struct SettingsTab: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                GroupBox("Premium") {
-                    HStack(spacing: 12) {
-                        Image(systemName: entitlement.isPremium ? "checkmark.seal.fill" : "sparkles")
-                            .font(.title2).foregroundStyle(entitlement.isPremium ? Color.green : Color.accentColor)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(entitlement.isPremium ? "Premium active" : "Free")
-                                .font(.headline)
-                            Text(entitlement.isPremium
-                                 ? "The full catalog and all features are unlocked."
-                                 : "Unlock the full catalog, per-display rotation, and more.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        if entitlement.isPremium {
-                            Button("Lock (test)") { entitlement.lock() }
-                                .help("Developer: relock to test the free experience")
-                        } else {
-                            Button("Unlock (test)") { entitlement.unlockForNow() }
-                                .help("Developer: local override — not a real purchase or device-bound license")
-                            Button("Check activation") { Task { await entitlement.refresh() } }
-                                .buttonStyle(.borderedProminent)
-                                .help("Fetch a device-bound license from the backend")
-                        }
-                    }
-                    .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
-                }
+                PremiumSettings()
                 GroupBox("General") {
                     VStack(alignment: .leading, spacing: 8) {
                         Toggle("Launch at login", isOn: $prefs.launchAtLogin)
                         Toggle("Solid backdrop under wallpapers", isOn: $prefs.solidBackdrop)
                         Text("Replaces your macOS desktop picture with a neutral colour so you never see it behind the wallpaper. Your original is restored when you quit or turn this off.")
                             .font(.caption).foregroundStyle(.secondary)
+                        Divider()
+                        Button("Show welcome again") { model.onShowOnboarding?() }
+                            .help("Replay the first-run walkthrough")
                     }
                     .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -691,6 +888,7 @@ struct SettingsTab: View {
                     }
                     .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
                 }
+                EnergySettings(model: model)
                 GroupBox("Rotation") {
                     VStack(alignment: .leading, spacing: 8) {
                         Toggle("Rotate through all wallpapers", isOn: $prefs.rotationEnabled)
@@ -709,6 +907,7 @@ struct SettingsTab: View {
                     }
                     .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
                 }
+                ScheduleSettings(model: model)
                 if let schema = model.schemas[model.currentID], !schema.isEmpty {
                     GroupBox("Parameters · \(model.title(forID: model.currentID))") {
                         VStack(alignment: .leading, spacing: 8) {
