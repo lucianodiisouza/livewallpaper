@@ -469,9 +469,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     ]
 
     /// Generate a wallpaper (shader or web) from a prompt: ask the model → validate (one repair
-    /// retry) → package + install → apply. Premium-gated (the moat feature).
+    /// retry) → package + install → apply. Free — the user brings their own AI key (see AIConfig).
     private func generate(_ prompt: String, kind: AppModel.GenerateKind) {
-        guard Entitlement.shared.isPremium else { model.showPaywall("AI generation is a Premium feature."); return }
+        guard AIConfig.isConfigured else {
+            model.aiError = "Add your AI provider + key in Settings → AI Generation first."
+            return
+        }
         model.isGenerating = true
         model.aiError = nil
         Task {

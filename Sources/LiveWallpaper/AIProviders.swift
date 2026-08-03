@@ -27,34 +27,9 @@ enum AIError: LocalizedError {
 enum AIProviderFactory {
     static func current() -> ShaderProvider {
         switch AIConfig.provider {
-        case .backend:   return BackendProvider()
         case .anthropic: return AnthropicProvider()
         case .openai:    return OpenAICompatibleProvider()
         }
-    }
-}
-
-// MARK: - Primo backend relay (production path — provider key stays server-side)
-
-struct BackendProvider: ShaderProvider {
-    func complete(system: String, user: String) async throws -> String {
-        let base = AIConfig.baseURL(for: .backend).trimmedSlash
-        guard !base.isEmpty, let url = URL(string: base + "/generate") else { throw AIError.notConfigured }
-
-        let body: [String: Any] = ["device_id": Device.id, "system": system, "user": user]
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        let (data, resp) = try await URLSession.shared.data(for: req)
-        let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
-        if code == 402 { throw AIError.unusable("This device isn't activated for Premium generation.") }
-        guard code == 200 else { throw AIError.http(code, AIParse.errorMessage(data)) }
-
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let text = json["text"] as? String else { throw AIError.noText }
-        return text
     }
 }
 

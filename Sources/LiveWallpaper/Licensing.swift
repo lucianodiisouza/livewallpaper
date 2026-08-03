@@ -63,7 +63,7 @@ enum Licensing {
     /// Fetch a fresh license from the backend and cache it if valid for this device.
     @discardableResult
     static func fetch() async -> Claims? {
-        let raw = AIConfig.baseURL(for: .backend)
+        let raw = AIConfig.backendURL
         let base = raw.hasSuffix("/") ? String(raw.dropLast()) : raw
         guard !base.isEmpty, let url = URL(string: base + "/license") else { return nil }
 
@@ -85,7 +85,7 @@ enum Licensing {
 
     /// The backend base URL (trimmed), or nil if unconfigured.
     static func backendBase() -> String? {
-        let raw = AIConfig.baseURL(for: .backend)
+        let raw = AIConfig.backendURL
         let base = raw.hasSuffix("/") ? String(raw.dropLast()) : raw
         return base.isEmpty ? nil : base
     }
@@ -94,7 +94,7 @@ enum Licensing {
         case backendUnavailable, orderNotFound, capReached(Int), http(Int), unusable, trialUsed, noOrder
         var errorDescription: String? {
             switch self {
-            case .backendUnavailable: return "Set the backend URL first (Settings → AI Generation → Backend URL)."
+            case .backendUnavailable: return "Can't reach the Primo backend. Check your connection and try again."
             case .orderNotFound: return "That license code wasn't found. Check it and try again."
             case let .capReached(cap): return "This license is already active on \(cap) machine(s). To use another Mac, contact support."
             case let .http(code): return "Request failed (HTTP \(code))."

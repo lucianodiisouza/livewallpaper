@@ -123,7 +123,7 @@ struct WorkshopClient: Sendable {
     /// surfaced as a friendly "unlock Premium" message rather than a raw HTTP error.
     private func downloadPremiumBundle(_ item: WorkshopItem, to dest: URL) async throws {
         guard let req = Self.premiumBundleRequest(
-            backendBase: AIConfig.baseURL(for: .backend), deviceID: Device.id, item: item)
+            backendBase: AIConfig.backendURL, deviceID: Device.id, item: item)
         else { throw WorkshopError.premiumBackendUnavailable }
 
         let (tmp, resp) = try await URLSession.shared.download(for: req)

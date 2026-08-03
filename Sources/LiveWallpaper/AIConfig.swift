@@ -1,60 +1,65 @@
 import Foundation
 import Security
 
-/// Configuration for AI wallpaper generation — provider-agnostic.
+/// Configuration for AI wallpaper generation — **bring your own key**.
 ///
-/// **Production routes through our own backend** so the model key stays server-side, we control
-/// cost, and reachability/blocking/fallback is a server-side routing decision (see docs/FREEMIUM.md).
-/// This pre-release build has no backend yet, so the client talks to a provider directly. It is
-/// **not Anthropic-only**: pick Anthropic, or any **OpenAI-compatible** endpoint via a configurable
-/// base URL — OpenAI, OpenRouter, Groq, or a **local** runtime (Ollama / LM Studio), which works
-/// fully offline and can't be region-blocked. Keys live in the Keychain, never hardcoded.
+/// Generation always runs against the provider *you* choose with *your own* key: **Anthropic**
+/// (Claude) directly, or any **OpenAI-compatible** endpoint — OpenAI, OpenRouter, Groq, or a **local**
+/// runtime (Ollama / LM Studio) that works fully offline and can't be region-blocked. Primo never
+/// proxies generation and never pays for it. Keys live in the Keychain, never hardcoded.
+///
+/// (The Primo *backend URL* — licensing, catalog, trial — is separate; see `backendURL` below.)
 enum AIConfig {
 
     enum Provider: String, CaseIterable, Identifiable {
-        case backend   // Primo's own relay Worker — provider key stays server-side (production path)
         case anthropic
         case openai    // any OpenAI-compatible /chat/completions endpoint (incl. local Ollama/LM Studio)
 
         var id: String { rawValue }
         var label: String {
             switch self {
-            case .backend: return "Primo (backend)"
             case .anthropic: return "Anthropic"
             case .openai: return "OpenAI-compatible"
             }
         }
         var defaultBaseURL: String {
             switch self {
-            case .backend: return "https://primo-ai.primo-ai.workers.dev"
             case .anthropic: return "https://api.anthropic.com"
             case .openai: return "https://api.openai.com/v1"
             }
         }
         var defaultModel: String {
             switch self {
-            case .backend: return ""            // the server picks the model
             case .anthropic: return "claude-opus-5"
             case .openai: return "gpt-4o"
             }
         }
-        /// Whether the client needs an API key (the backend and local runtimes don't).
+        /// Whether the client needs an API key (local OpenAI-compatible runtimes don't).
         var requiresKey: Bool { self == .anthropic }
-        /// Whether the client sets the model (the backend decides server-side).
-        var usesModel: Bool { self != .backend }
         var hint: String {
             switch self {
-            case .backend:
-                return "Routes generation through Primo's backend — no key needed, works even where a provider is blocked. This device must be activated for Premium."
             case .anthropic:
-                return "Uses the Anthropic Messages API directly with your key."
+                return "Uses the Anthropic Messages API directly with your own Claude key."
             case .openai:
-                return "Any OpenAI-compatible endpoint. For a local, offline, unblockable setup use Ollama (http://localhost:11434/v1) or LM Studio (http://localhost:1234/v1) — no key needed."
+                return "Any OpenAI-compatible endpoint with your own key — OpenAI, OpenRouter, Groq. For a local, offline, unblockable setup use Ollama (http://localhost:11434/v1) or LM Studio (http://localhost:1234/v1) — no key needed."
             }
         }
     }
 
     static let anthropicVersion = "2023-06-01"
+
+    // MARK: - Primo backend URL (licensing / catalog / trial — NOT AI)
+
+    /// The Primo backend Worker base URL, used by `Licensing` and the premium catalog. Distinct from
+    /// AI generation (which is BYO-key, above). Defaults to production; overridable for dev.
+    static let defaultBackendURL = "https://primo-ai.primo-ai.workers.dev"
+    static var backendURL: String {
+        get {
+            let v = UserDefaults.standard.string(forKey: "primoBackendURL") ?? ""
+            return v.isEmpty ? defaultBackendURL : v
+        }
+        set { UserDefaults.standard.set(newValue, forKey: "primoBackendURL") }
+    }
 
     // MARK: - Selection + per-provider settings (UserDefaults; keys in Keychain)
 

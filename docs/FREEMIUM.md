@@ -7,10 +7,16 @@ Decision date: **2026-08-02**. Turns [COMPETITIVE.md](COMPETITIVE.md) into a pla
 > **⚠️ Monetization update (2026-08-03) — this doc's "pay-once, no subscription" is now stale.**
 > The model is freemium with **plans**: a **7-day free trial** (one-time per machine, no card),
 > **monthly / annual subscriptions**, and a **lifetime** one-time purchase — sold via Stripe
-> (worldwide) and InfinitePay (Brazil). Licensing is still **device-bound, per machine**. The
-> authoritative pricing/licensing/trial/refund details live in the **backend repo** (never here —
-> this repo is public): `livewallpaper-workshop/docs/BILLING.md`. The prose below needs a pass to
-> match; treat BILLING.md as the source of truth for anything billing-related.
+> (worldwide) and InfinitePay (Brazil). Licensing is still **device-bound, per machine**.
+>
+> **AI generation is now FREE and bring-your-own-key** — it is *not* a premium feature and Primo does
+> *not* host or pay for it. Users plug in their own Anthropic (Claude) / OpenRouter / OpenAI-compatible
+> key, or run a local Ollama / LM Studio for free. Premium gates the **curated catalog** and pro
+> features, not generation. (The old server-side "Primo backend" AI relay was removed.)
+>
+> The authoritative pricing/licensing/trial/refund details live in the **backend repo** (never here —
+> this repo is public): `livewallpaper-workshop/docs/BILLING.md`. The capability table and prose below
+> still say AI-gen is premium — that needs the owner's pass; treat this note + BILLING.md as current.
 
 ## The pivot in one paragraph
 
