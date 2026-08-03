@@ -64,8 +64,7 @@ the Governor pauses/resumes it via the occlusion signal.
 - ✅ `WallpaperRenderer` protocol (configSchema/start/pause/resume/setFrameRate/apply(config:)/stop)
 - ✅ Video path conforms
 - ✅ The **Governor** aggregates occlusion, battery, Low Power Mode, thermal, screen-lock, sleep.
-  _(Explicit fullscreen-app / active-space signals still ⬜ — occlusion already covers the common
-  case: a fullscreen app fully covers the wallpaper → PAUSED. Add dedicated signals in M6 polish.)_
+  _(✅ 2026-08-03: explicit full-screen-cover signal added — see M6.)_
 - ✅ `MetalRenderer` driven by a view-synced `CADisplayLink` (ProMotion-adaptive via
   `preferredFrameRateRange`); pausing the link → ~0% GPU
 - ✅ `MetalRenderer`: MSL fragment shader compiled at runtime → `CAMetalLayer`, uniforms
@@ -230,7 +229,7 @@ Done in the first polish slice:
   the user never glimpses their own wallpaper behind/around ours; captures + restores the original
   (`DesktopBackground`), toggle in Settings, on by default
 - ✅ Preferences window (SwiftUI) — general / power / rotation
-- ✅ Self-test extended to 55 checks (config Codable round-trip, battery-behavior parse, update
+- ✅ Self-test extended to 59 checks (config Codable round-trip, battery-behavior parse, update
   version-compare)
 - ✅ Update notifications — lightweight GitHub Releases check (`UpdateChecker`): auto-check on
   launch (throttled, opt-out in Preferences) lights up a menu banner + "Check for Updates…";
@@ -247,7 +246,11 @@ Still open (future polish):
   `docs/PERFORMANCE_REPRODUCE.md` for real numbers. The app can't read per-process GPU energy
   cheaply on Apple Silicon, so this is a model grounded in `docs/PERFORMANCE.md`, not fabricated
   telemetry. Pure `EnergyModel` (+6 self-test checks). Free (a trust feature).
-- ⬜ Explicit fullscreen-app / active-space Governor signal (occlusion covers the common case)
+- ✅ Explicit fullscreen-app / active-space Governor signal — a public-API coverage check
+  (`FullscreenCoverage`): every display fully covered by a non-Primo normal window ⇒ pause, so we
+  react even when `NSWindow` occlusion lags on a Space switch into a full-screen app. Re-evaluated on
+  `activeSpaceDidChange` + `didActivateApplication`; composes with occlusion (multi-monitor correct).
+  +4 self-test checks. (`FullscreenCoverage.swift`, `Governor.swift`)
 - ✅ Onboarding — first-run walkthrough (welcome → pick a first wallpaper live → multi-monitor &
   rotation → Premium), skippable, re-runnable from Settings. Gated on `hasCompletedOnboarding`;
   force with `LW_ONBOARDING=1`. (`Onboarding.swift`, +1 self-test check)

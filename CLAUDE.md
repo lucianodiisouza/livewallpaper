@@ -78,6 +78,7 @@ Sources/LiveWallpaper/
   ConfigParameter.swift   # ConfigParameter/ConfigValue model (shared by manifest decode)
   SettingsPanel.swift     # auto-generated SwiftUI settings form + window controller
   Governor.swift          # power/visibility signal aggregation → RenderDirective
+  FullscreenCoverage.swift # explicit "every display covered by a foreign window" pause signal (M6)
   Manifest.swift          # .livewallpaper manifest decode + validation (M2)
   ZipArchive.swift        # native ZIP reader/writer, defensive (M2)
   WallpaperPackage.swift  # load/verify a package (checksum, shader gate) + makeRenderer (M2)
@@ -97,7 +98,7 @@ Sources/LiveWallpaper/
   WorkshopUI.swift        # SwiftUI workshop browser + window (M4)
   SampleMaker.swift       # --export / --make-sample package generators
   UpdateChecker.swift     # GitHub Releases "new version?" check + notify (Phase A bridge to Sparkle)
-  SelfTest.swift          # `--selftest` headless pipeline check (55 checks)
+  SelfTest.swift          # `--selftest` headless pipeline check (59 checks)
 scripts/seed-workshop.sh   # seed built-ins into PocketBase (admin; reads .env)
 LiveWallpaper.entitlements # app-sandbox + network.client + user-selected read-write
 scripts/build-app.sh       # assemble .app, generate loop.mp4 (ffmpeg), ad-hoc sign

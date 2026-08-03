@@ -99,9 +99,13 @@ paywalled). +6 self-test checks; 55/55 pass.
 ### B4. Per-space wallpapers  ⬜  *(heavier — Spaces APIs are fiddly)*
 Do after B1–B3.
 
-### B5. Explicit fullscreen-app / active-space Governor signal  ⬜  *(lowest priority)*
-Occlusion already covers the common case; this is a refinement. Keep the Governor's signal list in
-sync with DESIGN.md §4.
+### B5. Explicit fullscreen-app / active-space Governor signal  ✅  *(done 2026-08-03)*
+The desktop windows use `.canJoinAllSpaces`, so `isOnActiveSpace` is useless and occlusion was the
+only per-window signal — and it can lag entering a full-screen app. Added `FullscreenCoverage`: a
+public-API check (`CGWindowListCopyWindowInfo` + `CGDisplayBounds`, same coord space, no flipping)
+that pauses when *every* display is fully covered by a non-Primo normal window. Re-evaluated on
+`activeSpaceDidChange` + `didActivateApplication`; OR-ed into the Governor alongside occlusion, so
+it's multi-monitor correct. DESIGN.md §4 table synced. +4 self-test checks; 59/59 pass.
 
 ---
 

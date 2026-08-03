@@ -78,6 +78,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             forName: NSWindow.didChangeOcclusionStateNotification, object: nil, queue: .main
         ) { [weak self] _ in MainActor.assumeIsolated { self?.reportOcclusion() } }
 
+        // Active-Space / app-activation changes are when a full-screen app takes over and occlusion is
+        // slowest to fire — re-poll occlusion AND the explicit full-screen-cover signal right then.
+        let wsc = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.activeSpaceDidChangeNotification, NSWorkspace.didActivateApplicationNotification] {
+            wsc.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.reportOcclusion(); self?.governor.updateFullscreenCoverage() }
+            }
+        }
+
         if ProcessInfo.processInfo.environment["LW_OPEN_WINDOW"] != nil { openMainWindow() }
 
         // First run (or forced via LW_ONBOARDING=1): show the walkthrough. `available` is already

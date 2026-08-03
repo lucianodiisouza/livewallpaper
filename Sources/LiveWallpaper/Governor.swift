@@ -26,6 +26,7 @@ final class Governor {
 
     // Signals ---------------------------------------------------------------
     private var anyWindowVisible = true   // occlusion: at least one wallpaper window on-screen
+    private var fullscreenCoversAll = false // explicit: every screen covered by a non-Primo window
     private var screensAsleep = false
     private var locked = false
     private var onBattery = false
@@ -51,6 +52,41 @@ final class Governor {
         guard anyWindowVisible != visible else { return }
         anyWindowVisible = visible
         recompute()
+    }
+
+    /// Re-evaluate the explicit full-screen-cover signal. AppDelegate calls this on active-Space and
+    /// app-activation changes — the moments occlusion is slowest to report — so we pause promptly
+    /// when a full-screen app takes over every display.
+    func updateFullscreenCoverage() {
+        let covered = Self.allScreensCoveredByForeignWindow()
+        guard fullscreenCoversAll != covered else { return }
+        fullscreenCoversAll = covered
+        recompute()
+    }
+
+    /// Read the on-screen window list (public CoreGraphics API) and decide whether every display is
+    /// fully covered by a normal window that isn't ours. Both screen and window rects come back in
+    /// CoreGraphics global coordinates (`CGDisplayBounds` ↔ `kCGWindowBounds`), so no flipping.
+    private static func allScreensCoveredByForeignWindow() -> Bool {
+        let screens = NSScreen.screens.compactMap { s -> CGRect? in
+            (s.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)
+                .map { CGDisplayBounds(CGDirectDisplayID($0.uint32Value)) }
+        }
+        guard !screens.isEmpty else { return false }
+
+        let mine = ProcessInfo.processInfo.processIdentifier
+        let infos = (CGWindowListCopyWindowInfo(
+            [.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]) ?? []
+        var windows: [CGRect] = []
+        for w in infos {
+            guard (w[kCGWindowLayer as String] as? Int) == 0 else { continue }   // normal app windows
+            if (w[kCGWindowOwnerPID as String] as? Int32) == mine { continue }    // never ours
+            if let bounds = w[kCGWindowBounds as String] as? [String: Any],
+               let rect = CGRect(dictionaryRepresentation: bounds as CFDictionary) {
+                windows.append(rect)
+            }
+        }
+        return FullscreenCoverage.allScreensCovered(screens: screens, windows: windows)
     }
 
     // MARK: - Signal wiring
@@ -107,14 +143,15 @@ final class Governor {
         let batteryPause = onBattery && behavior == .pause
         let batteryThrottle = onBattery && behavior == .throttle
 
-        let paused = !anyWindowVisible || screensAsleep || locked || thermal == .critical || batteryPause
+        let paused = !anyWindowVisible || fullscreenCoversAll || screensAsleep || locked
+            || thermal == .critical || batteryPause
         let throttled = batteryThrottle || lowPower || thermal == .serious
         let fps = throttled ? 30 : 60
         let next = RenderDirective(paused: paused, fps: fps)
 
         guard next != current else { return }
         current = next
-        log.notice("Directive → \(next.description, privacy: .public) [visible:\(self.anyWindowVisible) sleep:\(self.screensAsleep) lock:\(self.locked) battery:\(self.onBattery) lowPower:\(self.lowPower)]")
+        log.notice("Directive → \(next.description, privacy: .public) [visible:\(self.anyWindowVisible) fullscreen:\(self.fullscreenCoversAll) sleep:\(self.screensAsleep) lock:\(self.locked) battery:\(self.onBattery) lowPower:\(self.lowPower)]")
         onChange?(next)
     }
 
@@ -122,6 +159,7 @@ final class Governor {
     /// energy panel. Mirrors the precedence in `recompute()`.
     var statusReason: String {
         if !anyWindowVisible { return "Paused — the desktop is covered" }
+        if fullscreenCoversAll { return "Paused — a full-screen app is in front" }
         if screensAsleep { return "Paused — the display is asleep" }
         if locked { return "Paused — the screen is locked" }
         if thermal == .critical { return "Paused — the device is too hot" }

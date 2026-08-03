@@ -96,7 +96,7 @@ Every renderer subscribes and obeys.
 | Signal | API | Action |
 |---|---|---|
 | Window occluded (fully covered) | `NSWindow.occlusionState` lacks `.visible` | **Pause** (0 fps) |
-| Fullscreen app frontmost | space/window inspection | **Pause** |
+| Fullscreen app frontmost (every display covered) | `CGWindowListCopyWindowInfo` coverage check (`FullscreenCoverage`), re-run on `activeSpaceDidChange` / `didActivateApplication` | **Pause** |
 | Display asleep / screen locked | `NSWorkspace.screensDidSleepNotification`, `com.apple.screenIsLocked` DistributedNotification | **Pause** |
 | On battery | `IOPSCopyPowerSourcesInfo` / `IOPSGetProvidingPowerSourceType` | **Throttle** (e.g. cap 30fps) or user-configurable pause |
 | Low Power Mode | `ProcessInfo.processInfo.isLowPowerModeEnabled` | **Throttle** |

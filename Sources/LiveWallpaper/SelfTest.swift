@@ -246,6 +246,19 @@ enum SelfTest {
         check("energy: lower resolution lowers the score",
               EnergyModel.estimate(kind: "metal", fps: 60, paused: false, pixels: refPx / 4).score < metalFull.score)
 
+        // 22) Full-screen cover signal (pure geometry): all screens covered → true; a gap → false;
+        // no screens → false; tolerance absorbs sub-point rounding.
+        let scr = [CGRect(x: 0, y: 0, width: 1920, height: 1080), CGRect(x: 1920, y: 0, width: 1920, height: 1080)]
+        let coverBoth = [CGRect(x: 0, y: 0, width: 1920, height: 1080), CGRect(x: 1920, y: 0, width: 1920, height: 1080)]
+        check("fullscreen: both screens covered → true", FullscreenCoverage.allScreensCovered(screens: scr, windows: coverBoth))
+        check("fullscreen: one screen uncovered → false",
+              !FullscreenCoverage.allScreensCovered(screens: scr, windows: [coverBoth[0]]))
+        check("fullscreen: no screens → false", !FullscreenCoverage.allScreensCovered(screens: [], windows: coverBoth))
+        check("fullscreen: sub-point rounding still counts as covered",
+              FullscreenCoverage.allScreensCovered(
+                screens: [CGRect(x: 0, y: 0, width: 1920, height: 1080)],
+                windows: [CGRect(x: 0.5, y: 0.5, width: 1919, height: 1079)]))
+
         // Clean up installed selftest packages.
         for pkg in library.installedPackages() where pkg.manifest.id.hasPrefix("selftest.") {
             try? FileManager.default.removeItem(at: pkg.directory)
