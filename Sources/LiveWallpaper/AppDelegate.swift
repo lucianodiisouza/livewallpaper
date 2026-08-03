@@ -430,6 +430,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             rebuildScreenlets()   // structural: a new package exists — full rebuild is correct here
             return nil
+        } catch let e as WorkshopClient.WorkshopError {
+            // The UI's Premium unlock and the backend's device flag are separate gates: a local dev
+            // override (or a cached-but-revoked license) can flip the UI to Premium while the backend
+            // still refuses the download (402). For those failures, re-open the paywall so the miss is
+            // unmistakable and the user can actually activate this device — instead of leaving a tiny
+            // banner that reads as "nothing happened."
+            if e.requiresPaywall { model.showPaywall(e.errorDescription ?? "This wallpaper is Premium.") }
+            return e.errorDescription
         } catch {
             return error.localizedDescription
         }

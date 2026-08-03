@@ -22,7 +22,19 @@ struct WorkshopClient: Sendable {
             case .premiumBackendUnavailable:
                 return "This is a Premium wallpaper, but the backend isn't configured (Settings → AI Generation → Backend URL)."
             case .premiumLocked:
-                return "This wallpaper is Premium — unlock Premium to install it."
+                // The backend refused this device (402): either not Premium yet, or Premium was
+                // bought but this Mac was never activated (its device id isn't registered).
+                return "This wallpaper is Premium. Activate this device (Settings → Premium) to install it."
+            }
+        }
+
+        /// True for failures that mean "this device can't get this premium bundle." The install path
+        /// re-opens the paywall for these instead of showing a passing banner, so a UI that thinks it's
+        /// Premium (dev override / stale license) can't diverge silently from the backend's device gate.
+        var requiresPaywall: Bool {
+            switch self {
+            case .premiumLocked, .premiumBackendUnavailable: return true
+            case .notConfigured, .badURL, .http: return false
             }
         }
     }

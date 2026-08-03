@@ -196,6 +196,22 @@ enum SelfTest {
             check("catalog: premium request carries device + bundle_key",
                   body["device_id"] == "dev" && body["bundle_key"] == "premium/b.livewallpaper" && body["item_id"] == "b")
         } else { check("catalog: premium request builds", false) }
+        // A premium item with no bundle_key can't be fetched → no request (surfaces as
+        // .premiumBackendUnavailable, which the install path routes to the paywall).
+        let premNoKey = decodeItem(#"{"id":"c","title":"NoKey","type":"metal","checksum":"sha256-z","tier":"premium"}"#)
+        check("catalog: premium item without bundle_key builds no request",
+              premNoKey.flatMap { WorkshopClient.premiumBundleRequest(backendBase: "https://api", deviceID: "dev", item: $0) } == nil)
+
+        // 17b) Premium-install failure routing: a backend refusal (402 → .premiumLocked) or a missing
+        // backend must re-open the paywall and carry a non-empty reason — this is the guard against the
+        // "click Install, nothing happens" regression where the UI thinks it's Premium but the device
+        // isn't entitled. Generic transport errors must NOT hijack the paywall.
+        check("premium: 402/locked routes to the paywall", WorkshopClient.WorkshopError.premiumLocked.requiresPaywall)
+        check("premium: missing backend routes to the paywall", WorkshopClient.WorkshopError.premiumBackendUnavailable.requiresPaywall)
+        check("premium: generic HTTP error does not open the paywall", !WorkshopClient.WorkshopError.http(500).requiresPaywall)
+        check("premium: bad URL does not open the paywall", !WorkshopClient.WorkshopError.badURL.requiresPaywall)
+        check("premium: locked failure has a non-empty reason",
+              !(WorkshopClient.WorkshopError.premiumLocked.errorDescription ?? "").isEmpty)
 
         // 18) Licensing auto-renew decision (pure): renew when missing or within the window; not when
         // comfortably valid.
