@@ -177,9 +177,14 @@ New Phase-2 scope instead:
   upsell, and a Premium section in Settings. **Activation is a pre-release local placeholder**
   (`unlockForNow`) — real StoreKit purchase + device-bound activation land with the backend
   ([LICENSING.md](docs/LICENSING.md)). +2 self-test checks.
-- ⬜ Device-bound licensing for premium downloads (`IOPlatformUUID`, device cap, signed license,
-  self-serve deactivation) — see [LICENSING.md](docs/LICENSING.md). Reuses the "bundle signing"
-  idea, repurposed from moderation to DRM.
+- 🟡 Device-bound licensing — **core built**: the backend Worker issues an **Ed25519-signed license**
+  bound to the device (`POST /license`); the client verifies it **offline** with the embedded public
+  key and checks the id matches this machine (`Licensing`, `Device` = `IOPlatformUUID`). `Entitlement`
+  now derives premium from a valid device-bound license (dev override kept for UI testing). Validated
+  end-to-end (Worker Web-Crypto sign ↔ CryptoKit verify) + 3 self-test checks.
+  - Remaining: **StoreKit purchase** flips the server-side `premium` flag (gated on an Apple Developer
+    account; today it's the admin route), plus device cap + self-serve deactivation + shorter expiry.
+    See [LICENSING.md](docs/LICENSING.md).
 - ✅ Make the backend repo **private** (client stays MIT) — done; git history scanned, no secrets
 - ✅ AI shader **and web** generation (marquee premium feature), provider-agnostic: prompt →
   selected provider → generate → validate → package + install + apply. Premium-gated; keys in the

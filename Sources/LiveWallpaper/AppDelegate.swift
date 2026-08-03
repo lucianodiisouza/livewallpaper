@@ -56,6 +56,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Entitlement.shared.$isPremium
             .sink { [weak self] _ in self?.restartRotation() }
             .store(in: &cancellables)
+        // Pull a fresh device-bound license from the backend (no-op if unconfigured/offline).
+        Task { await Entitlement.shared.refresh() }
 
         NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main

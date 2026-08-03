@@ -156,6 +156,17 @@ enum SelfTest {
             check("exportWeb installs as a web package", pkg.manifest.type == .web)
         } catch { check("exportWeb round-trip — \(error)", false) }
 
+        // 15) Device-bound license: Ed25519 verify, tamper rejection, device-binding. Fixed vector
+        // signed by the scaffold key (see Licensing.publicKeyB64).
+        let licPayload = "eyJkZXZpY2VfaWQiOiJzZWxmdGVzdC1kZXZpY2UiLCJleHAiOjQxMDI0NDQ4MDAsImlhdCI6MTczNTY4OTYwMCwicHJlbWl1bSI6dHJ1ZSwidiI6MX0"
+        let licSig = "ZiBfK5kMJfklTOORqeDRsk7DsQj_DeT9CocxZTtR9Vt_seFiYugWw-2Ct8iQjgzYY-NVrbacqKUk45PGbjspAg"
+        let licToken = licPayload + "." + licSig
+        if let c = Licensing.verify(licToken) {
+            check("license: valid signature + premium claim", c.premium && c.deviceId == "selftest-device")
+        } else { check("license: valid signature + premium claim", false) }
+        check("license: tampered token rejected", Licensing.verify(licPayload + "AA." + licSig) == nil)
+        check("license: not bound to this device", Licensing.claimsForThisDevice(licToken) == nil)
+
         // Clean up installed selftest packages.
         for pkg in library.installedPackages() where pkg.manifest.id.hasPrefix("selftest.") {
             try? FileManager.default.removeItem(at: pkg.directory)

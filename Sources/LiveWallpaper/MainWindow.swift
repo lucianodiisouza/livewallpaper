@@ -336,13 +336,13 @@ struct PaywallSheet: View {
             Text("One-time purchase · no subscription").font(.caption).foregroundStyle(.secondary)
 
             Divider()
-            Text("Pre-release build: this unlocks locally for testing. Real purchase and device-bound licensing arrive with the backend.")
+            Text("Purchasing isn't in this pre-release build yet. Once this Mac is activated on the backend, tap Check activation — the license is signed and bound to this device.")
                 .font(.caption2).foregroundStyle(.secondary)
 
             HStack {
                 Spacer()
                 Button("Not now") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Unlock Premium") { entitlement.unlockForNow(); dismiss() }
+                Button("Check activation") { Task { await entitlement.refresh(); dismiss() } }
                     .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
             }
         }
@@ -662,8 +662,11 @@ struct SettingsTab: View {
                             Button("Lock (test)") { entitlement.lock() }
                                 .help("Developer: relock to test the free experience")
                         } else {
-                            Button("Unlock…") { model.showPaywall("Unlock Primo Engine Premium.") }
+                            Button("Unlock (test)") { entitlement.unlockForNow() }
+                                .help("Developer: local override — not a real purchase or device-bound license")
+                            Button("Check activation") { Task { await entitlement.refresh() } }
                                 .buttonStyle(.borderedProminent)
+                                .help("Fetch a device-bound license from the backend")
                         }
                     }
                     .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
