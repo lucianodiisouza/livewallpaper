@@ -44,6 +44,7 @@ struct MainView: View {
         .frame(minWidth: 800, minHeight: 520)
         .onChange(of: section) { onTitle(section.rawValue) }
         .task { onTitle(section.rawValue) }
+        .sheet(item: $model.paywall) { ctx in PaywallSheet(reason: ctx.reason) }
     }
 
     private var activeFooter: some View {
@@ -100,9 +101,11 @@ struct WallpaperTile: View {
     /// Open the live preview sheet for this wallpaper (tap the thumbnail).
     var onOpen: (AppModel.Entry) -> Void = { _ in }
     @State private var thumb: NSImage?
+    @ObservedObject private var entitlement = Entitlement.shared
 
     private var isStarred: Bool { model.isStarred(entry.id) }
     private var multiMonitor: Bool { model.screens.count > 1 }
+    private var isLocked: Bool { entry.isPremium && !entitlement.isPremium }
     /// Is this wallpaper already applied to whatever "Set" would target?
     private var appliesHere: Bool {
         if let target, let s = model.screens.first(where: { $0.id == target }) { return s.assignedID == entry.id }
@@ -138,10 +141,10 @@ struct WallpaperTile: View {
             Button { onOpen(entry) } label: { Label("Preview", systemImage: "eye") }
             if multiMonitor {
                 Menu("Apply to") {
-                    Button("All displays") { model.setActive(entry.id) }
+                    Button("All displays") { model.attemptApply(entry) }
                     Divider()
                     ForEach(model.screens) { s in
-                        Button(s.name) { model.assign(entry.id, toScreen: s.id) }
+                        Button(s.name) { model.attemptApply(entry, toScreen: s.id) }
                     }
                 }
             }
@@ -161,10 +164,7 @@ struct WallpaperTile: View {
         .help("More actions")
     }
 
-    private func applySet() {
-        if let target { model.assign(entry.id, toScreen: target) }
-        else { model.setActive(entry.id) }
-    }
+    private func applySet() { model.attemptApply(entry, toScreen: target) }
 
     private var preview: some View {
         Group {
@@ -181,7 +181,13 @@ struct WallpaperTile: View {
         .help("Preview")
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(appliesHere ? Color.accentColor : .clear, lineWidth: 2))
         .overlay(alignment: .topLeading) {
-            if appliesHere {
+            if isLocked {
+                Label("Premium", systemImage: "lock.fill")
+                    .labelStyle(.titleAndIcon).font(.caption2.weight(.bold))
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .background(.black.opacity(0.6)).foregroundStyle(.yellow)
+                    .clipShape(Capsule()).padding(8)
+            } else if appliesHere {
                 Text("ACTIVE").font(.caption2.weight(.bold))
                     .padding(.horizontal, 6).padding(.vertical, 2)
                     .background(.green.opacity(0.9)).foregroundStyle(.white)
@@ -247,8 +253,10 @@ struct WallpaperPreviewSheet: View {
     let entry: AppModel.Entry
     var target: String?
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var entitlement = Entitlement.shared
 
     private var multiMonitor: Bool { model.screens.count > 1 }
+    private var isLocked: Bool { entry.isPremium && !entitlement.isPremium }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -267,17 +275,26 @@ struct WallpaperPreviewSheet: View {
                     Button { model.onExport?(entry.id) } label: { Label("Share…", systemImage: "square.and.arrow.up") }
                         .help("Export a .livewallpaper to share with someone")
                 }
-                if multiMonitor {
-                    Menu("Apply to…") {
-                        Button("All displays") { apply(nil) }
-                        Divider()
-                        ForEach(model.screens) { s in Button(s.name) { apply(s.id) } }
+                if isLocked {
+                    Button("Unlock Premium") {
+                        dismiss()
+                        model.showPaywall("“\(entry.title)” is a Premium wallpaper.")
                     }
-                    .fixedSize()
-                }
-                Button("Apply") { apply(target) }
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent)
+                } else {
+                    if multiMonitor {
+                        Menu("Apply to…") {
+                            Button("All displays") { apply(nil) }
+                            Divider()
+                            ForEach(model.screens) { s in Button(s.name) { apply(s.id) } }
+                        }
+                        .fixedSize()
+                    }
+                    Button("Apply") { apply(target) }
+                        .keyboardShortcut(.defaultAction)
+                        .buttonStyle(.borderedProminent)
+                }
                 Button("Close") { dismiss() }
                     .keyboardShortcut(.cancelAction)
             }
@@ -289,6 +306,56 @@ struct WallpaperPreviewSheet: View {
     private func apply(_ key: String?) {
         if let key { model.assign(entry.id, toScreen: key) } else { model.setActive(entry.id) }
         dismiss()
+    }
+}
+
+// MARK: - Paywall
+
+/// The Premium upsell sheet. Lists what Premium unlocks and offers activation. In this pre-release
+/// build the button flips the entitlement locally (see `Entitlement`); real purchase + device-bound
+/// licensing land with the backend (docs/LICENSING.md).
+struct PaywallSheet: View {
+    let reason: String
+    @ObservedObject private var entitlement = Entitlement.shared
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles").font(.title2).foregroundStyle(.tint)
+                Text("Primo Engine Premium").font(.title2.bold())
+            }
+            Text(reason).foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 8) {
+                benefit("The full wallpaper catalog", "square.stack")
+                benefit("Every Metal shader & web wallpaper", "sparkles")
+                benefit("Per-display rotation & playlists", "display.2")
+                benefit("AI-generated wallpapers (coming soon)", "wand.and.stars")
+            }
+            Text("One-time purchase · no subscription").font(.caption).foregroundStyle(.secondary)
+
+            Divider()
+            Text("Pre-release build: this unlocks locally for testing. Real purchase and device-bound licensing arrive with the backend.")
+                .font(.caption2).foregroundStyle(.secondary)
+
+            HStack {
+                Spacer()
+                Button("Not now") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Unlock Premium") { entitlement.unlockForNow(); dismiss() }
+                    .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 430)
+    }
+
+    private func benefit(_ text: String, _ icon: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon).foregroundStyle(.tint).frame(width: 22)
+            Text(text)
+            Spacer(minLength: 0)
+        }
     }
 }
 
@@ -451,11 +518,35 @@ struct ExploreView: View {
 struct SettingsTab: View {
     @ObservedObject var model: AppModel
     @ObservedObject private var prefs = Preferences.shared
+    @ObservedObject private var entitlement = Entitlement.shared
 
     // A ScrollView (not a Form) so this tab gets the same large inline title as Installed/Explore.
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                GroupBox("Premium") {
+                    HStack(spacing: 12) {
+                        Image(systemName: entitlement.isPremium ? "checkmark.seal.fill" : "sparkles")
+                            .font(.title2).foregroundStyle(entitlement.isPremium ? Color.green : Color.accentColor)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(entitlement.isPremium ? "Premium active" : "Free")
+                                .font(.headline)
+                            Text(entitlement.isPremium
+                                 ? "The full catalog and all features are unlocked."
+                                 : "Unlock the full catalog, per-display rotation, and more.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if entitlement.isPremium {
+                            Button("Lock (test)") { entitlement.lock() }
+                                .help("Developer: relock to test the free experience")
+                        } else {
+                            Button("Unlock…") { model.showPaywall("Unlock Primo Engine Premium.") }
+                                .buttonStyle(.borderedProminent)
+                        }
+                    }
+                    .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
+                }
                 GroupBox("General") {
                     VStack(alignment: .leading, spacing: 8) {
                         Toggle("Launch at login", isOn: $prefs.launchAtLogin)
@@ -478,9 +569,15 @@ struct SettingsTab: View {
                 GroupBox("Rotation") {
                     VStack(alignment: .leading, spacing: 8) {
                         Toggle("Rotate through all wallpapers", isOn: $prefs.rotationEnabled)
+                            .disabled(!entitlement.isPremium)
                         Stepper("Every \(prefs.rotationMinutes) min", value: $prefs.rotationMinutes, in: 1...240)
-                            .disabled(!prefs.rotationEnabled)
-                        if model.screens.count > 1 {
+                            .disabled(!prefs.rotationEnabled || !entitlement.isPremium)
+                        if !entitlement.isPremium {
+                            Button { model.showPaywall("Rotation is a Premium feature.") } label: {
+                                Label("Premium feature — Unlock", systemImage: "lock.fill")
+                            }
+                            .buttonStyle(.link).font(.caption)
+                        } else if model.screens.count > 1 {
                             Text("Each display rotates independently from its current wallpaper.")
                                 .font(.caption).foregroundStyle(.secondary)
                         }

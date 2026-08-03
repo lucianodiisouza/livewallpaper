@@ -127,6 +127,19 @@ enum SelfTest {
         check("update: older is not newer", !UpdateChecker.isNewer("0.1.0", than: "0.2.0"))
         check("update: tag normalizes (v + pre-release)", UpdateChecker.normalized("v1.2.3-beta.1") == "1.2.3")
 
+        // 12) Premium gating: a premium wallpaper is blocked (paywall opens) when locked, applied
+        // when unlocked. Snapshot + restore the entitlement so the check leaves no side effect.
+        let wasPremium = Entitlement.shared.isPremium
+        let em = AppModel()
+        let premiumEntry = AppModel.Entry(id: "selftest.premium", title: "Premium", kind: "metal",
+                                          isBuiltIn: true, isPremium: true)
+        Entitlement.shared.lock()
+        check("premium wallpaper is gated when locked", em.attemptApply(premiumEntry) == false && em.paywall != nil)
+        em.paywall = nil
+        Entitlement.shared.unlockForNow()
+        check("premium wallpaper applies when unlocked", em.attemptApply(premiumEntry) == true && em.paywall == nil)
+        if wasPremium { Entitlement.shared.unlockForNow() } else { Entitlement.shared.lock() }
+
         // Clean up installed selftest packages.
         for pkg in library.installedPackages() where pkg.manifest.id.hasPrefix("selftest.") {
             try? FileManager.default.removeItem(at: pkg.directory)

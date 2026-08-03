@@ -14,7 +14,11 @@ final class AppModel: ObservableObject {
         var previewSource: String? = nil   // shader source for the preview thumbnail (metal only)
         var previewVideoURL: URL? = nil    // video file for a static frame preview (video only)
         var isShareable: Bool = false      // user-imported ⇒ P2P-shareable (catalog content isn't)
+        var isPremium: Bool = false        // locked behind the Premium entitlement
     }
+
+    /// Drives the paywall sheet (nil ⇒ hidden). `reason` explains what the user tried to unlock.
+    struct PaywallContext: Identifiable { let id = UUID(); let reason: String }
 
     /// One physical display and what's assigned to it. `id` is the Library screen key.
     struct ScreenInfo: Identifiable {
@@ -32,6 +36,8 @@ final class AppModel: ObservableObject {
     @Published var screens: [ScreenInfo] = []
     /// The currently-rendering wallpaper id.
     @Published var currentID: String = ""
+    /// When non-nil, the paywall sheet is shown with this context.
+    @Published var paywall: PaywallContext?
     /// Pinned wallpaper ids shown in the menu bar (max 5, ordered).
     @Published private(set) var starred: [String] = []
 
@@ -79,6 +85,23 @@ final class AppModel: ObservableObject {
     func assign(_ wallpaperID: String, toScreen key: String) {
         onAssign?(wallpaperID, key)
     }
+
+    // MARK: - Premium gating
+
+    /// Apply a wallpaper, but if it's Premium and the user isn't entitled, open the paywall instead.
+    /// `key` = a display to target (nil ⇒ all). Returns true if applied, false if the paywall opened.
+    @discardableResult
+    func attemptApply(_ entry: Entry, toScreen key: String? = nil) -> Bool {
+        if entry.isPremium && !Entitlement.shared.isPremium {
+            paywall = PaywallContext(reason: "“\(entry.title)” is a Premium wallpaper.")
+            return false
+        }
+        if let key { assign(entry.id, toScreen: key) } else { setActive(entry.id) }
+        return true
+    }
+
+    /// Open the paywall with a custom reason (e.g. a gated setting).
+    func showPaywall(_ reason: String) { paywall = PaywallContext(reason: reason) }
 
     func remove(_ id: String) {
         onRemove?(id)

@@ -172,7 +172,11 @@ New Phase-2 scope instead:
   not a thumbnail) with Apply / Apply-to-display / Share
 - 🟡 Read-only premium catalog — the M4 client is repurposed (Explore renamed **Catalog**); still
   points at our own PocketBase feed (backend now private)
-- ⬜ Paywall / entitlement layer (free vs. premium — see [FREEMIUM.md](docs/FREEMIUM.md))
+- 🟡 Paywall / entitlement layer — `Entitlement` (single `isPremium` source of truth) + gating:
+  premium built-ins (lock badge → paywall on apply), rotation is Premium-gated, a `PaywallSheet`
+  upsell, and a Premium section in Settings. **Activation is a pre-release local placeholder**
+  (`unlockForNow`) — real StoreKit purchase + device-bound activation land with the backend
+  ([LICENSING.md](docs/LICENSING.md)). +2 self-test checks.
 - ⬜ Device-bound licensing for premium downloads (`IOPlatformUUID`, device cap, signed license,
   self-serve deactivation) — see [LICENSING.md](docs/LICENSING.md). Reuses the "bundle signing"
   idea, repurposed from moderation to DRM.

@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import UniformTypeIdentifiers
 import os
 
@@ -16,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusItem: NSStatusItem?
     private var rotationTimer: Timer?
+    private var cancellables = Set<AnyCancellable>()
     /// Set once a launch-time (or manual) check finds a newer release; surfaces in the menu.
     private var availableUpdate: UpdateChecker.Outcome?
 
@@ -49,6 +51,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.applyBackdropIfEnabled()
         }
         restartRotation()
+
+        // Rotation is Premium-gated; re-evaluate whenever the entitlement flips.
+        Entitlement.shared.$isPremium
+            .sink { [weak self] _ in self?.restartRotation() }
+            .store(in: &cancellables)
 
         NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
@@ -179,7 +186,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         var entries = WallpaperCatalog.all.map {
             AppModel.Entry(id: $0.id, title: $0.title, kind: $0.kind, isBuiltIn: true,
                            previewSource: WallpaperCatalog.shaderSource(forID: $0.id),
-                           previewVideoURL: $0.kind == "video" ? bundledLoop : nil)
+                           previewVideoURL: $0.kind == "video" ? bundledLoop : nil,
+                           isPremium: $0.isPremium)
         }
         entries += installed.map { pkg -> AppModel.Entry in
             var source: String?
@@ -456,7 +464,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func restartRotation() {
         rotationTimer?.invalidate(); rotationTimer = nil
-        guard Preferences.shared.rotationEnabled else { return }
+        // Rotation is a Premium feature — don't run it for free users even if the flag is set.
+        guard Preferences.shared.rotationEnabled, Entitlement.shared.isPremium else { return }
         let interval = TimeInterval(max(1, Preferences.shared.rotationMinutes) * 60)
         rotationTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.rotate() }

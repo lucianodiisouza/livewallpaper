@@ -9,6 +9,7 @@ enum WallpaperCatalog {
         let id: String
         let title: String
         let kind: String            // "video" | "metal" | "web"
+        var isPremium: Bool = false // locked behind the Premium entitlement
         let make: () -> WallpaperRenderer
     }
 
@@ -19,17 +20,21 @@ enum WallpaperCatalog {
     ]
 
     static let all: [Item] = [
+        // Free sampler: the default wallpaper is always free so free users can render something.
         Item(id: "video",  title: "Video Loop", kind: "video") { VideoRenderer() },
         Item(id: "plasma", title: "Shader · Plasma", kind: "metal") {
             MetalRenderer(shaderSource: BuiltInShaders.plasma, configSchema: shaderConfig)
         },
-        Item(id: "aurora", title: "Shader · Aurora", kind: "metal") {
+        // Premium sampler.
+        Item(id: "aurora", title: "Shader · Aurora", kind: "metal", isPremium: true) {
             MetalRenderer(shaderSource: BuiltInShaders.aurora, configSchema: shaderConfig)
         },
-        Item(id: "web-stars", title: "Web · Starfield", kind: "web") {
+        Item(id: "web-stars", title: "Web · Starfield", kind: "web", isPremium: true) {
             WebRenderer(inlineHTML: BuiltInWeb.starfield, allowlist: [], schema: [])
         },
     ]
+
+    static func isPremium(forID id: String) -> Bool { all.first { $0.id == id }?.isPremium ?? false }
 
     static func kind(forID id: String) -> String { all.first { $0.id == id }?.kind ?? "metal" }
 
