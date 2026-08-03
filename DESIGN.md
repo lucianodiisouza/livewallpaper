@@ -294,8 +294,11 @@ revenue. Private `WallpaperExtensionKit` path — see [COMPETITIVE.md](docs/COMP
 
 ## 12. Open questions / risks
 
-- **Sandbox vs. desktop window on current macOS.** Highest-priority unknown — spike in M0.
-  If App Store sandbox blocks it, fall back to notarized direct distribution.
+- **Sandbox vs. desktop window on current macOS.** ✅ **Resolved (2026-08-03).** M0 proved the
+  desktop-level window mounts under the App Sandbox; `--sandbox-probe` extends this to the full
+  current feature set (IOKit id, Keychain, container writes, CGWindowList metadata, desktop-picture
+  read/write) — all work in-container. The only remaining Mac App Store risk is *review policy* on
+  the undocumented `.desktopWindow` level, settled only by submitting. See DISTRIBUTION.md Phase D.
 - **Web content power cost.** May need a stricter default throttle for `web` type, or a per-package
   energy budget shown to users.
 - **Premium DRM is deterrence, not prevention.** The client is open-source and must decode

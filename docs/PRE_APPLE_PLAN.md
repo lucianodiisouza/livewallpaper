@@ -121,9 +121,14 @@ Steps: commit the work → push `main` → `git tag v0.3.0 && git push origin v0
 builds/self-tests/publishes. **Outward-facing + public — needs the owner's explicit go-ahead.** A
 safer first pass: Actions → Release (unsigned) → Run workflow (dry-run artifact, no public Release).
 
-### C2. (Optional) M0 sandbox spike  ⬜
-Pure engineering; answers the one real technical unknown (App-Sandbox desktop window on macOS 26 —
-CLAUDE.md "one real risk"). **Unblocks** the Apple/MAS track for later at no Apple cost now.
+### C2. M0 sandbox spike  ✅  *(done 2026-08-03)*
+Extended the M0 desktop-window proof to the whole current feature set via a headless
+`--sandbox-probe` (`SandboxProbe.swift`), run from the **sandboxed** `.app` binary. All required
+capabilities pass **inside the container**: IOKit `IOPlatformUUID`, Keychain round-trip, Application
+Support writes, `CGWindowListCopyWindowInfo` foreign-window bounds (B5 signal — no screen-recording
+permission needed), and `NSWorkspace` desktop-picture read/write. **Sandbox capability is not the
+blocker.** The only remaining Mac App Store risk is *review policy* on the undocumented
+`.desktopWindow` level — settleable only by submitting. DESIGN §12 + DISTRIBUTION Phase D updated.
 
 ---
 

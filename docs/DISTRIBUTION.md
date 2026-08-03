@@ -54,9 +54,22 @@ Phase-A notification bridge above with real in-place updates.
 
 ## Phase D — optional: Mac App Store
 
-A possible *second* channel, **pending the sandbox spike** (DESIGN.md §12): confirm an
-App-Sandbox build can still create the desktop-level window on the target macOS. If it can't,
-stay notarized-direct only. The MAS build would use StoreKit for updates instead of Sparkle.
+A possible *second* channel. The MAS build would use StoreKit for updates instead of Sparkle.
+
+**Sandbox spike — RESOLVED (2026-08-03).** M0 proved the desktop-level window mounts under the App
+Sandbox (macOS 26.5). `--sandbox-probe` (run from the sandboxed `.app` binary, `SandboxProbe.swift`)
+extends that to the whole current feature set: **all pass inside the container** — IOKit
+`IOPlatformUUID`, Keychain, Application Support writes, `CGWindowListCopyWindowInfo` foreign-window
+bounds (the B5 full-screen signal — window *metadata* needs no screen-recording permission), and
+`NSWorkspace` desktop-picture read/write (the running sandboxed instance had already set its solid
+backdrop). So **sandbox _capability_ is not the blocker.**
+
+The remaining MAS gate is **review policy, not function**: the desktop illusion uses the
+undocumented `.desktopWindow` window level (`CGWindowLevelForKey`), which App Review may reject
+regardless of the sandbox. That can only be settled by submitting. If MAS rejects it → stay
+notarized-direct only (Phases B/C); nothing else in the app depends on the store. Minor: for MAS,
+Apple discourages hardware ids — `Device.id` already falls back to a Keychain-persisted UUID when
+`IOPlatformUUID` is unavailable.
 
 ## CI/CD
 

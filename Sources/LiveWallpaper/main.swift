@@ -14,6 +14,12 @@ if CommandLine.arguments.contains("--selftest") {
     exit(SelfTest.run())
 }
 
+// Headless App-Sandbox capability probe: `LiveWallpaper --sandbox-probe`. Run it from the SANDBOXED
+// .app binary to confirm the current feature set works inside the container (the M0 spike, extended).
+if CommandLine.arguments.contains("--sandbox-probe") {
+    exit(SandboxProbe.run())
+}
+
 // Generate an importable sample package: `LiveWallpaper --make-sample <path.livewallpaper>`.
 // Compile-checks the shader first so the emitted package is guaranteed to render.
 if let i = CommandLine.arguments.firstIndex(of: "--make-sample"), i + 1 < CommandLine.arguments.count {

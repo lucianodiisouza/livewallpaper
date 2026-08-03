@@ -269,6 +269,8 @@ Still open (future polish):
   next tag **v0.3.0**.)_
 - ⬜ Phase B: Developer ID signing + notarization — **gated on Apple Developer account**
 - ⬜ Phase C: Sparkle auto-updates (appcast + EdDSA signing) — after Phase B
-- ⬜ Phase D: Mac App Store — pending the M0 sandbox spike
+- ⬜ Phase D: Mac App Store — **sandbox spike resolved** (2026-08-03): `--sandbox-probe` confirms the
+  full feature set works in-container (see DISTRIBUTION Phase D). Only remaining gate is App Review
+  policy on the undocumented `.desktopWindow` level — settleable only by submitting (needs Apple acct).
 - ✅ CI: GitHub Actions build-on-tag → self-test → zip → release (Phase A);
   sign/notarize/staple to be added with Phase B

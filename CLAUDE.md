@@ -38,10 +38,12 @@ When in doubt, prefer the smallest change that advances the current freemium/P2P
 
 ## The one real risk — verify early
 
-**Can an App-Sandbox'd build create a desktop-level window on macOS 26?** This is the only
-genuine technical unknown (see DESIGN.md §12). The M0 spike must answer it before we commit to
-Mac App Store as a distribution channel. Everything downstream assumes the desktop-window
-illusion holds. If sandbox blocks it → distribution stays notarized-direct only.
+**Can an App-Sandbox'd build create a desktop-level window on macOS 26?** ✅ **Resolved.** M0 proved
+the window mounts under the sandbox (macOS 26.5), and `--sandbox-probe` (run from the sandboxed
+`.app`) confirms the *whole current feature set* works in-container — IOKit id, Keychain, container
+writes, CGWindowList metadata, desktop-picture read/write. The only remaining Mac App Store risk is
+App Review *policy* on the undocumented `.desktopWindow` level (settleable only by submitting); if
+MAS rejects it, distribution stays notarized-direct. See DESIGN.md §12 / DISTRIBUTION.md Phase D.
 
 ## Load-bearing decisions (don't quietly reverse these)
 
@@ -99,6 +101,7 @@ Sources/LiveWallpaper/
   SampleMaker.swift       # --export / --make-sample package generators
   UpdateChecker.swift     # GitHub Releases "new version?" check + notify (Phase A bridge to Sparkle)
   SelfTest.swift          # `--selftest` headless pipeline check (59 checks)
+  SandboxProbe.swift      # `--sandbox-probe` — App-Sandbox capability spike (run from the .app)
 scripts/seed-workshop.sh   # seed built-ins into PocketBase (admin; reads .env)
 LiveWallpaper.entitlements # app-sandbox + network.client + user-selected read-write
 scripts/build-app.sh       # assemble .app, generate loop.mp4 (ffmpeg), ad-hoc sign
