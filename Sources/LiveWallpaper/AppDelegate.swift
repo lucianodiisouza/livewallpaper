@@ -191,7 +191,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return AppModel.Entry(id: pkg.manifest.id, title: pkg.manifest.title,
                                   kind: pkg.manifest.type.rawValue, isBuiltIn: false,
-                                  previewSource: source, previewVideoURL: videoURL)
+                                  previewSource: source, previewVideoURL: videoURL,
+                                  isShareable: library.isImported(pkg.manifest.id))
         }
         model.available = entries
 
@@ -376,6 +377,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let url = try await model.workshop.downloadBundle(item)
             let pkg = try library.install(fromZipAt: url)
             await model.workshop.incrementDownload(item.id)
+            library.markFromCatalog(pkg.manifest.id)   // catalog content is not P2P-shareable
             if let key, let screen = NSScreen.screens.first(where: { Library.key(for: $0) == key }) {
                 library.assign(pkg.manifest.id, to: screen)
             } else {
@@ -397,6 +399,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             let pkg = try library.install(fromZipAt: url)
+            library.markImported(pkg.manifest.id)   // user-imported ⇒ P2P-shareable
             library.assignToAll(pkg.manifest.id, screens: NSScreen.screens)
             rebuildScreenlets()
         } catch {

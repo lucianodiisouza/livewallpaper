@@ -125,23 +125,32 @@ struct WallpaperTile: View {
                     Button("Set") { applySet() }
                         .controlSize(.small).buttonStyle(.borderedProminent)
                 }
-                if multiMonitor { perDisplayMenu }
-                if !entry.isBuiltIn {
-                    Button { model.remove(entry.id) } label: { Image(systemName: "trash") }
-                        .buttonStyle(.plain).foregroundStyle(.secondary).controlSize(.small).help("Uninstall")
-                }
+                actionsMenu
             }
         }
         .task(id: entry.id) { thumb = await loadThumb(entry) }
     }
 
-    /// The "…" alternative: apply this wallpaper straight to one named display (or all).
-    private var perDisplayMenu: some View {
+    /// The "…" actions menu — always shown: Preview, Apply-to-display (multi-monitor), Share
+    /// (imported wallpapers only), Delete (installed only).
+    private var actionsMenu: some View {
         Menu {
-            Button("All displays") { model.setActive(entry.id) }
-            Divider()
-            ForEach(model.screens) { s in
-                Button(s.name) { model.assign(entry.id, toScreen: s.id) }
+            Button { onOpen(entry) } label: { Label("Preview", systemImage: "eye") }
+            if multiMonitor {
+                Menu("Apply to") {
+                    Button("All displays") { model.setActive(entry.id) }
+                    Divider()
+                    ForEach(model.screens) { s in
+                        Button(s.name) { model.assign(entry.id, toScreen: s.id) }
+                    }
+                }
+            }
+            if entry.isShareable {
+                Button { model.onExport?(entry.id) } label: { Label("Share…", systemImage: "square.and.arrow.up") }
+            }
+            if !entry.isBuiltIn {
+                Divider()
+                Button(role: .destructive) { model.remove(entry.id) } label: { Label("Delete", systemImage: "trash") }
             }
         } label: {
             Image(systemName: "ellipsis")
@@ -149,7 +158,7 @@ struct WallpaperTile: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help("Apply to a specific display")
+        .help("More actions")
     }
 
     private func applySet() {
@@ -254,7 +263,7 @@ struct WallpaperPreviewSheet: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                if !entry.isBuiltIn {
+                if entry.isShareable {
                     Button { model.onExport?(entry.id) } label: { Label("Share…", systemImage: "square.and.arrow.up") }
                         .help("Export a .livewallpaper to share with someone")
                 }

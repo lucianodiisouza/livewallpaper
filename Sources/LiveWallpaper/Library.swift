@@ -39,7 +39,25 @@ final class Library {
             try? fm.removeItem(at: pkg.directory)
             log.notice("Removed package '\(id, privacy: .public)'.")
         }
+        markFromCatalog(id)   // forget any imported-provenance flag
     }
+
+    // MARK: - Provenance (imported vs. from our catalog)
+
+    /// Ids the user imported from a local file. Only these are peer-to-peer *shareable* — catalog
+    /// content isn't (free items are re-downloadable by anyone; premium is device-bound). See
+    /// docs/LICENSING.md.
+    private var importedIDs: Set<String> {
+        get { Set(UserDefaults.standard.stringArray(forKey: "importedIDs") ?? []) }
+        set { UserDefaults.standard.set(Array(newValue), forKey: "importedIDs") }
+    }
+
+    /// Mark a package as user-imported (⇒ shareable).
+    func markImported(_ id: String) { var s = importedIDs; s.insert(id); importedIDs = s }
+    /// Mark a package as catalog-sourced (⇒ not shareable).
+    func markFromCatalog(_ id: String) { var s = importedIDs; s.remove(id); importedIDs = s }
+    /// Did the user import this package themselves (vs. install it from the catalog)?
+    func isImported(_ id: String) -> Bool { importedIDs.contains(id) }
 
     // MARK: - Install
 

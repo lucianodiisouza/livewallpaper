@@ -164,8 +164,10 @@ becomes the premium catalog; M5 is re-scoped away from moderation to licensing.
 moderation/review queue, ratings/reports, DMCA, author bans, upload quotas, creator payouts.
 
 New Phase-2 scope instead:
-- ✅ Peer-to-peer sharing UX — "Share…" in the preview sheet exports any installed wallpaper to a
-  `.livewallpaper` (`Library.exportPackage`, re-zips the unpacked package); import already existed
+- ✅ Peer-to-peer sharing UX — "Share…" (preview sheet + the per-tile "…" menu) exports a
+  wallpaper to a `.livewallpaper` (`Library.exportPackage`, re-zips the unpacked package). Only
+  **user-imported** wallpapers are shareable — catalog content isn't (free is re-downloadable,
+  premium will be device-bound). Provenance tracked via `Library.isImported`.
 - ✅ Preview-before-apply — tapping a wallpaper opens a live-rendered preview sheet (real renderer,
   not a thumbnail) with Apply / Apply-to-display / Share
 - 🟡 Read-only premium catalog — the M4 client is repurposed (Explore renamed **Catalog**); still

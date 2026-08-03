@@ -13,6 +13,7 @@ final class AppModel: ObservableObject {
         let isBuiltIn: Bool
         var previewSource: String? = nil   // shader source for the preview thumbnail (metal only)
         var previewVideoURL: URL? = nil    // video file for a static frame preview (video only)
+        var isShareable: Bool = false      // user-imported ⇒ P2P-shareable (catalog content isn't)
     }
 
     /// One physical display and what's assigned to it. `id` is the Library screen key.
