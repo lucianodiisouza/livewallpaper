@@ -10,8 +10,9 @@ import Foundation
 /// by `MetalUniforms`.
 enum BuiltInShaders {
 
-    /// Common prelude: the Uniforms struct + a full-screen-triangle vertex function.
-    private static let prelude = """
+    /// Common prelude: the Uniforms struct + a full-screen-triangle vertex function. Exposed so the
+    /// AI generator can prepend the exact, fixed contract and only ask the model for `f_main`.
+    static let prelude = """
     #include <metal_stdlib>
     using namespace metal;
 

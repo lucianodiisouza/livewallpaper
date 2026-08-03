@@ -359,6 +359,61 @@ struct PaywallSheet: View {
     }
 }
 
+// MARK: - AI generation
+
+/// Prompt sheet for AI wallpaper generation. Stays open while generating and dismisses on success;
+/// keeps the error visible on failure. Gated to Premium by the caller; needs an API key (Settings).
+struct GenerateSheet: View {
+    @ObservedObject var model: AppModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var prompt = ""
+    @State private var started = false
+
+    private var canGenerate: Bool {
+        !prompt.trimmingCharacters(in: .whitespaces).isEmpty && AIConfig.isConfigured && !model.isGenerating
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "wand.and.stars").foregroundStyle(.tint)
+                Text("Generate a wallpaper").font(.headline)
+            }
+            Text("Describe a look — we generate a live Metal-shader wallpaper (validated before it's applied).")
+                .font(.caption).foregroundStyle(.secondary)
+
+            TextField("e.g. slow aurora over a dark ocean, teal and violet", text: $prompt, axis: .vertical)
+                .textFieldStyle(.roundedBorder).lineLimit(2...4)
+
+            if !AIConfig.isConfigured {
+                Text("Set up an AI provider in Settings → AI Generation first.")
+                    .font(.caption).foregroundStyle(.orange)
+            }
+            if let err = model.aiError {
+                Text(err).font(.caption).foregroundStyle(.red)
+            }
+
+            HStack {
+                if model.isGenerating {
+                    ProgressView().controlSize(.small)
+                    Text("Generating…").font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Generate") { started = true; model.generate(prompt) }
+                    .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+                    .disabled(!canGenerate)
+            }
+        }
+        .padding(20)
+        .frame(width: 470)
+        // Dismiss once a run we started finishes cleanly; stay open (with the error) on failure.
+        .onChange(of: model.isGenerating) {
+            if started && !model.isGenerating && model.aiError == nil { dismiss() }
+        }
+    }
+}
+
 // MARK: - Installed
 
 struct InstalledView: View {
@@ -367,6 +422,8 @@ struct InstalledView: View {
     @State private var target: String?
     /// The wallpaper being previewed in the sheet (nil ⇒ no sheet).
     @State private var preview: AppModel.Entry?
+    @State private var showGenerate = false
+    @ObservedObject private var entitlement = Entitlement.shared
     private let columns = [GridItem(.adaptive(minimum: 200), spacing: 18)]
 
     /// Ignore a target that points at a display that's no longer connected.
@@ -398,6 +455,13 @@ struct InstalledView: View {
         .navigationSubtitle("\(model.available.count) wallpapers · pin up to \(AppModel.maxStars) ★")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
+                Button {
+                    if entitlement.isPremium { showGenerate = true }
+                    else { model.showPaywall("AI wallpaper generation is a Premium feature.") }
+                } label: { Label("Generate", systemImage: "wand.and.stars") }
+                .help("Generate a wallpaper with AI")
+            }
+            ToolbarItem(placement: .primaryAction) {
                 Button { model.onImport?() } label: { Label("Import", systemImage: "plus") }
                     .help("Import a local .livewallpaper")
             }
@@ -405,6 +469,7 @@ struct InstalledView: View {
         .sheet(item: $preview) { entry in
             WallpaperPreviewSheet(model: model, entry: entry, target: effectiveTarget)
         }
+        .sheet(isPresented: $showGenerate) { GenerateSheet(model: model) }
     }
 }
 
@@ -515,6 +580,48 @@ struct ExploreView: View {
 
 // MARK: - Settings
 
+/// Provider-agnostic AI settings: pick Anthropic or any OpenAI-compatible endpoint (incl. a local
+/// Ollama/LM Studio, which works offline and can't be region-blocked). Keys go to the Keychain.
+struct AISettings: View {
+    @State private var provider = AIConfig.provider
+    @State private var baseURL = ""
+    @State private var model = ""
+    @State private var apiKey = ""
+
+    var body: some View {
+        GroupBox("AI Generation") {
+            VStack(alignment: .leading, spacing: 8) {
+                Picker("Provider", selection: $provider) {
+                    ForEach(AIConfig.Provider.allCases) { Text($0.label).tag($0) }
+                }
+                .onChange(of: provider) { AIConfig.provider = provider; load() }
+
+                TextField("Base URL", text: $baseURL)
+                    .textFieldStyle(.roundedBorder)
+                    .onChange(of: baseURL) { AIConfig.setBaseURL(baseURL, for: provider) }
+                TextField("Model", text: $model)
+                    .textFieldStyle(.roundedBorder)
+                    .onChange(of: model) { AIConfig.setModel(model, for: provider) }
+                SecureField(provider.requiresKey ? "API key" : "API key (optional for local)", text: $apiKey)
+                    .textFieldStyle(.roundedBorder)
+                    .onChange(of: apiKey) { AIConfig.setAPIKey(apiKey.isEmpty ? nil : apiKey, for: provider) }
+
+                Text(provider.hint).font(.caption).foregroundStyle(.secondary)
+                Text("Pre-release: the app calls the provider directly with your key (stored in the Keychain). Production will route through our backend, so no key is needed and it works even where a provider is blocked. Premium feature.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .onAppear(perform: load)
+    }
+
+    private func load() {
+        baseURL = AIConfig.baseURL(for: provider)
+        model = AIConfig.model(for: provider)
+        apiKey = AIConfig.apiKey(for: provider) ?? ""
+    }
+}
+
 struct SettingsTab: View {
     @ObservedObject var model: AppModel
     @ObservedObject private var prefs = Preferences.shared
@@ -556,6 +663,7 @@ struct SettingsTab: View {
                     }
                     .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
                 }
+                AISettings()
                 GroupBox("Power") {
                     VStack(alignment: .leading, spacing: 8) {
                         Picker("On battery", selection: $prefs.batteryBehavior) {

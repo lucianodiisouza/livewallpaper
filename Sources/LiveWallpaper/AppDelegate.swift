@@ -77,6 +77,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.onImport = { [weak self] in self?.importWallpaper() }
         model.onExport = { [weak self] id in self?.exportWallpaper(id) }
         model.makePreviewRenderer = { [weak self] id in self?.makeRenderer(forID: id).0 }
+        model.onGenerate = { [weak self] prompt in self?.generateShader(prompt) }
         model.onStarsChanged = { [weak self] in self?.rebuildMenu() }
         model.onRemove = { [weak self] id in
             guard let self else { return }
@@ -413,6 +414,58 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             presentError("Could not import wallpaper", error)
         }
+    }
+
+    // MARK: - AI generation
+
+    private static let aiConfig: [Manifest.ConfigEntry] = [
+        .init(key: "speed", type: "float", label: "Speed", min: 0.1, max: 3, options: nil, defaultValue: .double(1)),
+        .init(key: "tint", type: "color", label: "Tint", min: nil, max: nil, options: nil, defaultValue: .string("#FFFFFF")),
+    ]
+
+    /// Generate a Metal-shader wallpaper from a prompt: ask the model → validate + compile (one
+    /// repair retry) → package + install → apply. Premium-gated (the moat feature).
+    private func generateShader(_ prompt: String) {
+        guard Entitlement.shared.isPremium else { model.showPaywall("AI generation is a Premium feature."); return }
+        model.isGenerating = true
+        model.aiError = nil
+        Task {
+            do {
+                let full = try await self.buildValidatedShader(prompt: prompt)
+                let id = "ai." + UUID().uuidString.prefix(8).lowercased()
+                let title = "AI · " + prompt.trimmingCharacters(in: .whitespacesAndNewlines).prefix(28)
+                let dest = FileManager.default.temporaryDirectory.appendingPathComponent("\(id).livewallpaper")
+                try self.library.exportShader(id: id, title: String(title), source: full,
+                                              config: Self.aiConfig, to: dest, authorHandle: "ai")
+                let pkg = try self.library.install(fromZipAt: dest)
+                self.library.markImported(pkg.manifest.id)   // the user's own creation ⇒ shareable
+                try? FileManager.default.removeItem(at: dest)
+                self.model.isGenerating = false
+                self.activate(pkg.manifest.id)               // rebuild + apply to the desktop
+            } catch {
+                self.model.isGenerating = false
+                self.model.aiError = error.localizedDescription
+                self.log.error("AI generation failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
+
+    /// Generate → prepend the fixed prelude → validate + compile; one repair retry on failure.
+    private func buildValidatedShader(prompt: String) async throws -> String {
+        var full = BuiltInShaders.prelude + "\n\n" + (try await ShaderGenerator.generate(prompt: prompt))
+        if !Self.isValidShader(full) {
+            let repaired = try await ShaderGenerator.generate(
+                prompt: prompt, feedback: "It failed to compile or was rejected by the fragment-only safety gate.")
+            full = BuiltInShaders.prelude + "\n\n" + repaired
+        }
+        guard Self.isValidShader(full) else { throw ShaderGenerator.GenError.invalidResult }
+        return full
+    }
+
+    /// A shader is usable if it passes the fragment-only static gate AND actually compiles + renders.
+    private static func isValidShader(_ source: String) -> Bool {
+        do { try ShaderValidator.validate(source) } catch { return false }
+        return ThumbnailRenderer.image(forShader: source) != nil
     }
 
     /// Export an installed wallpaper to a `.livewallpaper` the user can hand to someone else (P2P).

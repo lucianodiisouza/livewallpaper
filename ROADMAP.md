@@ -181,7 +181,17 @@ New Phase-2 scope instead:
   self-serve deactivation) — see [LICENSING.md](docs/LICENSING.md). Reuses the "bundle signing"
   idea, repurposed from moderation to DRM.
 - ✅ Make the backend repo **private** (client stays MIT) — done; git history scanned, no secrets
-- ⬜ AI shader/web generation (marquee premium feature)
+- 🟡 AI shader/web generation (marquee premium feature) — **shader generation shipped,
+  provider-agnostic**: prompt → selected provider (`ShaderProvider`) → prepend the fixed MSL prelude
+  so only `f_main` is model-authored → `ShaderValidator` + real compile gate (one repair retry) →
+  package + install + apply. Premium-gated; keys in the Keychain (`AIConfig`).
+  - Providers: **Anthropic** (Messages API) and **OpenAI-compatible** (`/chat/completions`, base-URL
+    configurable) — covers OpenAI, OpenRouter, Groq, and **local Ollama/LM Studio** (offline,
+    unblockable). Not vendor-locked.
+  - **Pre-release calls the provider directly with the user's key; production routes through the
+    backend** (keys server-side, server picks/falls-back across providers, region-block-proof).
+  - Web generation still to do. +2 self-test checks (reply parsing). Local HTTP providers still need
+    an ATS `NSAllowsLocalNetworking` exception in the app's Info.plist (TODO).
 
 ---
 

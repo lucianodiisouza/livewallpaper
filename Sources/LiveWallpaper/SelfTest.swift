@@ -140,6 +140,11 @@ enum SelfTest {
         check("premium wallpaper applies when unlocked", em.attemptApply(premiumEntry) == true && em.paywall == nil)
         if wasPremium { Entitlement.shared.unlockForNow() } else { Entitlement.shared.lock() }
 
+        // 13) AI generation: the model reply parser strips code fences and passes raw text through.
+        let fenced = ShaderGenerator.extractMetal(from: "Here you go:\n```metal\nfragment float4 f_main() {}\n```\ndone")
+        check("AI: extracts fenced shader", fenced == "fragment float4 f_main() {}")
+        check("AI: raw text passthrough", ShaderGenerator.extractMetal(from: "  fragment X  ") == "fragment X")
+
         // Clean up installed selftest packages.
         for pkg in library.installedPackages() where pkg.manifest.id.hasPrefix("selftest.") {
             try? FileManager.default.removeItem(at: pkg.directory)

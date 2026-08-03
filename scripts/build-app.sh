@@ -56,6 +56,13 @@ cat > "$CONTENTS/Info.plist" <<PLIST
     <key>LSUIElement</key><true/>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSHumanReadableCopyright</key><string>© Primo Engine contributors. MIT.</string>
+    <!-- Allow cleartext HTTP to localhost/.local only, so a local AI provider
+         (Ollama / LM Studio) works for shader generation. Public hosts still
+         require HTTPS under App Transport Security. -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsLocalNetworking</key><true/>
+    </dict>
 </dict>
 </plist>
 PLIST

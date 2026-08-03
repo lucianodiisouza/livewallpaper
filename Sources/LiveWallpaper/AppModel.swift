@@ -38,6 +38,10 @@ final class AppModel: ObservableObject {
     @Published var currentID: String = ""
     /// When non-nil, the paywall sheet is shown with this context.
     @Published var paywall: PaywallContext?
+    /// True while an AI wallpaper is being generated.
+    @Published var isGenerating = false
+    /// Last AI-generation error (nil on success).
+    @Published var aiError: String?
     /// Pinned wallpaper ids shown in the menu bar (max 5, ordered).
     @Published private(set) var starred: [String] = []
 
@@ -56,6 +60,8 @@ final class AppModel: ObservableObject {
     var onExport: ((String) -> Void)?
     /// Build a fresh, standalone renderer for a wallpaper id — used to render the live preview sheet.
     var makePreviewRenderer: ((String) -> (any WallpaperRenderer)?)?
+    /// Generate a Metal-shader wallpaper from a natural-language prompt (Premium).
+    var onGenerate: ((String) -> Void)?
     var onStarsChanged: (() -> Void)?
     var onInstall: ((WorkshopItem) async -> String?)?
     /// Install a workshop item, then assign it to one display (nil ⇒ all). Returns an error string.
@@ -102,6 +108,9 @@ final class AppModel: ObservableObject {
 
     /// Open the paywall with a custom reason (e.g. a gated setting).
     func showPaywall(_ reason: String) { paywall = PaywallContext(reason: reason) }
+
+    /// Kick off AI generation for `prompt` (Premium; gated in AppDelegate).
+    func generate(_ prompt: String) { onGenerate?(prompt) }
 
     func remove(_ id: String) {
         onRemove?(id)
