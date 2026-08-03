@@ -4,6 +4,13 @@ This repository is built **primarily with AI assistance**. Read this file first,
 It encodes decisions that are expensive to rediscover. When something here conflicts with a
 one-off request, surface the conflict rather than silently drifting.
 
+> **⚠️ Direction update (2026-08-02) — read before touching Phase 2.** The product pivoted from a
+> *community upload workshop* to **curated freemium + peer-to-peer sharing**. No user uploads, no
+> moderation. Monetization is a one-time premium unlock; premium content is **device-bound**. The
+> engine (Phase 1) is unchanged. Current source of truth for direction: [docs/FREEMIUM.md](docs/FREEMIUM.md),
+> [docs/LICENSING.md](docs/LICENSING.md), [docs/COMPETITIVE.md](docs/COMPETITIVE.md). Where those
+> conflict with older prose in this file or DESIGN.md, **those docs win.**
+
 ## What this is
 
 **Primo Engine** — a native macOS animated-wallpaper engine (video / Metal shader / web),
@@ -20,12 +27,14 @@ performance and battery. Full design: [DESIGN.md](DESIGN.md).
 The project is deliberately split into two phases. **Do not build phase 2 work while phase 1
 is unproven.**
 
-- **Phase 1 — the engine (current focus).** A local single-user app: install a
-  `.livewallpaper` bundle, it renders on the desktop, it pauses when unseen. Small-to-medium.
-- **Phase 2 — the community/workshop (later).** Backend, uploads, ratings, moderation. This is
-  a *platform*, not a feature. Do not scaffold backend/moderation code until Phase 1 ships.
+- **Phase 1 — the engine (done).** A local single-user app: install a `.livewallpaper` bundle,
+  it renders on the desktop, it pauses when unseen.
+- **Phase 2 — freemium + peer-to-peer (current).** A paywall/entitlement layer, a read-only
+  premium catalog of **our own** content, device-bound licensing (DRM), and P2P sharing of
+  user-made wallpapers. **No user-upload server, no moderation queue** — do not scaffold uploads,
+  auth-to-publish, ratings, or a review queue. See [docs/FREEMIUM.md](docs/FREEMIUM.md).
 
-When in doubt, prefer the smallest change that advances Phase 1.
+When in doubt, prefer the smallest change that advances the current freemium/P2P plan.
 
 ## The one real risk — verify early
 
@@ -84,7 +93,8 @@ Sources/LiveWallpaper/
   WorkshopClient.swift    # PocketBase REST browse/download + --workshop-smoke (M4)
   WorkshopUI.swift        # SwiftUI workshop browser + window (M4)
   SampleMaker.swift       # --export / --make-sample package generators
-  SelfTest.swift          # `--selftest` headless pipeline check (18 checks)
+  UpdateChecker.swift     # GitHub Releases "new version?" check + notify (Phase A bridge to Sparkle)
+  SelfTest.swift          # `--selftest` headless pipeline check (23 checks)
 scripts/seed-workshop.sh   # seed built-ins into PocketBase (admin; reads .env)
 LiveWallpaper.entitlements # app-sandbox + network.client + user-selected read-write
 scripts/build-app.sh       # assemble .app, generate loop.mp4 (ffmpeg), ad-hoc sign
@@ -92,8 +102,9 @@ dist/Primo Engine.app     # build output (gitignored)
 ```
 
 **Phase 1 (the engine) is complete** — video/metal/web renderers, Governor, package format +
-library. What's left is **Phase 2 — the community workshop** (backend, upload, moderation);
-don't scaffold it until intentionally starting Phase 2.
+library. Phase 2 is **freemium + peer-to-peer** (paywall, device-bound premium catalog, P2P
+sharing) — **not** an upload/moderation workshop. The `Workshop*` files (M4) are being repurposed
+as the read-only premium catalog client. See [docs/FREEMIUM.md](docs/FREEMIUM.md).
 
 Handy: `swift build -c release && .build/release/LiveWallpaper --selftest` runs the M2 package
 pipeline checks with no GUI.
@@ -140,6 +151,7 @@ See ROADMAP.md → M0 findings.
 ## Don't
 
 - Don't add third-party dependencies without a note in the PR explaining why native won't do.
-- Don't build Phase 2 (backend/moderation) infrastructure yet.
+- Don't build a user-upload server or moderation queue — the model is peer-to-peer sharing +
+  a device-bound premium catalog (docs/FREEMIUM.md, docs/LICENSING.md).
 - Don't relax a content sandbox to make a demo work.
 - Don't invent APIs — if unsure an AppKit/WebKit call exists on macOS 26, verify it.

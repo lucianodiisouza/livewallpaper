@@ -1,9 +1,16 @@
 # Primo Engine — Product & Architecture Design
 
-A native macOS animated-wallpaper engine with a community "workshop", in the spirit of
+A native macOS animated-wallpaper engine (video / Metal shader / web), in the spirit of
 Wallpaper Engine — but built to respect macOS performance and battery rather than fight it.
 
 Target: macOS 26 (Tahoe)+, Apple Silicon first.
+
+> **⚠️ Direction update (2026-08-02).** The product pivoted from a *community upload workshop*
+> to **curated freemium + peer-to-peer sharing**. Anything below describing user uploads, a
+> moderation queue, or author accounts (notably §8, §9, and the M4/M5 framing in §11) is
+> **superseded** by [docs/FREEMIUM.md](docs/FREEMIUM.md), [docs/LICENSING.md](docs/LICENSING.md),
+> and [docs/COMPETITIVE.md](docs/COMPETITIVE.md) — those are current truth. The engine design
+> (§2–§7, §10) still holds.
 
 ---
 
@@ -12,8 +19,9 @@ Target: macOS 26 (Tahoe)+, Apple Silicon first.
 1. **Invisible when unseen.** If no human can see moving pixels, we render nothing. Power
    behaviour is a *feature*, not an afterthought. This is our main advantage over the Windows
    incumbent.
-2. **Untrusted by default.** Community content is strangers' code running on people's Macs.
-   Every content type runs in the tightest sandbox its medium allows.
+2. **Untrusted by default.** Imported / peer-shared content is strangers' code running on
+   people's Macs. Every content type runs in the tightest sandbox its medium allows. (Still
+   true under P2P sharing — the validators run on import regardless of file origin.)
 3. **One format, many renderers.** A single package spec and a single `WallpaperRenderer`
    protocol. The desktop window never knows whether it's showing video, a shader, or a webview.
 4. **Native, not Electron.** SwiftUI + AppKit shell, Metal/AVFoundation/WebKit engines. No
@@ -37,15 +45,16 @@ Target: macOS 26 (Tahoe)+, Apple Silicon first.
 │  │ Governor      │                                │         │
 │  └──────────────┘                                 │         │
 │                          ┌────────────────────────┴──────┐  │
-│                          │  Workshop client (browse/DL)   │  │
+│                          │  Premium catalog client (DL)   │  │
 │                          └────────────────┬───────────────┘  │
+│   Community content: shared peer-to-peer (files), no server  │
 └──────────────────────────────────────────┼──────────────────┘
                                             │ HTTPS
                     ┌───────────────────────┴───────────────────┐
-                    │  Backend                                    │
-                    │  • Catalog API   • Object store + CDN       │
-                    │  • Auth          • Moderation queue         │
-                    │  • Ratings/search• Preview/thumb pipeline   │
+                    │  Backend (PRIVATE — our premium only)       │
+                    │  • Read-only catalog  • Object store + CDN  │
+                    │  • Purchase verify    • Device-bound license │
+                    │    (no uploads, no moderation, no auth-to-publish) │
                     └─────────────────────────────────────────────┘
 ```
 
@@ -177,8 +186,10 @@ mywallpaper.livewallpaper/
 Notes:
 - `config` drives an **auto-generated settings panel** — creators expose knobs without shipping UI.
 - `capabilities` is a *declaration the client enforces*, never a grant we take on faith.
-- `checksum` verified at install and at every load; `signature` ties the bundle to an account
-  for moderation/takedown.
+- `checksum` verified at install and at every load. `signature` is now used for **premium
+  device-bound licensing** (binding a downloaded bundle to the buyer's Mac), not author/account
+  moderation — see [LICENSING.md](docs/LICENSING.md). Premium licensing is layered as an additive
+  envelope so the frozen v1 format is not mutated.
 
 ---
 
@@ -198,34 +209,43 @@ App-level:
 - Downloaded content lives in a sandboxed container; the client verifies `checksum` before load.
 - No content type gets a code-signing exception or `com.apple.security.cs.allow-jit` beyond what
   WebKit itself needs.
-- **Content review before public listing** (see §9). Web packages get the most scrutiny.
+- **No pre-publish content review** (there is no publish step) — safety comes from the per-medium
+  sandboxes + import-time validators running on every file, server- or peer-sourced (§9).
 
 ---
 
-## 8. Community backend & workshop
+## 8. Premium content backend  *(superseded model below — see [FREEMIUM.md](docs/FREEMIUM.md))*
 
-Keep it boring to start:
-- **Object store + CDN** (e.g. S3-compatible + CloudFront) for bundles, previews, thumbnails.
-- **Catalog API**: publish, search, browse-by-tag, ratings, download counts, versioning.
-- **Auth**: Sign in with Apple (frictionless on-platform) + email fallback.
-- **Preview pipeline**: on upload, transcode a short looping `preview.mp4` + generate thumbnail;
-  reject bundles that fail validation (bad manifest, oversized, disallowed shader/web constructs).
-- **Client workshop UI**: browse, filter, one-click install → drops a verified bundle into the
-  local library; update notifications when a creator ships a new version.
+> **No user uploads.** Users never publish to a server. The backend hosts **only our own
+> premium content**, and it is a **private** repo/service (the client stays open; the backend
+> does not). See [LICENSING.md](docs/LICENSING.md).
+
+- **Object store + CDN** for our premium bundles, previews, thumbnails.
+- **Read-only catalog API**: list/browse our premium wallpapers. No publish, no ratings-by-upload.
+- **Purchase + activation**: verify purchase, bind a download to the buyer's Mac
+  (`IOPlatformUUID`, device cap), issue a signed device-bound license + wrapped content key.
+- **Client catalog UI**: browse our premium content, one-click purchase/install → device-bound
+  bundle drops into the local library.
+- **Community content is not here at all** — it's shared peer-to-peer between users (§9).
 
 Versioning: bundles are immutable per version; updates are new versions with the same `id`.
 
 ---
 
-## 9. Moderation
+## 9. Community sharing — peer-to-peer, no moderation
 
-- **Gate before public.** Nothing is browsable until it clears review.
-- Automated first pass: manifest/schema validation, size limits, shader static-analysis
-  (fragment-only, no disallowed ops), web static-analysis (flag network calls, obfuscation),
-  malware/hash checks on any binary assets.
-- Human queue for anything the automation flags + random spot checks + all `web` packages.
-- **Signature ties every bundle to an account** → fast takedown + author bans.
-- User reporting + rating; auto-hide on report threshold pending re-review.
+> **Superseded model.** There is **no moderation queue** because there is no user-upload
+> server. Users create wallpapers locally and share `.livewallpaper` files directly with each
+> other (AirDrop, messaging, etc.). This removes the moderation burden entirely — critical if
+> the app grows faster than we can staff review.
+
+- **Safety without moderation:** the per-medium sandboxes and the import-time validators
+  (`ShaderValidator` fragment-only gate, `WebValidator`, caged `WKWebView`) run on **every**
+  import regardless of where the file came from (§7). A peer-shared bundle is contained exactly
+  like a server-delivered one, so dropping moderation opens no security hole.
+- **Premium DRM (not moderation):** the `signature` / license binds *our premium* bundles to the
+  buyer's Mac so they can't be copied between machines — see [LICENSING.md](docs/LICENSING.md).
+  This is device-binding, not content review.
 
 ---
 
@@ -233,8 +253,9 @@ Versioning: bundles are immutable per version; updates are new versions with the
 
 - `LSUIElement = true` (menu-bar app).
 - App Sandbox entitlements needed:
-  - `com.apple.security.network.client` (workshop downloads).
-  - `com.apple.security.files.user-selected.read-only` (import local `.livewallpaper`).
+  - `com.apple.security.network.client` (premium catalog downloads + license activation).
+  - `com.apple.security.files.user-selected.read-write` (import **and** export/share local
+    `.livewallpaper` for peer-to-peer sharing).
   - Read/write to app container for the library.
 - Hardened Runtime + notarization. Verify desktop-level window creation is permitted under
   sandbox on the target OS **early** (spike this before committing to App Store as the only channel).
@@ -255,12 +276,19 @@ multi-monitor per-screen assignment.
 
 **M3 — Web renderer + sandbox.** WKWebView path with the full lockdown from §7.
 
-**M4 — Backend + workshop (read).** Browse/search/install from a hosted catalog. Seed with
-first-party content.
+**M4 — Backend + catalog (read).** Browse/install from a hosted catalog of **our own** content.
+Seeded with first-party content. *(Built; being repurposed as the read-only premium catalog.)*
 
-**M5 — Publishing + moderation.** Auth, upload, validation pipeline, review queue, ratings.
+**M5 — ~~Publishing + moderation~~ → Freemium + licensing.** Dropped: open upload, moderation
+queue, ratings, DMCA, payouts. Replaced by: paywall/entitlement layer + device-bound licensing
+for premium downloads, and peer-to-peer sharing for user content. See
+[FREEMIUM.md](docs/FREEMIUM.md) / [LICENSING.md](docs/LICENSING.md).
 
-**M6 — Polish.** Playlists/rotation, per-space wallpapers, schedules, energy dashboard.
+**M6 — Polish.** Multi-monitor UI + per-display playlists/rotation, per-space wallpapers,
+schedules, energy dashboard, onboarding.
+
+**M7 (deferred) — Lock-screen / screen-saver video.** Gated on a spike; re-evaluate after first
+revenue. Private `WallpaperExtensionKit` path — see [COMPETITIVE.md](docs/COMPETITIVE.md).
 
 ---
 
@@ -270,8 +298,10 @@ first-party content.
   If App Store sandbox blocks it, fall back to notarized direct distribution.
 - **Web content power cost.** May need a stricter default throttle for `web` type, or a per-package
   energy budget shown to users.
-- **Moderation cost at scale.** Automation must catch the long tail; human review can't be the
-  bottleneck. Consider a trusted-creator tier with lighter review.
+- **Premium DRM is deterrence, not prevention.** The client is open-source and must decode
+  content to display it, so a determined user can extract premium content on their own licensed
+  Mac. Goal is to stop casual file-copy sharing between Macs, not to be uncrackable — keep signing
+  keys server-side and don't over-invest. See [LICENSING.md](docs/LICENSING.md).
 - **HEVC-with-alpha authoring friction** — most creators won't know how; may need a small export guide/tool.
 - **Stage Manager / Spaces edge cases** — budget real time for the window-management matrix.
 ```

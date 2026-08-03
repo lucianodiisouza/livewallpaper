@@ -3,8 +3,14 @@
 Living checklist of what's done and what isn't. Update the boxes as work lands.
 Legend: ✅ done · 🟡 in progress · ⬜ not started · 🔴 blocking risk to de-risk early
 
-Milestones map to [DESIGN.md](DESIGN.md) §11. **Phase 1 = the engine (current). Phase 2 = the
-community workshop (deferred until the engine ships).**
+Milestones map to [DESIGN.md](DESIGN.md) §11. **Phase 1 = the engine (done).**
+
+> **⚠️ Direction update (2026-08-02).** Phase 2 is **no longer a community upload workshop.**
+> The product pivoted to **curated freemium + peer-to-peer sharing**: no user uploads, no
+> moderation. M5's upload/moderation/ratings/DMCA/payouts are **dropped**; the new Phase-2 work
+> is a paywall + device-bound licensing for our own premium content. Current plan:
+> [docs/FREEMIUM.md](docs/FREEMIUM.md) · [docs/LICENSING.md](docs/LICENSING.md) ·
+> [docs/COMPETITIVE.md](docs/COMPETITIVE.md).
 
 ---
 
@@ -130,7 +136,9 @@ over `lwp://`, and the Governor pauses/resumes it.
 
 A local, sandboxed macOS wallpaper engine: video + Metal-shader + web wallpapers, a power-aware
 Governor, a frozen `.livewallpaper` package format with import/export, and per-screen assignment.
-Everything below is **Phase 2 — the community workshop** (deliberately deferred until now).
+Everything below was **Phase 2 — the community workshop**, now **repositioned to freemium +
+peer-to-peer** (see the direction-update banner at the top). M4 (read-only catalog) is built and
+becomes the premium catalog; M5 is re-scoped away from moderation to licensing.
 
 ---
 
@@ -144,25 +152,26 @@ Everything below is **Phase 2 — the community workshop** (deliberately deferre
 - ✅ Seeded first-party content (Plasma/Aurora/Matrix); verified `--workshop-smoke` → `OK: 3` and
   the in-app workshop lists + installs them
 
-> Decisions locked: in-app self-serve submission · Sign in with Apple (M5) · **PocketBase on
-> Railway + R2 for files** (~$5/mo) · gate-before-public. Backend: `livewallpaper-workshop` repo.
+> Decisions locked: **PocketBase on Railway + R2 for files** (~$5/mo). Backend:
+> `livewallpaper-workshop` repo (to be made **private**). ~~in-app self-serve submission · Sign in
+> with Apple · gate-before-public~~ — **superseded** by the freemium/P2P pivot (no user uploads).
 
 ---
 
-## M5 — Publishing + moderation ⬜ · Phase 2  ([scope](docs/PHASE2_BACKEND.md))
+## M5 — ~~Publishing + moderation~~ → Freemium + licensing ⬜ · Phase 2  ([plan](docs/FREEMIUM.md))
 
-- ⬜ Auth: Sign in with Apple (native) + a PocketBase hook to verify Apple's identity token
-- ⬜ In-app self-serve upload → authenticated PocketBase `create` on the `wallpapers` collection
-- ⬜ **Server-side validation** (PocketBase hook) — re-runs manifest/checksum/size + the metal & web
-  static gates (ports of ShaderValidator/WebValidator; keep rules in sync)
-- ⬜ Moderation: gate-before-public via PocketBase's **built-in admin UI** as the review queue
-- ⬜ Ratings + reports (report auto-hide past threshold)
-- ⬜ Bundle signing (server signs content hash to account) → enforceable takedown + author ban
-- ⬜ ToS / content policy / DMCA + upload license terms (before submissions open)
+**Dropped (pivot 2026-08-02):** open upload, Sign-in-to-publish, server-side upload validation,
+moderation/review queue, ratings/reports, DMCA, author bans, upload quotas, creator payouts.
 
-## M5.5 — Trust & polish ⬜ · Phase 2
-
-- ⬜ Trusted-creator tier (lighter review), upload quotas + rate limits, basic analytics
+New Phase-2 scope instead:
+- ⬜ Peer-to-peer sharing UX (export/share a local `.livewallpaper`, easy import)
+- ⬜ Read-only premium catalog (repurpose the M4 client; our own content only)
+- ⬜ Paywall / entitlement layer (free vs. premium — see [FREEMIUM.md](docs/FREEMIUM.md))
+- ⬜ Device-bound licensing for premium downloads (`IOPlatformUUID`, device cap, signed license,
+  self-serve deactivation) — see [LICENSING.md](docs/LICENSING.md). Reuses the "bundle signing"
+  idea, repurposed from moderation to DRM.
+- ⬜ Make the backend repo **private** (client stays MIT); scrub git history first
+- ⬜ AI shader/web generation (marquee premium feature)
 
 ---
 
@@ -172,9 +181,25 @@ Done in the first polish slice:
 - ✅ Config-value persistence (per-wallpaper values survive relaunch — ConfigValue is Codable)
 - ✅ Launch at login (SMAppService, reconciled with system state on launch)
 - ✅ Configurable battery behavior (Pause / Throttle / Keep full rate) wired into the Governor
-- ✅ Wallpaper rotation (cycle through all wallpapers every N minutes)
+- ✅ Wallpaper rotation (cycle through all wallpapers every N minutes) — now **per-display**:
+  each monitor advances independently from its own current wallpaper
+- ✅ **Multi-monitor UI** — a to-scale, horizontally-scrollable **monitor strip** at the top of
+  Installed (drawn from real `NSScreen.frame`s, with gaps + a static preview of each screen's
+  wallpaper + names). Tap a monitor to target it; a "…" menu next to every Set/Install (Installed
+  and Explore) applies a wallpaper straight to a named display. The per-screen assignment engine
+  existed since M2; this exposes it intuitively (replaced the earlier dropdown-grid "Displays" tab)
+- ✅ **Disguised switch** — changing one monitor swaps just that screenlet's renderer in its
+  existing window with a crossfade, instead of rebuilding every screen (no flash on the others)
+- ✅ **Static previews** — shader frames (rendered) and video frames (`AVAssetImageGenerator`)
+- ✅ **Solid backdrop** — optionally replaces the macOS desktop picture with a neutral colour so
+  the user never glimpses their own wallpaper behind/around ours; captures + restores the original
+  (`DesktopBackground`), toggle in Settings, on by default
 - ✅ Preferences window (SwiftUI) — general / power / rotation
-- ✅ Self-test extended to 18 checks (config Codable round-trip, battery-behavior parse)
+- ✅ Self-test extended to 23 checks (config Codable round-trip, battery-behavior parse, update
+  version-compare)
+- ✅ Update notifications — lightweight GitHub Releases check (`UpdateChecker`): auto-check on
+  launch (throttled, opt-out in Preferences) lights up a menu banner + "Check for Updates…";
+  `--check-updates` CLI. Phase-A bridge until Sparkle (Phase C) does real in-place updates.
 
 Still open (future polish):
 - ⬜ Per-space wallpapers
