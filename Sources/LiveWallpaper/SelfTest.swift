@@ -110,6 +110,13 @@ enum SelfTest {
         // 10) Battery behavior parses from its raw value.
         check("battery behavior enum round-trips", BatteryBehavior(rawValue: "pause") == .pause)
 
+        // 11) Update version comparison (pure, no network).
+        check("update: newer minor is newer", UpdateChecker.isNewer("0.2.0", than: "0.1.0"))
+        check("update: v-prefix + equal is not newer", !UpdateChecker.isNewer("v0.1.0", than: "0.1.0"))
+        check("update: numeric (not lexical) compare", UpdateChecker.isNewer("0.10.0", than: "0.9.0"))
+        check("update: older is not newer", !UpdateChecker.isNewer("0.1.0", than: "0.2.0"))
+        check("update: tag normalizes (v + pre-release)", UpdateChecker.normalized("v1.2.3-beta.1") == "1.2.3")
+
         // Clean up installed selftest packages.
         for pkg in library.installedPackages() where pkg.manifest.id.hasPrefix("selftest.") {
             try? FileManager.default.removeItem(at: pkg.directory)

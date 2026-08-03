@@ -40,6 +40,11 @@ if CommandLine.arguments.contains("--workshop-smoke") {
     exit(WorkshopSmoke.run())
 }
 
+// Check GitHub for a newer release, print current vs latest: `--check-updates` (no GUI).
+if CommandLine.arguments.contains("--check-updates") {
+    exit(UpdateCheckSmoke.run())
+}
+
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate

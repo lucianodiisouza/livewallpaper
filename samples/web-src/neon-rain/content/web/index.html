@@ -1,0 +1,318 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Neon Rain — Cyberpunk Dusk</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #05060a; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  #fallback { position: fixed; inset: 0; display: none; align-items: center;
+              justify-content: center; color: #9aa; font: 14px system-ui; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="fallback">WebGL2 unavailable in this runtime.</div>
+<script id="vs" type="x-shader/x-vertex">#version 300 es
+void main() {
+  vec2 v = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
+  gl_Position = vec4(v * 2.0 - 1.0, 0.0, 1.0);
+}
+</script>
+<script id="fs" type="x-shader/x-fragment">#version 300 es
+precision highp float;
+out vec4 outColor;
+
+uniform vec2  uRes;
+uniform float uTime;
+uniform float uRain;     // 0..2 intensity
+uniform float uFlicker;  // 0 or 1
+uniform vec3  uTint;     // mood tint (linear-ish rgb)
+
+// ---------- hashing / noise ----------
+float h11(float x){ return fract(sin(x*127.13)*43758.5453); }
+float h21(vec2 p){ p = fract(p*vec2(127.13,311.7)); p += dot(p, p+34.53); return fract(p.x*p.y); }
+float vnoise(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  f = f*f*(3.0-2.0*f);
+  float a = h21(i), b = h21(i+vec2(1,0)), c = h21(i+vec2(0,1)), d = h21(i+vec2(1,1));
+  return mix(mix(a,b,f.x), mix(c,d,f.x), f.y);
+}
+float fbm(vec2 p){
+  float s = 0.0, a = 0.5;
+  for(int i=0;i<4;i++){ s += a*vnoise(p); p *= 2.02; a *= 0.5; }
+  return s;
+}
+
+const float GROUND = 0.32;   // wet-street line, in uv.y (0 bottom .. 1 top)
+const int   LAYERS = 4;
+
+// ---------- neon signs (screen-ish world coords: x centered & aspect-scaled, y up) ----------
+vec3 neonBar(vec2 p, vec2 c, vec2 hs, vec3 col, float on){
+  vec2 d = abs(p-c) - hs;
+  float dist = length(max(d,0.0)) + min(max(d.x,d.y),0.0);
+  float core = smoothstep(0.010,0.0,dist);
+  float glow = exp(-dist*24.0)*0.55 + exp(-dist*110.0)*1.1;
+  return col*(core*1.4 + glow)*on;
+}
+vec3 neon(vec2 p, float t){
+  float f = uFlicker;
+  vec3 g = vec3(0.0);
+  // magenta CLUB, pink HOTEL, red BAR, cyan sign, amber low sign
+  g += neonBar(p, vec2(-0.05,0.52), vec2(0.075,0.014), vec3(0.85,0.20,1.00),
+               mix(1.0,0.75+0.25*sin(t*3.1),f));
+  g += neonBar(p, vec2( 0.34,0.60), vec2(0.055,0.013), vec3(1.00,0.28,0.62),
+               mix(1.0,0.70+0.30*sin(t*2.0+1.7),f));
+  g += neonBar(p, vec2(-0.30,0.44), vec2(0.038,0.012), vec3(1.00,0.18,0.22),
+               mix(1.0,0.60+0.40*sin(t*5.3+0.5)*step(-0.2,sin(t*13.0)),f));
+  g += neonBar(p, vec2( 0.30,0.40), vec2(0.045,0.010), vec3(0.20,0.85,1.00),
+               mix(1.0,0.80+0.20*sin(t*1.4+3.0),f));
+  g += neonBar(p, vec2(-0.16,0.36), vec2(0.030,0.009), vec3(1.00,0.72,0.25),
+               mix(1.0,0.85+0.15*sin(t*2.7),f));
+  return g;
+}
+
+// ---------- city ---------- returns base (fogged) color; emissive color via out param
+vec3 cityAt(vec2 uv, float aspect, float t, out vec3 emis){
+  vec3 col = vec3(0.0);
+  emis = vec3(0.0);
+  float wx = (uv.x-0.5)*aspect;
+
+  vec3 fogCol = mix(vec3(0.30,0.28,0.40), uTint*0.9, 0.5);
+
+  for(int i=LAYERS-1;i>=0;i--){
+    float fi = float(i);
+    float depth = fi/float(LAYERS-1);              // 0 near .. 1 far
+    float colW  = mix(0.075, 0.16, depth);         // building column width (world x)
+    float x     = wx/colW + fi*17.0;
+    float id    = floor(x);
+    float fx    = fract(x);
+    float rnd   = h11(id*1.7 + fi*53.0);
+
+    // silhouette: some columns are much shorter (gaps / low blocks)
+    float tall  = step(0.16, rnd);
+    float top   = GROUND + mix(0.06,0.03,depth) + (0.10 + rnd*mix(0.42,0.16,depth))*tall;
+
+    if(uv.y > GROUND && uv.y < top){
+      // building body: dark solid mass, always carrying a little fog so it never
+      // becomes a pure-black hole; recedes into the haze with depth.
+      float vgrad = smoothstep(GROUND-0.1, top, uv.y);
+      vec3 body = mix(vec3(0.038,0.042,0.062), vec3(0.014,0.016,0.030), vgrad);
+      body = mix(body, fogCol, depth*0.62 + 0.20);   // fog floor: no building goes pure-black
+      // faint rim of skyglow catching the top edge
+      body += vec3(0.10,0.09,0.14)*smoothstep(top-0.006, top, uv.y)*(1.0-depth)*0.6;
+
+      // windows (world-uniform grid) — SPARSE + dim, so the mass reads as building
+      float wy = (uv.y-GROUND);
+      vec2 g = vec2(fx*mix(3.5,2.6,depth), wy/0.024);
+      vec2 gi = floor(g), gf = fract(g)-0.5;
+      float cell = h21(gi + id*7.0 + fi*91.0);
+      float lit  = step(mix(0.70,0.86,depth), cell);   // only the top ~15-30% are lit
+      // flicker a small subset
+      float fk = h21(gi+13.0);
+      float flick = mix(1.0, 0.4+0.6*abs(sin(t*(0.6+fk*2.5)+cell*40.0)), uFlicker*step(0.82,fk));
+      float warm = step(0.42, h21(gi+4.2));            // mostly warm interiors
+      vec3 wcol = mix(vec3(0.45,0.62,0.95), vec3(1.05,0.72,0.38), warm);
+      float pane = smoothstep(0.32,0.18,abs(gf.x))*smoothstep(0.34,0.16,abs(gf.y));
+      float glow = exp(-dot(gf,gf)*5.5)*0.35;          // tight, subtle bloom
+      float e = lit*flick*mix(1.0,0.4,depth);
+      vec3 wEmis = wcol*(pane*0.6 + glow)*e;
+      col = body + wEmis;
+      emis = wEmis*0.9;
+    }
+  }
+
+  // neon signs sit in front of the towers (world coords, y up)
+  vec3 nz = neon(vec2(wx, uv.y), t);
+  col  += nz;
+  emis += nz;
+  return col;
+}
+
+// ---------- sky ----------
+vec3 sky(vec2 uv){
+  vec3 top = mix(vec3(0.05,0.05,0.09), uTint*0.35, 0.6);
+  vec3 hor = mix(vec3(0.32,0.20,0.28), uTint*1.1, 0.4);
+  vec3 c = mix(hor, top, smoothstep(GROUND, 1.0, uv.y));
+  // distant mountain ridge behind the city (soft, hazy — reads as backdrop, not a void)
+  float ridge = GROUND + 0.20 + 0.10*fbm(vec2(uv.x*2.4 + 3.0, 1.0)) + 0.05*sin(uv.x*5.0);
+  float mtn = 1.0 - smoothstep(ridge-0.015, ridge+0.015, uv.y);  // 1 below ridge, 0 above
+  c = mix(c, mix(vec3(0.15,0.14,0.22), uTint*0.5, 0.5), mtn*0.7);
+  // light-pollution glow rising off the skyline
+  c += vec3(0.9,0.55,0.4)*0.12*exp(-abs(uv.y-GROUND-0.05)*6.0);
+  // drifting cloud haze
+  float cl = fbm(vec2(uv.x*2.2 - uTime*0.01, uv.y*3.0));
+  c += vec3(0.10,0.09,0.13)*cl*smoothstep(GROUND,1.0,uv.y)*0.6;
+  return c;
+}
+
+// ---------- rain ----------
+float rainLayer(vec2 uv, float aspect, float t, float scale, float speed, float slant){
+  vec2 p = vec2(uv.x*aspect, uv.y);
+  p += vec2(slant, 1.0)*t*speed;                 // fall + wind drift
+  p *= scale;
+  vec2 ip = floor(p);
+  float col = h11(ip.x*12.9);
+  float y = fract(p.y) ;
+  float streak = smoothstep(0.5,0.0,abs(fract(p.x)-0.5)*8.0);  // thin vertical
+  float on = step(0.62, h21(vec2(ip.x, floor(p.y+col*7.0))));
+  float head = smoothstep(0.0,0.15,y)*smoothstep(0.9,0.4,y);
+  return streak*on*head;
+}
+
+// ---------- tone map / grade ----------
+vec3 aces(vec3 x){
+  return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14), 0.0, 1.0);
+}
+
+void main(){
+  vec2 uv = gl_FragCoord.xy/uRes;
+  float aspect = uRes.x/uRes.y;
+  float t = uTime;
+
+  vec3 emis;
+  vec3 col;
+
+  if(uv.y >= GROUND){
+    // sky, then composite city over it
+    vec3 s = sky(uv);
+    vec3 cEmis;
+    vec3 c = cityAt(uv, aspect, t, cEmis);
+    // cityAt returns 0 where no building drawn & no neon -> treat near-black as sky
+    float cityMask = step(0.0008, dot(c, vec3(0.333)));
+    col  = mix(s, c, cityMask);
+    col += cEmis*0.0;             // (emission already in c)
+    emis = cEmis;
+  } else {
+    // wet street: reflect the skyline with ripple, keep mostly the emissive/neon streaks
+    float d = GROUND - uv.y;                       // distance below the line
+    float ripple = 0.010*sin(uv.x*38.0 - t*1.4) * (0.4+d*3.0)
+                 + 0.012*(fbm(vec2(uv.x*6.0, t*0.4))-0.5)*(0.5+d*4.0);
+    vec2 ruv = vec2(uv.x + ripple, GROUND + d*0.98);
+    vec3 rEmis;
+    cityAt(ruv, aspect, t, rEmis);
+    // base wet asphalt
+    vec3 wet = mix(vec3(0.03,0.035,0.05), uTint*0.06, 0.5);
+    wet += vec3(0.05,0.05,0.07)*fbm(vec2(uv.x*aspect*3.0, uv.y*3.0));
+    float fade = exp(-d*3.2);                       // reflections fade with distance
+    float smear = 0.6+0.4*sin(uv.y*120.0);          // vertical light smear
+    col = wet + rEmis*fade*1.3*smear;
+    emis = rEmis*fade;
+    // rain hitting the ground -> occasional ripple rings
+    float rr = 0.0;
+    for(int k=0;k<3;k++){
+      vec2 rc = vec2(h11(float(k)*4.0+floor(t*1.3)), h11(float(k)*9.0+floor(t*1.3))*GROUND);
+      float ph = fract(t*1.3);
+      float rad = ph*0.18;
+      float ring = smoothstep(0.01,0.0,abs(length((uv-rc)*vec2(aspect,1.0))-rad));
+      rr += ring*(1.0-ph)*0.4;
+    }
+    col += vec3(0.3,0.4,0.5)*rr*uRain;
+  }
+
+  // atmospheric haze band right at the horizon
+  col = mix(col, mix(vec3(0.4,0.32,0.42), uTint,0.4),
+            0.35*exp(-abs(uv.y-GROUND)*9.0));
+
+  // rain overlay (two layers, parallax) — subtle, not a curtain of white
+  float rain = rainLayer(uv, aspect, t, 26.0, 0.9, 0.18)*0.32
+             + rainLayer(uv, aspect, t, 40.0, 1.4, 0.22)*0.22;
+  col += vec3(0.45,0.52,0.70)*rain*uRain;
+
+  // soft additive bloom haze so bright spots bleed into neighbours
+  col += emis*0.18;
+
+  // vignette (moody, pulls the frame inward)
+  vec2 q = uv-0.5; q.x *= aspect/1.4;
+  col *= 1.0 - dot(q,q)*0.75;
+
+  // grade: teal shadows / warm highlights, then ACES; keep it dark & filmic
+  col = mix(col, col*vec3(0.88,1.0,1.06), 0.30);
+  col = aces(col*0.92);
+  col = pow(col, vec3(1.02));                       // gentle contrast, no shadow lift
+
+  // film grain
+  float g = h21(uv*uRes + fract(t)*vec2(37.0,17.0));
+  col += (g-0.5)*0.022;
+
+  outColor = vec4(col, 1.0);
+}
+</script>
+<script>
+const cv = document.getElementById('c');
+const gl = cv.getContext('webgl2', { antialias: false, alpha: false, powerPreference: 'low-power' });
+if (!gl) { document.getElementById('fallback').style.display = 'flex'; }
+
+const CFG = { speed: 1.0, rain: 1.0, flicker: true, tint: '#5a4a8a' };
+function readConfig(src){
+  if (!src) return;
+  if (typeof src.speed === 'number')   CFG.speed = src.speed;
+  if (typeof src.rain === 'number')    CFG.rain = src.rain;
+  if (typeof src.flicker === 'boolean')CFG.flicker = src.flicker;
+  if (typeof src.tint === 'string')    CFG.tint = src.tint;
+}
+window.LiveWallpaper = window.LiveWallpaper || {};
+readConfig(window.LiveWallpaper.config);
+window.LiveWallpaper.onConfig = readConfig;
+
+function hexToRgb(h){
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(h||'');
+  return m ? [parseInt(m[1],16)/255, parseInt(m[2],16)/255, parseInt(m[3],16)/255] : [0.35,0.29,0.54];
+}
+
+function compile(type, src){
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    console.error(gl.getShaderInfoLog(s)); throw new Error('shader compile failed');
+  }
+  return s;
+}
+
+let prog, uRes, uTime, uRain, uFlicker, uTint;
+if (gl) {
+  prog = gl.createProgram();
+  gl.attachShader(prog, compile(gl.VERTEX_SHADER,   document.getElementById('vs').textContent));
+  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, document.getElementById('fs').textContent));
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+    console.error(gl.getProgramInfoLog(prog));
+  }
+  gl.useProgram(prog);
+  uRes = gl.getUniformLocation(prog, 'uRes');
+  uTime = gl.getUniformLocation(prog, 'uTime');
+  uRain = gl.getUniformLocation(prog, 'uRain');
+  uFlicker = gl.getUniformLocation(prog, 'uFlicker');
+  uTint = gl.getUniformLocation(prog, 'uTint');
+}
+
+let DPR = 1;
+function resize(){
+  DPR = Math.min(window.devicePixelRatio || 1, 1.75);   // cap for the Governor's sake
+  cv.width  = Math.floor(innerWidth * DPR);
+  cv.height = Math.floor(innerHeight * DPR);
+  if (gl) gl.viewport(0, 0, cv.width, cv.height);
+}
+addEventListener('resize', resize);
+resize();
+
+let simTime = 0, last = performance.now();
+function frame(now){
+  let dt = (now - last)/1000; last = now;
+  if (dt > 0.1) dt = 0.1;
+  simTime += dt * CFG.speed;
+  if (gl) {
+    gl.uniform2f(uRes, cv.width, cv.height);
+    gl.uniform1f(uTime, simTime);
+    gl.uniform1f(uRain, Math.max(0, Math.min(2, CFG.rain)));
+    gl.uniform1f(uFlicker, CFG.flicker ? 1.0 : 0.0);
+    const t = hexToRgb(CFG.tint);
+    gl.uniform3f(uTint, t[0], t[1], t[2]);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

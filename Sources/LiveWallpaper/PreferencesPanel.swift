@@ -10,6 +10,7 @@ struct PreferencesView: View {
         Form {
             Section("General") {
                 Toggle("Launch at login", isOn: $prefs.launchAtLogin)
+                Toggle("Check for updates automatically", isOn: $prefs.checkForUpdatesAutomatically)
             }
             Section("Power") {
                 Picker("On battery", selection: $prefs.batteryBehavior) {

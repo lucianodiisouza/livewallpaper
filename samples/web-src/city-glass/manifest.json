@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "3f7e2a91-8c46-4d02-b1e7-2a9f5c0d84e6",
+  "version": "1.0.0",
+  "title": "City Glass · Rain on the Window",
+  "author": { "id": "00000000-0000-0000-0000-000000000000", "handle": "@oprimodev" },
+  "type": "web",
+  "entry": "content/web/index.html",
+  "minMacOS": "26.0",
+  "checksum": "sha256-PLACEHOLDER",
+  "config": [
+    { "key": "speed",   "type": "float", "min": 0.25, "max": 2.5, "default": 1.0, "label": "Speed" },
+    { "key": "rain",    "type": "float", "min": 0.0,  "max": 2.0, "default": 1.0, "label": "Rain / droplets" },
+    { "key": "flicker", "type": "bool",  "default": true,  "label": "Neon flicker" },
+    { "key": "tint",    "type": "color", "default": "#5a4a8a", "label": "Mood tint" }
+  ],
+  "capabilities": {
+    "network": [],
+    "audio": false
+  }
+}

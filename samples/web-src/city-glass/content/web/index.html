@@ -1,0 +1,274 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>City Glass — Rain on the Window</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #05060a; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  #fb { position: fixed; inset: 0; display: none; align-items: center;
+        justify-content: center; color: #9aa; font: 14px system-ui; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="fb">WebGL2 unavailable.</div>
+
+<script id="vs" type="x-shader/x-vertex">#version 300 es
+void main(){ vec2 v = vec2((gl_VertexID<<1)&2, gl_VertexID&2); gl_Position = vec4(v*2.0-1.0,0.0,1.0); }
+</script>
+
+<script id="fs" type="x-shader/x-fragment">#version 300 es
+precision highp float;
+out vec4 outColor;
+
+uniform sampler2D uTex;
+uniform vec2  uRes;
+uniform vec2  uImg;      // texture pixel size
+uniform float uTime;
+uniform float uRain;     // 0..2
+uniform float uFlicker;  // 0/1
+uniform vec3  uTint;
+
+float N(float x){ return fract(sin(x*127.13)*43758.5453); }
+float N2(vec2 p){ p=fract(p*vec2(127.13,311.7)); p+=dot(p,p+34.53); return fract(p.x*p.y); }
+float vnoise(vec2 p){
+  vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
+  float a=N2(i),b=N2(i+vec2(1,0)),c=N2(i+vec2(0,1)),d=N2(i+vec2(1,1));
+  return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);
+}
+float fbm(vec2 p){ float s=0.0,a=0.5; for(int i=0;i<4;i++){ s+=a*vnoise(p); p*=2.03; a*=0.5; } return s; }
+
+// map screen-uv (0..1) to a cover-fit crop of the image, with parallax
+vec2 coverUV(vec2 uv, float t){
+  float sAsp = uRes.x/uRes.y;
+  float iAsp = uImg.x/uImg.y;
+  vec2 scale = (sAsp > iAsp) ? vec2(1.0, iAsp/sAsp) : vec2(sAsp/iAsp, 1.0);
+  // slow autonomous parallax drift + a touch of zoom so edges never show
+  float zoom = 1.055;
+  vec2 drift = vec2(sin(t*0.045)*0.5, sin(t*0.037+1.3)*0.35) * 0.012;
+  vec2 p = (uv-0.5)/zoom + 0.5 + drift;
+  return (p-0.5)*scale + 0.5;
+}
+
+vec3 samp(vec2 tuv){ return texture(uTex, clamp(tuv,0.001,0.999)).rgb; }
+vec3 blurTex(vec2 tuv, float r){
+  vec2 px = r/uImg;
+  vec3 s = samp(tuv)*0.30;
+  s += samp(tuv+vec2( px.x,0))*0.14 + samp(tuv+vec2(-px.x,0))*0.14;
+  s += samp(tuv+vec2(0, px.y))*0.14 + samp(tuv+vec2(0,-px.y))*0.14;
+  s += samp(tuv+px*0.8)*0.07 + samp(tuv-px*0.8)*0.07;
+  return s;
+}
+
+// ---- rain on glass ----------------------------------------------------------
+// static clinging droplets (jittered grid). refr = lens offset, .x=body .y=highlight
+vec3 staticDrops(vec2 uv, float t, out vec2 refr){
+  refr = vec2(0.0);
+  vec2 g = uv * vec2(20.0, 20.0);
+  vec2 id = floor(g);
+  vec2 f  = fract(g)-0.5;
+  vec2 jit = (vec2(N2(id+0.1), N2(id+5.7))-0.5) * 0.7;
+  // very subtle jiggle so drops feel alive without shimmering like snow
+  jit += 0.02*vec2(sin(t*1.3+id.x), cos(t*1.5+id.y));
+  float rr = N2(id+2.3);
+  float has = step(0.74, rr);                    // sparser — let the art breathe
+  // heavy size variance: mostly small, a few big (rr^3 skews small)
+  float sz = N2(id+9.2); sz = sz*sz;
+  float r = (0.10 + 0.34*sz);
+  float d = length(f - jit);
+  float body = smoothstep(r, r*0.62, d) * has;
+  float rim  = smoothstep(r*0.62, r*0.9, d) * smoothstep(r*1.05, r*0.9, d) * has; // dark lens edge
+  refr = (f - jit) * body * 1.15;                // lensing reads as glass
+  float hi = smoothstep(r*0.5, 0.0, length(f - jit + vec2(0.32,-0.32)*r)) * body;
+  return vec3(body, hi, rim);
+}
+
+// sliding runner drops that leave a clear trail
+vec3 slideDrops(vec2 uv, float t, out vec2 refr){
+  refr = vec2(0.0);
+  float cols = 22.0;
+  float cid = floor(uv.x*cols);
+  float cx  = fract(uv.x*cols)-0.5;
+  float has = step(0.55, N(cid*1.7));
+  float spd = (0.10 + 0.16*N(cid*3.1));
+  float ph  = N(cid*7.7);
+  // head position sweeps down repeatedly
+  float head = 1.0 - fract(t*spd + ph);
+  float wob  = 0.04*sin(uv.y*20.0 + cid);     // wiggle path
+  float dx = cx + wob;
+  float body = smoothstep(0.14, 0.02, abs(dx)) * has;
+  // the drop head (round) vs the thin trail above it
+  float headM = smoothstep(0.05, 0.0, length(vec2(dx, (uv.y-head)*1.6)));
+  float trail = smoothstep(0.05,0.0,abs(dx)) * step(uv.y, head) * (0.35+0.65*smoothstep(head-0.5,head,uv.y));
+  float m = clamp(max(headM, trail*0.6), 0.0, 1.0) * has;
+  refr = vec2(dx, (uv.y-head)) * headM * 0.8;
+  float hi = smoothstep(0.03,0.0,length(vec2(dx+0.01, (uv.y-head)*1.6+0.01)))*headM;
+  return vec3(m, hi, 0.0);
+}
+
+vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.0,1.0); }
+
+void main(){
+  vec2 uv = gl_FragCoord.xy/uRes;
+  float aspect = uRes.x/uRes.y;
+  float t = uTime;
+  vec2 auv = vec2(uv.x*aspect, uv.y);   // aspect-corrected for round drops
+
+  // ---- glass droplets ----
+  float amt = clamp(uRain, 0.0, 2.0);
+  vec2 rS, rD;
+  vec3 ds = staticDrops(auv, t, rS);
+  vec3 dd = slideDrops(uv, t, rD);
+  float dropMask = clamp((ds.x + dd.x)*amt, 0.0, 1.0);
+  float highlight = (ds.y + dd.y)*amt;
+  float rim = ds.z*amt;
+  vec2 refr = (rS + rD) * amt * 0.06;
+
+  // ---- base image through the glass ----
+  vec2 tuv = coverUV(uv, t);
+  vec3 sharp = samp(tuv + refr);
+  vec3 misted = blurTex(tuv, 2.2);                 // fogged-up glass between drops
+  float baseClarity = 0.62;                        // city stays readable
+  float clarity = clamp(baseClarity + dropMask*0.6, 0.0, 1.0);
+  vec3 col = mix(misted, sharp, clarity);
+
+  // slight chromatic split inside drops (premium refraction feel)
+  if(dropMask > 0.02){
+    float ca = 0.004*dropMask;
+    col.r = samp(tuv + refr + vec2(ca,0)).r;
+    col.b = samp(tuv + refr - vec2(ca,0)).b;
+  }
+
+  // lens edge (subtle darkening) + soft specular glint
+  col *= 1.0 - rim*0.35;
+  col += highlight * 0.35;
+
+  // ---- neon / window flicker: modulate the bright lights already in the art ----
+  float lum = dot(col, vec3(0.299,0.587,0.114));
+  float lightMask = smoothstep(0.30, 0.72, lum);
+  float warmMask  = smoothstep(0.02, 0.20, col.r - col.b) * lightMask;
+  float fl = 1.0
+    + uFlicker * 0.16 * sin(t*3.2 + fbm(tuv*30.0)*25.0) * lightMask
+    + uFlicker * 0.10 * sin(t*7.1 + N2(floor(tuv*40.0))*40.0) * warmMask;
+  col *= fl;
+
+  // ---- drifting mist / fog (concentrated toward the back / upper haze) ----
+  float fog = fbm(vec2(uv.x*2.2 - t*0.02, uv.y*2.6 + t*0.015));
+  float fogBand = smoothstep(0.30, 0.95, uv.y) * (0.5 + 0.5*fog);
+  col = mix(col, mix(vec3(0.42,0.44,0.52), uTint*1.1, 0.4), fogBand*0.10);
+
+  // ---- bloom: soft glow from bright neon/windows ----
+  vec3 br = blurTex(tuv, 7.0);
+  br = max(br - 0.42, 0.0);
+  col += br * (0.55 + warmMask*0.3);
+
+  // ---- grade: cinematic, cool shadows / warm highlights ----
+  col = mix(col, col*mix(vec3(0.85,0.95,1.12), vec3(1.15,1.02,0.85), smoothstep(0.2,0.8,lum)), 0.35);
+  col *= mix(vec3(1.0), uTint*1.6, 0.10);          // gentle mood tint
+  col = aces(col*1.02);
+  col = pow(col, vec3(0.98));
+
+  // vignette
+  vec2 q = uv-0.5; q.x *= aspect/1.5;
+  col *= 1.0 - dot(q,q)*0.65;
+
+  // subtle rain streaks in the air (in front, faint)
+  float air = smoothstep(0.5,0.0,abs(fract(auv.x*80.0 + floor(auv.y*4.0+t*2.0))-0.5))
+            * step(0.7, N2(vec2(floor(auv.x*80.0), floor(auv.y*4.0+t*2.0))));
+  col += vec3(0.5,0.55,0.7)*air*0.05*amt;
+
+  // film grain
+  float g = N2(uv*uRes + fract(t)*vec2(37.0,17.0));
+  col += (g-0.5)*0.02;
+
+  outColor = vec4(col, 1.0);
+}
+</script>
+
+<script>
+const cv = document.getElementById('c');
+const gl = cv.getContext('webgl2', { antialias:false, alpha:false, powerPreference:'low-power' });
+if(!gl){ document.getElementById('fb').style.display='flex'; }
+
+const CFG = { speed:1.0, rain:1.0, flicker:true, tint:'#5a4a8a' };
+function readConfig(s){
+  if(!s) return;
+  if(typeof s.speed==='number')   CFG.speed=s.speed;
+  if(typeof s.rain==='number')    CFG.rain=s.rain;
+  if(typeof s.flicker==='boolean')CFG.flicker=s.flicker;
+  if(typeof s.tint==='string')    CFG.tint=s.tint;
+}
+window.LiveWallpaper = window.LiveWallpaper || {};
+readConfig(window.LiveWallpaper.config);
+window.LiveWallpaper.onConfig = readConfig;
+
+function hexToRgb(h){
+  const m=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(h||'');
+  return m?[parseInt(m[1],16)/255,parseInt(m[2],16)/255,parseInt(m[3],16)/255]:[0.35,0.29,0.54];
+}
+function compile(type,src){
+  const s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
+  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){ console.error(gl.getShaderInfoLog(s)); throw new Error('compile'); }
+  return s;
+}
+
+let prog, uni={}, tex, imgW=16, imgH=9, ready=false;
+if(gl){
+  prog=gl.createProgram();
+  gl.attachShader(prog,compile(gl.VERTEX_SHADER,document.getElementById('vs').textContent));
+  gl.attachShader(prog,compile(gl.FRAGMENT_SHADER,document.getElementById('fs').textContent));
+  gl.linkProgram(prog);
+  if(!gl.getProgramParameter(prog,gl.LINK_STATUS)) console.error(gl.getProgramInfoLog(prog));
+  gl.useProgram(prog);
+  for(const n of ['uTex','uRes','uImg','uTime','uRain','uFlicker','uTint']) uni[n]=gl.getUniformLocation(prog,n);
+
+  // 1x1 placeholder until the image loads
+  tex=gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D,tex);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([10,10,16,255]));
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+
+  const img=new Image();
+  img.onload=()=>{
+    imgW=img.naturalWidth; imgH=img.naturalHeight;
+    gl.bindTexture(gl.TEXTURE_2D,tex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,img);
+    ready=true;
+  };
+  img.onerror=()=>{ document.getElementById('fb').textContent='asset city.jpg failed to load'; document.getElementById('fb').style.display='flex'; };
+  img.src='assets/city.jpg';
+}
+
+let DPR=1;
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,1.75);
+  cv.width=Math.floor(innerWidth*DPR); cv.height=Math.floor(innerHeight*DPR);
+  if(gl) gl.viewport(0,0,cv.width,cv.height);
+}
+addEventListener('resize',resize); resize();
+
+let sim=0,last=performance.now();
+function frame(now){
+  let dt=(now-last)/1000; last=now; if(dt>0.1)dt=0.1;
+  sim+=dt*CFG.speed;
+  if(gl){
+    gl.uniform1i(uni.uTex,0);
+    gl.uniform2f(uni.uRes,cv.width,cv.height);
+    gl.uniform2f(uni.uImg,imgW,imgH);
+    gl.uniform1f(uni.uTime,sim);
+    gl.uniform1f(uni.uRain,Math.max(0,Math.min(2,CFG.rain)));
+    gl.uniform1f(uni.uFlicker,CFG.flicker?1:0);
+    const c=hexToRgb(CFG.tint); gl.uniform3f(uni.uTint,c[0],c[1],c[2]);
+    gl.drawArrays(gl.TRIANGLES,0,3);
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

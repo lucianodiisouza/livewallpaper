@@ -32,10 +32,19 @@ Gated on an **Apple Developer Program** account ($99/yr). Once available:
 Result: no Gatekeeper warning on launch. Ship the signed+stapled build via GitHub Releases as
 before.
 
+## Phase A bridge — update *notifications* (shipping now)
+
+Until signed builds unlock Sparkle, `UpdateChecker` (in-app) polls the GitHub Releases API
+(`/releases/latest`), compares the tag to the running version, and — if newer — lights up a
+menu-bar banner + "Check for Updates…" that opens the release page. It only **notifies**; it
+never downloads or installs. Auto-check is throttled (≤ once/24h) and opt-out in Preferences.
+GUI-free check: `LiveWallpaper --check-updates`. Retire this once Sparkle (below) takes over.
+
 ## Phase C — later: auto-updates via Sparkle
 
 [Sparkle](https://sparkle-project.org) is the standard updater for notarized non-App-Store Mac
-apps. It requires signed builds, so it lands with (or after) Phase B.
+apps. It requires signed builds, so it lands with (or after) Phase B. It **replaces** the
+Phase-A notification bridge above with real in-place updates.
 
 - Host an **appcast** XML feed (can be a file in the repo / GitHub Pages / a release asset).
 - Each release: sign the update with an **EdDSA** key, add an `<item>` to the appcast with the
