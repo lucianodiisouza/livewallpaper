@@ -174,7 +174,8 @@ New Phase-2 scope instead:
   `tier`/`bundle_key` on each record + a Worker `/catalog/bundle` route stream premium bundles from a
   private R2 bucket only to premium devices (free items stay on the public URL). Client shows a lock
   badge + paywall on locked items. Code landed 2026-08-03; live infra (private bucket + collection
-  fields + deploy) still to provision — see [PRE_APPLE_PLAN.md](docs/PRE_APPLE_PLAN.md) A1.
+  fields + deploy) **live in production as of 2026-08-03** (validated: premium→200, non-premium→402);
+  a 3-item premium showcase is seeded — see [PRE_APPLE_PLAN.md](docs/PRE_APPLE_PLAN.md) A1.
 - 🟡 Paywall / entitlement layer — `Entitlement` (single `isPremium` source of truth) + gating:
   premium built-ins (lock badge → paywall on apply), rotation is Premium-gated, a `PaywallSheet`
   upsell, and a Premium section in Settings. **Activation is a pre-release local placeholder**

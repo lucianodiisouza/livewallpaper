@@ -26,7 +26,7 @@ Apple-gated remainder is the StoreKit trigger + signing.
 Makes the product monetizable the instant StoreKit lands. Backend lives in the separate
 `livewallpaper-workshop` repo (`worker/src/index.ts`); client is `Sources/LiveWallpaper/`.
 
-### A1. Premium catalog delivery — device-bound  🟡  *(code landed 2026-08-03; infra pending)*
+### A1. Premium catalog delivery — device-bound  ✅  *(deployed + validated 2026-08-03)*
 The catalog was served straight from public PocketBase + R2, so premium bundle URLs would be
 copyable between Macs — violating the "device-bound, can't copy" promise in
 [FREEMIUM.md](FREEMIUM.md) / [LICENSING.md](LICENSING.md). Implemented:
@@ -42,10 +42,12 @@ copyable between Macs — violating the "device-bound, can't copy" promise in
   "Unlock" button that opens the paywall for non-entitled users. Checksum re-verify unchanged.
 - Self-test: +5 checks (tier decode + premium-request contract). 40/40 pass; worker `deploy --dry-run`
   clean.
-- **Remaining (infra, needs a Cloudflare/PocketBase session):** create the private
-  `lw-wallpapers-premium` bucket, add the two PocketBase fields to the live collection, deploy the
-  Worker, and seed a premium item to validate end-to-end. Optional hardening: swap the worker-proxied
-  stream for short-lived signed R2 URLs.
+- **Infra — LIVE (2026-08-03):** private `lw-wallpapers-premium` bucket created; Worker deployed with
+  the `BUNDLES` binding + `LICENSE_PRIVATE_KEY`/`ADMIN_TOKEN` secrets (private key verified to match
+  the client's embedded public key); PocketBase `tier`/`bundle_key` fields added. Validated in
+  production: premium device → 200 + exact bytes, non-premium → 402, traversal → 400, missing → 404.
+  A 3-item premium showcase is seeded (see the workshop repo `docs/CATALOG.md`).
+- Optional later hardening: swap the worker-proxied stream for short-lived signed R2 URLs.
 
 ### A2. Licensing backend hardening — the non-StoreKit remainder  ✅  *(done 2026-08-03)*
 All testable **now** via `POST /admin/order`; StoreKit later just auto-creates the order.
