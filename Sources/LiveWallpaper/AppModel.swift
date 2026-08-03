@@ -12,10 +12,23 @@ final class AppModel: ObservableObject {
         let kind: String        // video | metal | web
         let isBuiltIn: Bool
         var previewSource: String? = nil   // shader source for the preview thumbnail (metal only)
+        var previewVideoURL: URL? = nil    // video file for a static frame preview (video only)
+    }
+
+    /// One physical display and what's assigned to it. `id` is the Library screen key.
+    struct ScreenInfo: Identifiable {
+        let id: String          // Library.key(for:) — stable NSScreenNumber string
+        let name: String        // e.g. "Built-in Retina Display"
+        let width: Int          // pixels
+        let height: Int
+        let frame: CGRect       // points, global coords — drives the to-scale arrangement drawing
+        var assignedID: String  // wallpaper id currently rendering here
     }
 
     /// Everything available locally to use (built-ins + installed packages).
     @Published var available: [Entry] = []
+    /// Connected displays + per-screen assignment (drives the in-Installed monitor strip).
+    @Published var screens: [ScreenInfo] = []
     /// The currently-rendering wallpaper id.
     @Published var currentID: String = ""
     /// Pinned wallpaper ids shown in the menu bar (max 5, ordered).
@@ -28,10 +41,14 @@ final class AppModel: ObservableObject {
 
     // Wired by AppDelegate:
     var onSetActive: ((String) -> Void)?
+    /// Assign one wallpaper to a single display: (wallpaperID, screenKey).
+    var onAssign: ((String, String) -> Void)?
     var onRemove: ((String) -> Void)?
     var onImport: (() -> Void)?
     var onStarsChanged: (() -> Void)?
     var onInstall: ((WorkshopItem) async -> String?)?
+    /// Install a workshop item, then assign it to one display (nil ⇒ all). Returns an error string.
+    var onInstallToScreen: ((WorkshopItem, String?) async -> String?)?
     var configFor: ((String) -> [String: ConfigValue])?
     var onApplyConfig: ((String, [String: ConfigValue]) -> Void)?
 
@@ -51,6 +68,11 @@ final class AppModel: ObservableObject {
     func setActive(_ id: String) {
         currentID = id
         onSetActive?(id)
+    }
+
+    /// Assign a wallpaper to a single display (leaves other screens untouched).
+    func assign(_ wallpaperID: String, toScreen key: String) {
+        onAssign?(wallpaperID, key)
     }
 
     func remove(_ id: String) {

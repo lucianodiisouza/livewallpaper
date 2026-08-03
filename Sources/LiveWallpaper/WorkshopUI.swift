@@ -7,6 +7,9 @@ import SwiftUI
 struct WorkshopView: View {
     let client: WorkshopClient
     let onInstall: @MainActor (WorkshopItem) async -> String?
+    /// Connected displays + a per-display install path — enables the "…" per-monitor menu.
+    var screens: [AppModel.ScreenInfo] = []
+    var onInstallToScreen: (@MainActor (WorkshopItem, String?) async -> String?)? = nil
 
     @State private var items: [WorkshopItem] = []
     @State private var search = ""
@@ -62,7 +65,8 @@ struct WorkshopView: View {
                     ForEach(items) { item in
                         WorkshopTile(item: item,
                                      installing: installing.contains(item.id),
-                                     installed: installed.contains(item.id)) { install(item) }
+                                     installed: installed.contains(item.id),
+                                     screens: screens) { key in install(item, toScreen: key) }
                     }
                 }
                 .padding(20)
@@ -87,10 +91,12 @@ struct WorkshopView: View {
         loading = false
     }
 
-    private func install(_ item: WorkshopItem) {
+    private func install(_ item: WorkshopItem, toScreen key: String? = nil) {
         installing.insert(item.id)
         Task {
-            let err = await onInstall(item)
+            let err: String?
+            if let key, let onInstallToScreen { err = await onInstallToScreen(item, key) }
+            else { err = await onInstall(item) }
             installing.remove(item.id)
             if err == nil { installed.insert(item.id) }
             banner = err ?? "Installed “\(item.title)”."
@@ -104,7 +110,9 @@ struct WorkshopTile: View {
     let item: WorkshopItem
     let installing: Bool
     let installed: Bool
-    let onInstall: () -> Void
+    var screens: [AppModel.ScreenInfo] = []
+    /// Install the item, then apply it to one display (key) or all (nil).
+    let onInstall: (String?) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -123,10 +131,28 @@ struct WorkshopTile: View {
                 } else if installed {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
                 } else {
-                    Button("Install") { onInstall() }.controlSize(.small).buttonStyle(.bordered)
+                    Button("Install") { onInstall(nil) }.controlSize(.small).buttonStyle(.bordered)
+                    if screens.count > 1 { perDisplayMenu }
                 }
             }
         }
+    }
+
+    /// Install straight onto one named display (or all).
+    private var perDisplayMenu: some View {
+        Menu {
+            Button("Install · all displays") { onInstall(nil) }
+            Divider()
+            ForEach(screens) { s in
+                Button("Install · \(s.name)") { onInstall(s.id) }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Install and apply to a specific display")
     }
 
     @ViewBuilder private var preview: some View {

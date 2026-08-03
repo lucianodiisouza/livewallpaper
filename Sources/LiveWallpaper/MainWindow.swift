@@ -82,14 +82,30 @@ struct PlaceholderThumb: View {
     }
 }
 
+/// Load a preview thumbnail for an entry: a rendered shader frame, a static video frame, or nil
+/// (callers fall back to `PlaceholderThumb`). Shared by every tile so the logic lives in one place.
+@MainActor
+func loadThumb(_ entry: AppModel.Entry) async -> NSImage? {
+    if let src = entry.previewSource { return ThumbnailRenderer.image(forShader: src) }
+    if let url = entry.previewVideoURL { return await ThumbnailRenderer.image(forVideoAt: url) }
+    return nil
+}
+
 /// One wallpaper preview card in the Installed grid.
 struct WallpaperTile: View {
     @ObservedObject var model: AppModel
     let entry: AppModel.Entry
+    /// The selected monitor from the strip (nil ⇒ act on all displays).
+    var target: String? = nil
     @State private var thumb: NSImage?
 
-    private var isActive: Bool { entry.id == model.currentID }
     private var isStarred: Bool { model.isStarred(entry.id) }
+    private var multiMonitor: Bool { model.screens.count > 1 }
+    /// Is this wallpaper already applied to whatever "Set" would target?
+    private var appliesHere: Bool {
+        if let target, let s = model.screens.first(where: { $0.id == target }) { return s.assignedID == entry.id }
+        return entry.id == model.currentID
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -101,21 +117,42 @@ struct WallpaperTile: View {
                         .font(.caption2).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 4)
-                if isActive {
+                if appliesHere {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
                 } else {
-                    Button("Set") { model.setActive(entry.id) }
+                    Button("Set") { applySet() }
                         .controlSize(.small).buttonStyle(.borderedProminent)
                 }
+                if multiMonitor { perDisplayMenu }
                 if !entry.isBuiltIn {
                     Button { model.remove(entry.id) } label: { Image(systemName: "trash") }
                         .buttonStyle(.plain).foregroundStyle(.secondary).controlSize(.small).help("Uninstall")
                 }
             }
         }
-        .task(id: entry.id) {
-            if let src = entry.previewSource { thumb = ThumbnailRenderer.image(forShader: src) }
+        .task(id: entry.id) { thumb = await loadThumb(entry) }
+    }
+
+    /// The "…" alternative: apply this wallpaper straight to one named display (or all).
+    private var perDisplayMenu: some View {
+        Menu {
+            Button("All displays") { model.setActive(entry.id) }
+            Divider()
+            ForEach(model.screens) { s in
+                Button(s.name) { model.assign(entry.id, toScreen: s.id) }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
         }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Apply to a specific display")
+    }
+
+    private func applySet() {
+        if let target { model.assign(entry.id, toScreen: target) }
+        else { model.setActive(entry.id) }
     }
 
     private var preview: some View {
@@ -128,9 +165,9 @@ struct WallpaperTile: View {
         }
         .frame(height: 120).frame(maxWidth: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(isActive ? Color.accentColor : .clear, lineWidth: 2))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(appliesHere ? Color.accentColor : .clear, lineWidth: 2))
         .overlay(alignment: .topLeading) {
-            if isActive {
+            if appliesHere {
                 Text("ACTIVE").font(.caption2.weight(.bold))
                     .padding(.horizontal, 6).padding(.vertical, 2)
                     .background(.green.opacity(0.9)).foregroundStyle(.white)
@@ -155,12 +192,30 @@ struct WallpaperTile: View {
 
 struct InstalledView: View {
     @ObservedObject var model: AppModel
+    /// The monitor the plain "Set" button targets (nil ⇒ all displays). Chosen in the strip.
+    @State private var target: String?
     private let columns = [GridItem(.adaptive(minimum: 200), spacing: 18)]
+
+    /// Ignore a target that points at a display that's no longer connected.
+    private var effectiveTarget: String? {
+        guard let target, model.screens.contains(where: { $0.id == target }) else { return nil }
+        return target
+    }
+    private var targetName: String {
+        model.screens.first(where: { $0.id == effectiveTarget })?.name ?? "All displays"
+    }
 
     var body: some View {
         ScrollView {
-            LazyVGrid(columns: columns, spacing: 18) {
-                ForEach(model.available) { WallpaperTile(model: model, entry: $0) }
+            VStack(alignment: .leading, spacing: 16) {
+                if model.screens.count > 1 {
+                    MonitorStrip(model: model, target: $target)
+                    Text("Setting: \(targetName) — tap a monitor to target it, or use “…” on a wallpaper.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                LazyVGrid(columns: columns, spacing: 18) {
+                    ForEach(model.available) { WallpaperTile(model: model, entry: $0, target: effectiveTarget) }
+                }
             }
             .padding(20)
         }
@@ -175,14 +230,107 @@ struct InstalledView: View {
     }
 }
 
+// MARK: - Monitor strip (per-display targeting inside Installed)
+
+/// A monitor placed in the strip: its info + the drawn rect (in view points).
+struct PlacedScreen: Identifiable {
+    let id: String
+    let screen: AppModel.ScreenInfo
+    let rect: CGRect
+}
+
+/// To-scale rects for the connected displays, preserving relative size and layout, fit to a target
+/// height. A small gap is carved between adjacent monitors so they read as separate screens.
+enum ScreenLayout {
+    static func place(_ screens: [AppModel.ScreenInfo], height H: CGFloat, gap: CGFloat = 6) -> [PlacedScreen] {
+        guard !screens.isEmpty else { return [] }
+        let f = screens.map(\.frame)
+        let minX = f.map(\.minX).min()!
+        let maxY = f.map(\.maxY).max()!, minY = f.map(\.minY).min()!
+        let scale = H / max(maxY - minY, 1)
+        return screens.map { s in
+            let raw = CGRect(x: (s.frame.minX - minX) * scale,
+                             y: (maxY - s.frame.maxY) * scale,   // flip Y (macOS y-up → view y-down)
+                             width: s.frame.width * scale, height: s.frame.height * scale)
+            return PlacedScreen(id: s.id, screen: s, rect: raw.insetBy(dx: gap / 2, dy: gap / 2))
+        }
+    }
+}
+
+/// Horizontal, scrollable to-scale drawing of the connected monitors, shown at the top of Installed.
+/// Each monitor shows a static preview of the wallpaper applied to it + its name; tapping targets it.
+struct MonitorStrip: View {
+    @ObservedObject var model: AppModel
+    @Binding var target: String?
+    private let stripHeight: CGFloat = 132
+
+    var body: some View {
+        let placed = ScreenLayout.place(model.screens, height: stripHeight)
+        let width = placed.map { $0.rect.maxX }.max() ?? 0
+        ScrollView(.horizontal, showsIndicators: false) {
+            ZStack(alignment: .topLeading) {
+                ForEach(placed) { p in
+                    MonitorTile(model: model, screen: p.screen, isSelected: target == p.id)
+                        .frame(width: p.rect.width, height: p.rect.height)
+                        .offset(x: p.rect.minX, y: p.rect.minY)
+                        .onTapGesture { target = (target == p.id ? nil : p.id) }
+                }
+            }
+            .frame(width: max(width, 1), height: stripHeight, alignment: .topLeading)
+            .padding(8)
+        }
+        .frame(height: stripHeight + 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+/// One monitor in the strip: wallpaper preview inside a bezel, name chip, selection ring.
+struct MonitorTile: View {
+    @ObservedObject var model: AppModel
+    let screen: AppModel.ScreenInfo
+    let isSelected: Bool
+    @State private var thumb: NSImage?
+
+    private var entry: AppModel.Entry? { model.available.first { $0.id == screen.assignedID } }
+
+    var body: some View {
+        Group {
+            if let thumb {
+                Image(nsImage: thumb).resizable().aspectRatio(contentMode: .fill)
+            } else {
+                PlaceholderThumb(seed: entry?.title ?? screen.name, kind: entry?.kind ?? "metal")
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay(alignment: .bottom) {
+            Text(screen.name)
+                .font(.caption2.weight(.medium)).lineLimit(1)
+                .padding(.horizontal, 6).padding(.vertical, 2)
+                .background(.black.opacity(0.5), in: Capsule())
+                .foregroundStyle(.white)
+                .padding(6)
+        }
+        .overlay(RoundedRectangle(cornerRadius: 6)
+            .stroke(isSelected ? Color.accentColor : Color.primary.opacity(0.25),
+                    lineWidth: isSelected ? 3 : 1))
+        .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
+        .task(id: screen.assignedID) {
+            if let e = entry { thumb = await loadThumb(e) } else { thumb = nil }
+        }
+    }
+}
+
 // MARK: - Explore (the workshop)
 
 struct ExploreView: View {
     @ObservedObject var model: AppModel
     var body: some View {
-        WorkshopView(client: model.workshop) { item in
-            await model.onInstall?(item) ?? "Install unavailable."
-        }
+        WorkshopView(
+            client: model.workshop,
+            onInstall: { item in await model.onInstall?(item) ?? "Install unavailable." },
+            screens: model.screens,
+            onInstallToScreen: { item, key in await model.onInstallToScreen?(item, key) ?? "Install unavailable." })
         .navigationTitle("Explore")
     }
 }
@@ -198,8 +346,13 @@ struct SettingsTab: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 GroupBox("General") {
-                    Toggle("Launch at login", isOn: $prefs.launchAtLogin)
-                        .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle("Launch at login", isOn: $prefs.launchAtLogin)
+                        Toggle("Solid backdrop under wallpapers", isOn: $prefs.solidBackdrop)
+                        Text("Replaces your macOS desktop picture with a neutral colour so you never see it behind the wallpaper. Your original is restored when you quit or turn this off.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
                 }
                 GroupBox("Power") {
                     VStack(alignment: .leading, spacing: 8) {
@@ -216,6 +369,10 @@ struct SettingsTab: View {
                         Toggle("Rotate through all wallpapers", isOn: $prefs.rotationEnabled)
                         Stepper("Every \(prefs.rotationMinutes) min", value: $prefs.rotationMinutes, in: 1...240)
                             .disabled(!prefs.rotationEnabled)
+                        if model.screens.count > 1 {
+                            Text("Each display rotates independently from its current wallpaper.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                     .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
                 }

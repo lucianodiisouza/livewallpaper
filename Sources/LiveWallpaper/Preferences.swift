@@ -33,12 +33,19 @@ final class Preferences: ObservableObject {
     @Published var batteryBehavior: BatteryBehavior { didSet { persist(); onChange?() } }
     @Published var rotationEnabled: Bool { didSet { persist(); onChange?() } }
     @Published var rotationMinutes: Int { didSet { persist(); onChange?() } }
+    @Published var checkForUpdatesAutomatically: Bool { didSet { persist() } }
+    /// Paint a neutral solid colour as the macOS desktop picture so the user never glimpses their
+    /// own wallpaper behind/around our window. Default on; restores the original when turned off.
+    @Published var solidBackdrop: Bool { didSet { persist(); onChange?() } }
 
     private init() {
         launchAtLogin = d.bool(forKey: "launchAtLogin")
         batteryBehavior = BatteryBehavior(rawValue: d.string(forKey: "batteryBehavior") ?? "") ?? .throttle
         rotationEnabled = d.bool(forKey: "rotationEnabled")
         rotationMinutes = max(1, d.object(forKey: "rotationMinutes") as? Int ?? 15)
+        // Default on: opt-out, not opt-in — testers should hear about new builds by default.
+        checkForUpdatesAutomatically = d.object(forKey: "checkForUpdatesAutomatically") as? Bool ?? true
+        solidBackdrop = d.object(forKey: "solidBackdrop") as? Bool ?? true
         // Reconcile the actual login-item state with the stored preference on launch.
         syncLoginItemState()
     }
@@ -48,6 +55,8 @@ final class Preferences: ObservableObject {
         d.set(batteryBehavior.rawValue, forKey: "batteryBehavior")
         d.set(rotationEnabled, forKey: "rotationEnabled")
         d.set(rotationMinutes, forKey: "rotationMinutes")
+        d.set(checkForUpdatesAutomatically, forKey: "checkForUpdatesAutomatically")
+        d.set(solidBackdrop, forKey: "solidBackdrop")
     }
 
     // MARK: - Launch at login (SMAppService)

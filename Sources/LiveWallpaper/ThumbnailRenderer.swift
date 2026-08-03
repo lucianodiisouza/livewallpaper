@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import Metal
 import simd
 
@@ -27,6 +28,26 @@ enum ThumbnailRenderer {
         guard let image = render(source: source, size: size, time: time) else { return nil }
         cache[key] = image
         return image
+    }
+
+    /// A single static frame from a video file, for a preview tile. Cached by URL+size.
+    static func image(forVideoAt url: URL,
+                      size: CGSize = CGSize(width: 360, height: 220),
+                      at seconds: Double = 1) async -> NSImage? {
+        let key = "vid:\(url.path)@\(Int(size.width))x\(Int(size.height))"
+        if let cached = cache[key] { return cached }
+        let asset = AVURLAsset(url: url)
+        let gen = AVAssetImageGenerator(asset: asset)
+        gen.appliesPreferredTrackTransform = true
+        gen.maximumSize = CGSize(width: size.width * 2, height: size.height * 2)
+        do {
+            let cg = try await gen.image(at: CMTime(seconds: seconds, preferredTimescale: 600)).image
+            let img = NSImage(cgImage: cg, size: size)
+            cache[key] = img
+            return img
+        } catch {
+            return nil
+        }
     }
 
     private static func render(source: String, size: CGSize, time: Float) -> NSImage? {
