@@ -77,7 +77,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.onImport = { [weak self] in self?.importWallpaper() }
         model.onExport = { [weak self] id in self?.exportWallpaper(id) }
         model.makePreviewRenderer = { [weak self] id in self?.makeRenderer(forID: id).0 }
-        model.onGenerate = { [weak self] prompt in self?.generateShader(prompt) }
+        model.onGenerate = { [weak self] prompt, kind in self?.generate(prompt, kind: kind) }
         model.onStarsChanged = { [weak self] in self?.rebuildMenu() }
         model.onRemove = { [weak self] id in
             guard let self else { return }
@@ -423,20 +423,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         .init(key: "tint", type: "color", label: "Tint", min: nil, max: nil, options: nil, defaultValue: .string("#FFFFFF")),
     ]
 
-    /// Generate a Metal-shader wallpaper from a prompt: ask the model → validate + compile (one
-    /// repair retry) → package + install → apply. Premium-gated (the moat feature).
-    private func generateShader(_ prompt: String) {
+    /// Generate a wallpaper (shader or web) from a prompt: ask the model → validate (one repair
+    /// retry) → package + install → apply. Premium-gated (the moat feature).
+    private func generate(_ prompt: String, kind: AppModel.GenerateKind) {
         guard Entitlement.shared.isPremium else { model.showPaywall("AI generation is a Premium feature."); return }
         model.isGenerating = true
         model.aiError = nil
         Task {
             do {
-                let full = try await self.buildValidatedShader(prompt: prompt)
                 let id = "ai." + UUID().uuidString.prefix(8).lowercased()
                 let title = "AI · " + prompt.trimmingCharacters(in: .whitespacesAndNewlines).prefix(28)
                 let dest = FileManager.default.temporaryDirectory.appendingPathComponent("\(id).livewallpaper")
-                try self.library.exportShader(id: id, title: String(title), source: full,
-                                              config: Self.aiConfig, to: dest, authorHandle: "ai")
+                switch kind {
+                case .shader:
+                    let src = try await self.buildValidatedShader(prompt: prompt)
+                    try self.library.exportShader(id: id, title: String(title), source: src,
+                                                  config: Self.aiConfig, to: dest, authorHandle: "ai")
+                case .web:
+                    let html = try await self.buildValidatedWeb(prompt: prompt)
+                    try self.library.exportWeb(id: id, title: String(title), html: html, to: dest, authorHandle: "ai")
+                }
                 let pkg = try self.library.install(fromZipAt: dest)
                 self.library.markImported(pkg.manifest.id)   // the user's own creation ⇒ shareable
                 try? FileManager.default.removeItem(at: dest)
@@ -458,14 +464,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 prompt: prompt, feedback: "It failed to compile or was rejected by the fragment-only safety gate.")
             full = BuiltInShaders.prelude + "\n\n" + repaired
         }
-        guard Self.isValidShader(full) else { throw ShaderGenerator.GenError.invalidResult }
+        guard Self.isValidShader(full) else {
+            throw AIError.unusable("The generated shader didn't compile — try rephrasing.")
+        }
         return full
+    }
+
+    /// Generate an offline HTML wallpaper; one repair retry if it uses network or isn't a document.
+    private func buildValidatedWeb(prompt: String) async throws -> String {
+        var html = try await WebGenerator.generate(prompt: prompt)
+        if !Self.isValidWeb(html) {
+            html = try await WebGenerator.generate(
+                prompt: prompt, feedback: "It used network/external resources or wasn't a complete offline HTML document.")
+        }
+        guard Self.isValidWeb(html) else {
+            throw AIError.unusable("The generated page used network/external resources or wasn't valid — try rephrasing.")
+        }
+        return html
     }
 
     /// A shader is usable if it passes the fragment-only static gate AND actually compiles + renders.
     private static func isValidShader(_ source: String) -> Bool {
         do { try ShaderValidator.validate(source) } catch { return false }
         return ThumbnailRenderer.image(forShader: source) != nil
+    }
+
+    /// A web wallpaper is usable if it looks like an HTML document and uses NO network/eval — the
+    /// caged renderer blocks those, so anything flagged would render broken.
+    private static func isValidWeb(_ html: String) -> Bool {
+        let lower = html.lowercased()
+        guard lower.contains("<html") || lower.contains("<canvas") || lower.contains("<script") else { return false }
+        return WebValidator.warnings(source: html, filename: "index.html").isEmpty
     }
 
     /// Export an installed wallpaper to a `.livewallpaper` the user can hand to someone else (P2P).

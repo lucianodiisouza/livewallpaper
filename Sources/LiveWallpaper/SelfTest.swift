@@ -145,6 +145,17 @@ enum SelfTest {
         check("AI: extracts fenced shader", fenced == "fragment float4 f_main() {}")
         check("AI: raw text passthrough", ShaderGenerator.extractMetal(from: "  fragment X  ") == "fragment X")
 
+        // 14) AI web packaging: exportWeb → readable web bundle that installs as a `web` package.
+        do {
+            let webShare = tmp.appendingPathComponent("ai-web.livewallpaper")
+            try library.exportWeb(id: "selftest.aiweb", title: "AI Web",
+                                  html: "<!doctype html><html><body><canvas></canvas></body></html>", to: webShare)
+            let files = (try? Data(contentsOf: webShare)).flatMap { try? ZipArchive.extract($0) } ?? [:]
+            check("exportWeb has content/web/index.html", files["content/web/index.html"] != nil)
+            let pkg = try library.install(fromZipAt: webShare)
+            check("exportWeb installs as a web package", pkg.manifest.type == .web)
+        } catch { check("exportWeb round-trip — \(error)", false) }
+
         // Clean up installed selftest packages.
         for pkg in library.installedPackages() where pkg.manifest.id.hasPrefix("selftest.") {
             try? FileManager.default.removeItem(at: pkg.directory)

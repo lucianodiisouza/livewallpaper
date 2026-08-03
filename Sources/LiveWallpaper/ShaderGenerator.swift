@@ -12,15 +12,6 @@ enum ShaderGenerator {
 
     private static let log = Logger(subsystem: "com.livewallpaper.app", category: "ShaderGenerator")
 
-    enum GenError: LocalizedError {
-        case invalidResult
-        var errorDescription: String? {
-            switch self {
-            case .invalidResult: return "The generated shader didn't compile — try rephrasing."
-            }
-        }
-    }
-
     /// The MSL contract the model must target. The prelude is prepended by the caller.
     private static let system = """
     You write Metal Shading Language (MSL) fragment shaders for a live-wallpaper engine.
@@ -51,21 +42,6 @@ enum ShaderGenerator {
         return extractMetal(from: text)
     }
 
-    // MARK: - Parsing (pure — unit-testable without a network)
-
-    /// Pull the shader source out of the model's reply: the contents of the first fenced code block
-    /// if present (```metal / ```cpp / ```), otherwise the trimmed text.
-    static func extractMetal(from text: String) -> String {
-        if let fenced = firstFencedBlock(in: text) { return fenced }
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private static func firstFencedBlock(in text: String) -> String? {
-        guard let open = text.range(of: "```") else { return nil }
-        // Skip an optional language tag on the opening fence's line.
-        var contentStart = open.upperBound
-        if let nl = text[contentStart...].firstIndex(of: "\n") { contentStart = text.index(after: nl) }
-        guard let close = text.range(of: "```", range: contentStart..<text.endIndex) else { return nil }
-        return String(text[contentStart..<close.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
-    }
+    /// Pull the shader source out of the model's reply (fenced block or trimmed text).
+    static func extractMetal(from text: String) -> String { AIParse.codeBlock(from: text) }
 }

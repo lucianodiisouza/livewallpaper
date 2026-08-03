@@ -367,6 +367,7 @@ struct GenerateSheet: View {
     @ObservedObject var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var prompt = ""
+    @State private var kind: AppModel.GenerateKind = .shader
     @State private var started = false
 
     private var canGenerate: Bool {
@@ -379,8 +380,13 @@ struct GenerateSheet: View {
                 Image(systemName: "wand.and.stars").foregroundStyle(.tint)
                 Text("Generate a wallpaper").font(.headline)
             }
-            Text("Describe a look — we generate a live Metal-shader wallpaper (validated before it's applied).")
+            Text("Describe a look — we generate a live wallpaper (validated before it's applied).")
                 .font(.caption).foregroundStyle(.secondary)
+
+            Picker("Type", selection: $kind) {
+                ForEach(AppModel.GenerateKind.allCases) { Text($0.label).tag($0) }
+            }
+            .pickerStyle(.segmented).labelsHidden()
 
             TextField("e.g. slow aurora over a dark ocean, teal and violet", text: $prompt, axis: .vertical)
                 .textFieldStyle(.roundedBorder).lineLimit(2...4)
@@ -400,7 +406,7 @@ struct GenerateSheet: View {
                 }
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Generate") { started = true; model.generate(prompt) }
+                Button("Generate") { started = true; model.generate(prompt, kind: kind) }
                     .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
                     .disabled(!canGenerate)
             }

@@ -139,6 +139,33 @@ final class Library {
         log.notice("Exported '\(title, privacy: .public)' → \(destination.lastPathComponent, privacy: .public)")
     }
 
+    /// Package an inline HTML document into a stored-only `web` `.livewallpaper` at `destination`.
+    /// Mirrors `exportShader`; used by AI web generation. `capabilities.network` is empty (offline).
+    func exportWeb(id: String, title: String, html: String, to destination: URL,
+                   authorHandle: String = "built-in") throws {
+        let entryRel = "web/index.html"
+        let contentFiles = [entryRel: Data(html.utf8)]
+        let checksum = WallpaperPackage.checksum(ofContentFiles: contentFiles)
+
+        let manifest = Manifest(
+            schemaVersion: 1, id: id, version: "1.0.0", title: title,
+            author: Manifest.Author(id: nil, handle: authorHandle),
+            type: .web, entry: "content/\(entryRel)", minMacOS: "26.0",
+            checksum: checksum, config: [],
+            capabilities: Manifest.Capabilities(network: [], audio: false))
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let manifestData = try encoder.encode(manifest)
+
+        let archive = ZipArchive.archive([
+            "manifest.json": manifestData,
+            "content/\(entryRel)": Data(html.utf8),
+        ])
+        try archive.write(to: destination)
+        log.notice("Exported web '\(title, privacy: .public)' → \(destination.lastPathComponent, privacy: .public)")
+    }
+
     // MARK: - Export an installed package (peer-to-peer sharing)
 
     enum ExportError: LocalizedError {

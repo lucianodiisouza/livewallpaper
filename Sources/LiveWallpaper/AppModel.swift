@@ -20,6 +20,13 @@ final class AppModel: ObservableObject {
     /// Drives the paywall sheet (nil ⇒ hidden). `reason` explains what the user tried to unlock.
     struct PaywallContext: Identifiable { let id = UUID(); let reason: String }
 
+    /// What the AI generator should produce.
+    enum GenerateKind: String, CaseIterable, Identifiable {
+        case shader, web
+        var id: String { rawValue }
+        var label: String { self == .shader ? "Shader" : "Web" }
+    }
+
     /// One physical display and what's assigned to it. `id` is the Library screen key.
     struct ScreenInfo: Identifiable {
         let id: String          // Library.key(for:) — stable NSScreenNumber string
@@ -60,8 +67,8 @@ final class AppModel: ObservableObject {
     var onExport: ((String) -> Void)?
     /// Build a fresh, standalone renderer for a wallpaper id — used to render the live preview sheet.
     var makePreviewRenderer: ((String) -> (any WallpaperRenderer)?)?
-    /// Generate a Metal-shader wallpaper from a natural-language prompt (Premium).
-    var onGenerate: ((String) -> Void)?
+    /// Generate a wallpaper (shader or web) from a natural-language prompt (Premium).
+    var onGenerate: ((String, GenerateKind) -> Void)?
     var onStarsChanged: (() -> Void)?
     var onInstall: ((WorkshopItem) async -> String?)?
     /// Install a workshop item, then assign it to one display (nil ⇒ all). Returns an error string.
@@ -110,7 +117,7 @@ final class AppModel: ObservableObject {
     func showPaywall(_ reason: String) { paywall = PaywallContext(reason: reason) }
 
     /// Kick off AI generation for `prompt` (Premium; gated in AppDelegate).
-    func generate(_ prompt: String) { onGenerate?(prompt) }
+    func generate(_ prompt: String, kind: GenerateKind) { onGenerate?(prompt, kind) }
 
     func remove(_ id: String) {
         onRemove?(id)

@@ -12,11 +12,13 @@ enum AIError: LocalizedError {
     case notConfigured
     case http(Int, String)
     case noText
+    case unusable(String)   // generated content failed validation (compile / offline gate)
     var errorDescription: String? {
         switch self {
         case .notConfigured: return "Set up an AI provider in Settings → AI Generation first."
         case let .http(code, msg): return "Generation failed (\(code)): \(msg)"
         case .noText: return "The model returned no text."
+        case let .unusable(why): return why
         }
     }
 }
@@ -102,6 +104,20 @@ struct OpenAICompatibleProvider: ShaderProvider {
 // MARK: - Shared parsing
 
 enum AIParse {
+    /// Extract source out of a model reply: the contents of the first fenced code block if present
+    /// (```lang … ```), otherwise the trimmed text. Shared by the shader and web generators.
+    static func codeBlock(from text: String) -> String {
+        guard let open = text.range(of: "```") else {
+            return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        var contentStart = open.upperBound   // skip an optional language tag on the fence line
+        if let nl = text[contentStart...].firstIndex(of: "\n") { contentStart = text.index(after: nl) }
+        guard let close = text.range(of: "```", range: contentStart..<text.endIndex) else {
+            return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return String(text[contentStart..<close.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     /// Pull a human-readable error from either provider's error envelope, else a truncated body.
     static func errorMessage(_ data: Data) -> String {
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
