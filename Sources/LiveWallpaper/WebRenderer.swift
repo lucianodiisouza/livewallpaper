@@ -154,11 +154,24 @@ final class WebRenderer: NSObject, WallpaperRenderer, NowPlayingSink, WKNavigati
 
     // MARK: - WallpaperRenderer
 
+    /// Hiding the web view blanks it to the black host layer. Doing that the instant occlusion flips
+    /// makes switching macOS Spaces flash black-then-content, because a Space transition toggles
+    /// `occlusionState` off→on within a few hundred ms. So defer the actual hide: suspend media at
+    /// once (invisible, saves work), but only blank the view if it stays covered past this grace
+    /// window. A resume that lands first cancels it — no flash. Genuine long occlusion still hides
+    /// and drops to ~0% GPU.
+    private var pendingHide: DispatchWorkItem?
+    private static let hideGrace: TimeInterval = 0.75
+
     func pause() {
-        webView?.isHidden = true
         webView?.setAllMediaPlaybackSuspended(true)
+        pendingHide?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.webView?.isHidden = true }
+        pendingHide = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.hideGrace, execute: work)
     }
     func resume() {
+        pendingHide?.cancel(); pendingHide = nil
         webView?.isHidden = false
         webView?.setAllMediaPlaybackSuspended(false)
     }
@@ -172,6 +185,7 @@ final class WebRenderer: NSObject, WallpaperRenderer, NowPlayingSink, WKNavigati
     }
 
     func stop() {
+        pendingHide?.cancel(); pendingHide = nil
         webView?.stopLoading()
         webView?.removeFromSuperview()
         webView = nil
