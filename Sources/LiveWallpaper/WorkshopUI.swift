@@ -19,6 +19,9 @@ struct WorkshopView: View {
     @ObservedObject private var entitlement = Entitlement.shared
 
     @State private var items: [WorkshopItem] = []
+    /// Top-5 by download count, shown in the Featured carousel. Loaded alongside the grid; failures
+    /// are non-fatal — the grid still works without it.
+    @State private var featured: [WorkshopItem] = []
     @State private var search = ""
     @State private var sort: WorkshopClient.Sort = .newest
     @State private var loading = false
@@ -68,19 +71,39 @@ struct WorkshopView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollView {
-                LazyVGrid(columns: columns, spacing: 18) {
-                    ForEach(items) { item in
-                        WorkshopTile(item: item,
-                                     installing: installing.contains(item.id),
-                                     installed: isInstalled(item),
-                                     locked: item.isPremium && !entitlement.isPremium,
-                                     screens: screens) { key in
+                VStack(alignment: .leading, spacing: 24) {
+                    if !featured.isEmpty {
+                        FeaturedCarousel(items: featured,
+                                         installing: installing,
+                                         installed: { isInstalled($0) },
+                                         locked: { $0.isPremium && !entitlement.isPremium },
+                                         screens: screens,
+                                         onInstall: { item, key in
                             if item.isPremium && !entitlement.isPremium { onLocked?(item) }
                             else { install(item, toScreen: key) }
+                        })
+                        .padding(.top, 4)
+                    }
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("All Wallpapers")
+                            .font(.title3.weight(.semibold))
+                            .padding(.horizontal, 20)
+                        LazyVGrid(columns: columns, spacing: 18) {
+                            ForEach(items) { item in
+                                WorkshopTile(item: item,
+                                             installing: installing.contains(item.id),
+                                             installed: isInstalled(item),
+                                             locked: item.isPremium && !entitlement.isPremium,
+                                             screens: screens) { key in
+                                    if item.isPremium && !entitlement.isPremium { onLocked?(item) }
+                                    else { install(item, toScreen: key) }
+                                }
+                            }
                         }
+                        .padding(.horizontal, 20)
                     }
                 }
-                .padding(20)
+                .padding(.bottom, 20)
             }
         }
     }
@@ -97,8 +120,14 @@ struct WorkshopView: View {
 
     private func load() async {
         loading = true; banner = nil
-        do { items = try await client.fetchCatalog(search: search, sort: sort) }
+        // Fetch the grid and the Featured carousel in parallel. The carousel reuses the same call
+        // shape with sort=.popular and a perPage=200 default; the client already memoises, so the
+        // second hit to the same URL (within 60s) is free.
+        async let catalog = client.fetchCatalog(search: search, sort: sort)
+        async let top = (try? await client.fetchCatalog(search: "", sort: .popular)) ?? []
+        do { items = try await catalog }
         catch { banner = error.localizedDescription }
+        featured = Array(await top.prefix(5))
         loading = false
     }
 
@@ -214,5 +243,120 @@ struct CachedThumb: View {
         .task(id: item.id) {
             if image == nil { image = await WorkshopCache.shared.thumbnail(for: item) }
         }
+    }
+}
+
+// MARK: - Featured carousel
+
+/// Horizontally-scrolling row of wider featured cards (top 5 by install count), shown above the
+/// main catalog grid. Each card is ~1.6× a regular tile's width with a "Featured" ribbon, the live
+/// thumbnail, the install count, and an Install/Unlock/Installed action.
+struct FeaturedCarousel: View {
+    let items: [WorkshopItem]
+    let installing: Set<String>
+    let installed: (WorkshopItem) -> Bool
+    let locked: (WorkshopItem) -> Bool
+    let screens: [AppModel.ScreenInfo]
+    let onInstall: (WorkshopItem, String?) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles").foregroundStyle(.tint)
+                Text("Featured").font(.title3.weight(.semibold))
+                Text("· Top by installs").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 18) {
+                    ForEach(items) { item in
+                        FeaturedCard(item: item,
+                                     installing: installing.contains(item.id),
+                                     installed: installed(item),
+                                     locked: locked(item),
+                                     screens: screens,
+                                     onInstall: onInstall)
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+        }
+    }
+}
+
+/// One wider featured card. Live preview (when shipped), title, type + install count, and the
+/// same Install / Unlock / Installed states as a regular tile — so a user who acts on the
+/// featured card doesn't need to learn a second pattern.
+struct FeaturedCard: View {
+    let item: WorkshopItem
+    let installing: Bool
+    let installed: Bool
+    let locked: Bool
+    let screens: [AppModel.ScreenInfo]
+    let onInstall: (WorkshopItem, String?) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            preview
+                .frame(width: 320, height: 180)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(alignment: .topLeading) {
+                    Label("Featured", systemImage: "sparkles")
+                        .labelStyle(.titleAndIcon).font(.caption2.weight(.bold))
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(.black.opacity(0.55)).foregroundStyle(.white)
+                        .clipShape(Capsule()).padding(10)
+                }
+                .overlay(alignment: .topTrailing) {
+                    if item.isPremium {
+                        Label("Premium", systemImage: "lock.fill")
+                            .labelStyle(.titleAndIcon).font(.caption2.weight(.bold))
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(.black.opacity(0.6)).foregroundStyle(.yellow)
+                            .clipShape(Capsule()).padding(8)
+                    }
+                }
+
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.title).font(.headline).lineLimit(1)
+                    Text("\(item.type.rawValue) · \(item.downloadCount) installs")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                if installing {
+                    ProgressView().controlSize(.small)
+                } else if installed {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                        .help("Already installed")
+                } else if locked {
+                    Button("Unlock") { onInstall(item, nil) }
+                        .controlSize(.small).buttonStyle(.borderedProminent).tint(.yellow)
+                } else {
+                    Button("Install") { onInstall(item, nil) }
+                        .controlSize(.small).buttonStyle(.bordered)
+                    if screens.count > 1 { perDisplayMenu }
+                }
+            }
+        }
+        .frame(width: 320)
+    }
+
+    private var perDisplayMenu: some View {
+        Menu {
+            Button("Install · all displays") { onInstall(item, nil) }
+            Divider()
+            ForEach(screens) { s in
+                Button("Install · \(s.name)") { onInstall(item, s.id) }
+            }
+        } label: { Image(systemName: "ellipsis") }
+            .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+    }
+
+    @ViewBuilder private var preview: some View {
+        if item.thumbURL != nil { CachedThumb(item: item) }
+        else { PlaceholderThumb(seed: item.title, kind: item.type.rawValue) }
     }
 }
