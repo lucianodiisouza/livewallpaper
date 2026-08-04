@@ -9,31 +9,44 @@
     --deck:#7a4a2b; --deck-dark:#4b2c19; --deck-hi:#9a6238;
     --disc:#141018; --disc-hi:#2c2833;
     --cream:#f6efe2; --accent:#ffb454; --accent-2:#ff6d8f; --metal:#e9e2d4;
+    /* dot-matrix LED display */
+    --led:#ffc775; --led-glow:rgba(255,150,50,.6); --led-off:rgba(255,192,97,.09);
+    --panel:#0a0806;
+    --dot:0.2vw;                       /* LED pixel pitch — ~6 dots per glyph for legibility */
   }
   html,body{margin:0;height:100%;overflow:hidden;background:#0f0c1c;font-family:"Avenir Next","Segoe UI",system-ui,sans-serif;}
   #stage{position:fixed;inset:0;display:grid;place-items:center;
-    background:radial-gradient(120% 90% at 50% 12%, var(--bg-top), var(--bg-bot) 72%);}
+    background:radial-gradient(120% 105% at 50% 44%, var(--bg-top), var(--bg-bot) 80%);
+    perspective:2400px;}
   .glow{position:absolute;border-radius:50%;filter:blur(90px);opacity:.4;pointer-events:none;}
-  .glow.a{width:46vw;height:46vw;left:-8vw;top:-12vw;background:var(--bg-top);}
-  .glow.b{width:38vw;height:38vw;right:-4vw;bottom:-14vw;background:var(--accent-2);}
-  .scene{position:relative;width:min(92vw,1200px);aspect-ratio:16/9;}
+  .glow.a{width:52vw;height:52vw;left:-14vw;top:-16vw;background:var(--bg-top);opacity:.42;}
+  .glow.b{width:44vw;height:44vw;right:-8vw;bottom:-16vw;background:var(--accent-2);opacity:.30;}
+  /* fill tall (16:10) desktops: size by whichever of width/height binds, keep the 16/9 stage */
+  .scene{position:relative;width:min(86vw,150vh);aspect-ratio:16/9;
+    transform:rotateX(5deg);}
 
-  /* ---- turntable base: layered gradients + bevel + SVG wood-grain overlay ---- */
-  .deck{position:absolute;left:3%;bottom:7%;width:66%;aspect-ratio:1/0.72;border-radius:30px;
+  /* ---- turntable base: layered gradients + bevel + a chunky 3D side ---- */
+  .deck{position:absolute;left:2%;bottom:6%;width:70%;aspect-ratio:1/0.72;border-radius:32px;
     background:
       radial-gradient(130% 120% at 22% 8%, var(--deck-hi), rgba(0,0,0,0) 55%),
       linear-gradient(158deg, var(--deck), var(--deck-dark));
-    box-shadow:0 48px 100px -24px rgba(0,0,0,.72),
-      inset 0 3px 0 rgba(255,255,255,.16), inset 0 -14px 30px rgba(0,0,0,.42),
-      inset 0 0 0 1px rgba(0,0,0,.25);}
-  .deck::after{content:"";position:absolute;inset:18px;border-radius:20px;
-    box-shadow:inset 0 0 0 1.5px rgba(0,0,0,.14), inset 0 2px 6px rgba(0,0,0,.2);pointer-events:none;}
-  .wood{position:absolute;inset:0;border-radius:30px;opacity:.14;mix-blend-mode:overlay;pointer-events:none;}
+    box-shadow:
+      0 60px 120px -28px rgba(0,0,0,.78),        /* cast shadow on the floor */
+      0 26px 0 -2px var(--deck-dark),            /* extruded front lip (3D thickness) */
+      0 30px 40px -10px rgba(0,0,0,.6),
+      inset 0 3px 0 rgba(255,255,255,.18), inset 0 -16px 34px rgba(0,0,0,.45),
+      inset 0 0 0 1px rgba(0,0,0,.28);}
+  .deck::after{content:"";position:absolute;inset:18px;border-radius:22px;
+    box-shadow:inset 0 0 0 1.5px rgba(0,0,0,.16), inset 0 3px 8px rgba(0,0,0,.24);pointer-events:none;}
+  .wood{position:absolute;inset:0;border-radius:32px;opacity:.14;mix-blend-mode:overlay;pointer-events:none;}
 
-  /* platter well + record */
+  /* platter well + record — raised bezel for depth */
   .platter{position:absolute;left:4%;top:9%;width:64%;aspect-ratio:1/1;border-radius:50%;
     background:radial-gradient(circle at 50% 42%, #3a3540, #17141d 72%);
-    box-shadow:inset 0 6px 22px rgba(0,0,0,.7), inset 0 0 0 6px rgba(0,0,0,.25), 0 12px 26px rgba(0,0,0,.4);}
+    box-shadow:
+      inset 0 8px 26px rgba(0,0,0,.72), inset 0 0 0 6px rgba(0,0,0,.28),
+      0 2px 0 3px rgba(255,255,255,.05),          /* thin raised rim highlight */
+      0 16px 34px rgba(0,0,0,.5);}
   .record{position:absolute;inset:4%;border-radius:50%;
     background:
       repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,.055) 0 0.6px, rgba(0,0,0,0) 0.7px 3.4px),
@@ -41,10 +54,9 @@
     box-shadow:inset 0 0 50px rgba(0,0,0,.9);
     animation:spin 1.8s linear infinite;}
   .record.paused{animation-play-state:paused;}
-  /* fixed specular that the record spins UNDER — reads as light on vinyl */
   .sheen{position:absolute;inset:4%;border-radius:50%;pointer-events:none;z-index:3;
     background:
-      radial-gradient(60% 45% at 34% 26%, rgba(255,255,255,.16), rgba(255,255,255,0) 60%),
+      radial-gradient(60% 45% at 34% 26%, rgba(255,255,255,.18), rgba(255,255,255,0) 60%),
       radial-gradient(50% 40% at 72% 78%, rgba(120,150,255,.10), rgba(255,255,255,0) 60%);
     mix-blend-mode:screen;}
   .label{position:absolute;left:50%;top:50%;width:47%;aspect-ratio:1/1;border-radius:50%;
@@ -62,36 +74,68 @@
   .armsvg{position:absolute;left:4%;top:9%;width:64%;aspect-ratio:1/1;z-index:6;overflow:visible;pointer-events:none;}
   #armTube,#armHead{transition:all .6s cubic-bezier(.4,1.3,.5,1);}
 
-  /* ---- vitrola controls ---- */
-  .controls{position:absolute;right:5%;top:15%;width:26%;height:70%;display:flex;flex-direction:column;justify-content:space-between;}
-  .knobs{display:flex;gap:12%;}
-  .knob{width:38%;aspect-ratio:1/1;border-radius:50%;position:relative;
+  /* ---- right console: knobs · LED display · pitch fader (all on the deck face) ---- */
+  .console{position:absolute;right:3.5%;top:11%;width:29%;height:78%;
+    display:flex;flex-direction:column;gap:6%;}
+  .knobs{display:flex;gap:10%;height:22%;}
+  .knob{width:34%;aspect-ratio:1/1;border-radius:50%;position:relative;
     background:radial-gradient(circle at 38% 30%, #524c58, #16131b 80%);
-    box-shadow:inset 0 2px 5px rgba(255,255,255,.2), inset 0 -3px 6px rgba(0,0,0,.6), 0 8px 16px rgba(0,0,0,.5);}
+    box-shadow:inset 0 2px 5px rgba(255,255,255,.22), inset 0 -3px 6px rgba(0,0,0,.6),
+      0 10px 18px rgba(0,0,0,.55), 0 2px 0 rgba(0,0,0,.4);}
   .knob::before{content:"";position:absolute;inset:20%;border-radius:50%;
     background:radial-gradient(circle at 40% 34%, #3a3642, #101017);box-shadow:inset 0 1px 2px rgba(255,255,255,.15);}
   .knob::after{content:"";position:absolute;left:50%;top:14%;width:7%;height:30%;border-radius:99px;
     transform:translateX(-50%);background:var(--accent);z-index:2;box-shadow:0 0 6px rgba(255,180,84,.6);}
   .knob.b::after{background:var(--cream);transform:translateX(-50%) rotate(38deg);transform-origin:bottom center;box-shadow:none;}
-  .btn{align-self:flex-start;padding:.55em 1.15em;border-radius:99px;font-size:.82vw;font-weight:800;letter-spacing:.14em;
-    color:#1a141f;background:linear-gradient(180deg,var(--accent),#e8992f);text-transform:uppercase;
-    box-shadow:0 6px 14px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.55), inset 0 -2px 4px rgba(0,0,0,.2);}
-  .btn.stopped{background:linear-gradient(180deg,#8a8394,#5c5666);color:#241f2c;box-shadow:0 6px 14px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.3);}
-  .pitch{height:8%;border-radius:99px;background:linear-gradient(180deg,#1a1218,#2a1f27);position:relative;
-    box-shadow:inset 0 2px 6px rgba(0,0,0,.6), inset 0 0 0 1px rgba(0,0,0,.3);}
-  .pitch::after{content:"";position:absolute;left:44%;top:50%;width:15%;height:230%;border-radius:6px;
-    transform:translateY(-50%);background:linear-gradient(180deg,#f5eee0,#a99c86);box-shadow:0 5px 10px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.6);}
 
-  /* ---- now playing text (tonearm is the progress indicator) ---- */
-  .card{position:absolute;right:2%;top:26%;width:31%;color:var(--cream);}
-  .kicker{display:flex;align-items:center;gap:.5em;font-size:clamp(11px,1.05vw,15px);letter-spacing:.22em;text-transform:uppercase;color:var(--accent);font-weight:700;}
-  .dot{width:.6em;height:.6em;border-radius:50%;background:var(--accent-2);box-shadow:0 0 0 0 rgba(255,109,143,.6);animation:pulse 1.6s ease-out infinite;}
-  .dot.paused{animation:none;background:#8a8394;box-shadow:none;}
-  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,109,143,.5);}70%{box-shadow:0 0 0 12px rgba(255,109,143,0);}100%{box-shadow:0 0 0 0 rgba(255,109,143,0);}}
-  .title{margin:.4em 0 .12em;font-size:clamp(22px,3vw,44px);font-weight:800;line-height:1.05;text-shadow:0 2px 10px rgba(0,0,0,.4);}
-  .artist{font-size:clamp(14px,1.65vw,24px);font-weight:600;opacity:.86;}
-  .album{font-size:clamp(12px,1.2vw,17px);opacity:.6;margin-top:.15em;}
-  #stage::after{content:"";position:fixed;inset:0;pointer-events:none;box-shadow:inset 0 0 220px 60px rgba(0,0,0,.5);}
+  /* dot-matrix LED panel — recessed into the deck (inset shadow) with a glass cover */
+  .display{position:relative;flex:1;border-radius:12px;padding:5% 7%;
+    display:flex;flex-direction:column;justify-content:center;gap:6%;overflow:hidden;
+    background:linear-gradient(180deg,#151013,var(--panel));
+    box-shadow:
+      inset 0 3px 10px rgba(0,0,0,.9), inset 0 0 0 1px rgba(0,0,0,.6),
+      inset 0 -2px 6px rgba(255,255,255,.03),
+      0 1px 0 rgba(255,255,255,.06);}
+  /* header strip: status LED + label */
+  .disp-head{display:flex;align-items:center;gap:.5em;height:14%;}
+  .stat{width:.7em;height:.7em;border-radius:50%;background:var(--accent-2);
+    box-shadow:0 0 8px 1px var(--accent-2);animation:blip 1.6s ease-out infinite;flex:none;}
+  .stat.paused{background:#5a5560;box-shadow:none;animation:none;}
+  @keyframes blip{0%{opacity:1}50%{opacity:.35}100%{opacity:1}}
+  .disp-head .lbl{font-size:0.72vw;letter-spacing:.3em;color:var(--led);
+    opacity:.82;text-shadow:0 0 6px var(--led-glow);font-weight:700;}
+
+  /* each LED line: monospace, uppercased, then chopped into a dot grid via a mask */
+  .led{position:relative;overflow:hidden;white-space:nowrap;height:1.45em;line-height:1.45em;
+    font-family:"SFMono-Regular",ui-monospace,Menlo,Consolas,monospace;
+    font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--led);
+    text-shadow:0 0 calc(var(--dot)*1.6) var(--led-glow);
+    -webkit-mask-image:radial-gradient(circle at center, #000 0 46%, transparent 52%);
+            mask-image:radial-gradient(circle at center, #000 0 46%, transparent 52%);
+    -webkit-mask-size:var(--dot) var(--dot); mask-size:var(--dot) var(--dot);
+    -webkit-mask-position:center; mask-position:center;}
+  .led .txt{display:inline-block;will-change:transform;}
+  .led.scroll .txt{animation:marquee 9s ease-in-out infinite alternate;}
+  @keyframes marquee{0%,12%{transform:translateX(0)}88%,100%{transform:translateX(var(--shift,0))}}
+  .led.t1{font-size:1.55vw;height:1.35em;line-height:1.35em;}
+  .led.t2{font-size:1.12vw;opacity:.94;}
+  .led.t3{font-size:0.96vw;opacity:.66;}
+  /* faint "off" pixels behind, so the panel reads as a real matrix even on short text */
+  .display::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;
+    background:radial-gradient(circle at center, var(--led-off) 0 30%, transparent 34%);
+    background-size:var(--dot) var(--dot);}
+  /* glass cover: specular sheen for depth */
+  .display::after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:12px;
+    background:linear-gradient(160deg, rgba(255,255,255,.10), rgba(255,255,255,0) 42%);
+    box-shadow:inset 0 0 24px rgba(0,0,0,.5);}
+
+  .pitch{height:9%;border-radius:99px;background:linear-gradient(180deg,#1a1218,#2a1f27);position:relative;
+    box-shadow:inset 0 2px 6px rgba(0,0,0,.65), inset 0 0 0 1px rgba(0,0,0,.35);}
+  .pitch::after{content:"";position:absolute;left:44%;top:50%;width:14%;height:230%;border-radius:6px;
+    transform:translateY(-50%);background:linear-gradient(180deg,#f5eee0,#a99c86);
+    box-shadow:0 6px 12px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.6);}
+
+  #stage::after{content:"";position:fixed;inset:0;pointer-events:none;box-shadow:inset 0 0 240px 70px rgba(0,0,0,.5);}
 </style>
 </head>
 <body>
@@ -123,17 +167,16 @@
           <circle cx="82" cy="15" r="1.5" fill="#6f6350"/>
         </g>
       </svg>
-      <div class="controls">
+      <div class="console">
         <div class="knobs"><div class="knob a"></div><div class="knob b"></div></div>
-        <div class="btn" id="btn">Playing</div>
+        <div class="display">
+          <div class="disp-head"><span class="stat" id="stat"></span><span class="lbl">NOW PLAYING</span></div>
+          <div class="led t1" id="l-title"><span class="txt">—</span></div>
+          <div class="led t2" id="l-artist"><span class="txt"></span></div>
+          <div class="led t3" id="l-album"><span class="txt"></span></div>
+        </div>
         <div class="pitch"></div>
       </div>
-    </div>
-    <div class="card">
-      <div class="kicker"><span class="dot" id="dot"></span> Now Playing</div>
-      <div class="title" id="title">—</div>
-      <div class="artist" id="artist"></div>
-      <div class="album" id="album"></div>
     </div>
   </div>
 </div>
@@ -164,17 +207,27 @@ function setArm(progress, playing){
   el('armHead').setAttribute('cx',S.x.toFixed(2)); el('armHead').setAttribute('cy',S.y.toFixed(2));
 }
 
+/* LED line: set text, then scroll it (marquee) only if it overflows the panel */
+function setLine(lineId, text){
+  const line = el(lineId), span = line.firstElementChild;
+  span.textContent = text || '';
+  line.classList.remove('scroll'); span.style.removeProperty('--shift');
+  // measure after layout settles
+  requestAnimationFrame(() => {
+    const over = span.scrollWidth - line.clientWidth;
+    if (over > 2){ span.style.setProperty('--shift', (-over - 2) + 'px'); line.classList.add('scroll'); }
+  });
+}
+
 let live=false;
 function render(np){
-  el('title').textContent  = np.title  || '—';
-  el('artist').textContent = np.artist || '';
-  el('album').textContent  = np.album  || '';
+  setLine('l-title',  np.title  || '—');
+  setLine('l-artist', np.artist || '');
+  setLine('l-album',  np.album  || '');
   if (np.artwork) el('art').src = np.artwork;
   const playing = np.isPlaying !== false;
   el('record').classList.toggle('paused', !playing);
-  el('dot').classList.toggle('paused', !playing);
-  el('btn').textContent = playing ? 'Playing' : 'Paused';
-  el('btn').classList.toggle('stopped', !playing);
+  el('stat').classList.toggle('paused', !playing);
   const dur=np.duration||0, pos=Math.min(np.position||0, dur||1e9);
   setArm(dur ? pos/dur : 0, playing);
 }
