@@ -94,7 +94,7 @@
      so the gap between the led and the eq is visibly larger than
      the gap between the knobs and the led.
      ============================================================ */
-  .console{position:absolute;right:4%;top:14%;width:36%;height:62%;
+  .console{position:absolute;right:4%;top:14%;width:36%;height:14%;
     display:flex;flex-direction:column;gap:8%;}
 
   /* knobs row — 3 knobs distributed evenly across the LED's width
@@ -118,8 +118,13 @@
   .knob.c .ind{background:var(--accent-2);
     box-shadow:0 0 8px rgba(255,109,143,.7), inset 0 1px 0 rgba(255,255,255,.4);}
 
-  /* ----- 2-row LED display — shorter, fixed height so the EQ gets its own row ----- */
-  .display-wrap{position:relative;flex:0 0 auto;height:20%;padding:3px;border-radius:16px;
+  /* ----- 2-row LED display — separate row, vertically centered between knobs
+     and the EQ slider. The console (knobs) sits at top:14% with height:14%
+     (ends at ~28% of deck). The EQ starts at 74% of deck (bottom:8%, height:18%).
+     The midpoint of that gap is ~51%, so the LED is placed with top:42% and
+     height:18% to land centered. */
+  .display-wrap{position:absolute;right:4%;top:42%;width:36%;height:18%;
+    padding:3px;border-radius:16px;
     background:linear-gradient(180deg,#2a1d18,#110a08);
     box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 2px 0 rgba(0,0,0,.4);}
   .display{position:relative;height:100%;border-radius:14px;padding:6% 8%;
@@ -266,11 +271,11 @@
           <div class="knob c"><span class="ind"></span></div>
           <div class="knob b"><span class="ind"></span></div>
         </div>
-        <div class="display-wrap">
-          <div class="display">
-            <div class="led t1" id="l-title"><span class="txt">—</span></div>
-            <div class="led t2" id="l-artist"><span class="txt"></span></div>
-          </div>
+      </div>
+      <div class="display-wrap">
+        <div class="display">
+          <div class="led t1" id="l-title"><span class="txt">—</span></div>
+          <div class="led t2" id="l-artist"><span class="txt"></span></div>
         </div>
       </div>
       <div class="eq-wrap">
@@ -325,14 +330,24 @@ function setArm(progress, playing){
 /* LED line: set text, then measure overflow so the marquee animation knows
    how far to translate. The animation always runs (it pauses visually when
    the overflow is 0, since translateX(0) = translateX(0)). The --shift
-   variable is always set, even when 0, so the keyframes have a valid value. */
+   variable is only touched when the value actually changes — re-setting a
+   CSS custom property on an animating element restarts the animation, which
+   causes the marquee to blink. */
+const _lineCache = new Map();  // lineId -> last {text, shift}
 function setLine(lineId, text){
   const line = el(lineId), span = line.firstElementChild;
-  span.textContent = text || '';
-  span.style.removeProperty('--shift');
+  const newText = text || '';
+  if (_lineCache.get(lineId)?.text === newText) return;   // no change → skip
+  span.textContent = newText;
+  _lineCache.set(lineId, { text: newText, shift: null });
+  // measure after layout settles, then only update --shift if it changed
   requestAnimationFrame(() => {
     const over = span.scrollWidth - line.clientWidth;
-    span.style.setProperty('--shift', (-over - 8) + 'px');   // 8px gap before wrap
+    const newShift = (-over - 8) + 'px';
+    if (_lineCache.get(lineId)?.shift !== newShift) {
+      span.style.setProperty('--shift', newShift);
+      _lineCache.set(lineId, { text: newText, shift: newShift });
+    }
   });
 }
 
