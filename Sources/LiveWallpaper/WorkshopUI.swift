@@ -154,7 +154,9 @@ struct WorkshopView: View {
             installing.remove(item.id)
             if err == nil { installed.insert(item.id) }
             banner = err ?? String(format: String(localized: "workshop.banner.installed", bundle: .main), item.title)
-            await load()
+            // Don't reload the catalog here: `installed` + `isInstalled(_:)` already flip the tile to
+            // its installed state, and a full `load()` swaps the ScrollView for the ProgressView —
+            // which makes the page blink and reset scroll position back to the top after every install.
         }
     }
 }

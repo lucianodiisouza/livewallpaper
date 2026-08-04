@@ -24,6 +24,8 @@ jobs:
     runs-on: macos-26   # needs the macOS 26 SDK + Swift 6.2 toolchain (Package.swift)
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history + tags so we can list commits since the previous tag
 
       - name: Select latest Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
@@ -79,16 +81,23 @@ jobs:
       - name: Write release notes
         run: |
           V="${{ steps.ver.outputs.version }}"
-          # Extract the matching section from CHANGELOG.md so the GitHub Release carries the
-          # curated notes. Matches `## [x.y.z]` until the next `## [` heading or EOF. Empty if
-          # the version isn't in the changelog yet (workflow keeps working with template-only).
-          CHANGELOG_SECTION="$(awk -v v="[${V}]" '
-            /^## \[Unreleased\]/ { next }
-            /^## \[/ && index($0, v) { in_section = 1; next }
-            /^## \[/ && in_section { exit }
-            /^\[.*\]:/ && in_section { exit }
-            in_section { print }
-          ' CHANGELOG.md)"
+          # Build the "What's changed" list straight from git history — every commit since the
+          # previous tag. This needs no manual curation (unlike a hand-written CHANGELOG section),
+          # so it never goes stale. On a tag push we walk previous-tag..this-tag; for a manual
+          # dry-run (no tag) we fall back to the last tag reachable from HEAD.
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            HEAD_REF="${GITHUB_REF_NAME}"
+          else
+            HEAD_REF="HEAD"
+          fi
+          PREV_TAG="$(git describe --tags --abbrev=0 "${HEAD_REF}^" 2>/dev/null || echo "")"
+          if [ -n "${PREV_TAG}" ]; then
+            RANGE="${PREV_TAG}..${HEAD_REF}"
+          else
+            RANGE="${HEAD_REF}"   # first release — no earlier tag, list the whole history
+          fi
+          # `- subject (abbrev-hash)` — GitHub auto-links the short hash to the commit.
+          COMMIT_LIST="$(git log --no-merges --pretty=format:'- %s (%h)' "${RANGE}")"
           {
             echo "## Primo Engine ${V} (unsigned test build)"
             echo
@@ -96,10 +105,14 @@ jobs:
             echo "build for testers — it is not yet notarized by Apple, so macOS"
             echo "Gatekeeper will block the first launch. This is expected."
             echo
-            if [ -n "${CHANGELOG_SECTION}" ]; then
+            if [ -n "${COMMIT_LIST}" ]; then
               echo "### What's changed in ${V}"
               echo
-              echo "${CHANGELOG_SECTION}"
+              if [ -n "${PREV_TAG}" ]; then
+                echo "Commits since \`${PREV_TAG}\`:"
+                echo
+              fi
+              echo "${COMMIT_LIST}"
               echo
             fi
             echo "### Install"

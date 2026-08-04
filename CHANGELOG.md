@@ -11,10 +11,19 @@ Sections per release:
 - **Fixed** — bug fixes
 - **Removed** — removed features
 
-The release workflow auto-injects the matching section into the GitHub Release notes
-on every `v*` tag push — see [`.github/workflows/release.yml`](.github/workflows/release.yml).
+GitHub Release notes are generated automatically from the commit list since the previous
+tag (see [`.github/workflows/release.yml`](.github/workflows/release.yml)) — this file is a
+human-readable, curated summary and is **not** the source for the release notes.
 
 ## [Unreleased]
+
+## [0.3.10] — 2026-08-04
+
+### Fixed
+- **Explore catalog no longer blinks and scrolls to top on install** — installing a wallpaper
+  triggered a full catalog reload, which swapped the grid for a loading spinner and reset the
+  scroll position. The tile's installed state is driven by local state, so the reload was
+  unnecessary and is gone.
 
 ## [0.3.9] — 2026-08-04
 
