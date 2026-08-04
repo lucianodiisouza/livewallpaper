@@ -41,6 +41,11 @@ if let i = CommandLine.arguments.firstIndex(of: "--render-thumbs"), i + 2 < Comm
     exit(SampleMaker.renderThumbs(inDir: CommandLine.arguments[i + 1], outDir: CommandLine.arguments[i + 2]))
 }
 
+// Live now-playing check: `--nowplaying-probe` — print what Music/Spotify would push to a wallpaper.
+if CommandLine.arguments.contains("--nowplaying-probe") {
+    exit(MainActor.assumeIsolated { NowPlayingProbe.run() })
+}
+
 // Verify the workshop catalog is reachable: `--workshop-smoke` (no GUI).
 if CommandLine.arguments.contains("--workshop-smoke") {
     exit(WorkshopSmoke.run())

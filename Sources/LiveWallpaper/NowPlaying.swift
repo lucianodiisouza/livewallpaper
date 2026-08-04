@@ -151,10 +151,25 @@ final class NowPlayingMonitor {
         return NowPlayingInfo(
             title: f[1], artist: f[2], album: f[3],
             isPlaying: f[0] == "playing",
-            position: Double(f[5]) ?? 0,
-            duration: Double(f[4]) ?? 0,
+            position: seconds(f[5]),
+            duration: seconds(f[4]),
             source: source)
     }
+
+    /// AppleScript coerces `duration`/`player position` to text in the **user's locale**, so on a
+    /// pt-BR/de-DE/etc. Mac they arrive comma-decimal ("255,382") — which `Double(_:)` rejects, zeroing
+    /// out the progress the tonearm/UI reads from. Parse with the current locale first (authoritative,
+    /// since it's the same locale AppleScript formatted with), then fall back to plain `Double`.
+    private func seconds(_ s: String) -> Double {
+        Self.localizedNumber.number(from: s)?.doubleValue ?? Double(s) ?? 0
+    }
+
+    private static let localizedNumber: NumberFormatter = {
+        let f = NumberFormatter()
+        f.locale = .current
+        f.numberStyle = .decimal
+        return f
+    }()
 
     // MARK: - Artwork
 
