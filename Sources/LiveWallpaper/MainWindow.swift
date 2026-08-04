@@ -1,8 +1,10 @@
 import AppKit
 import SwiftUI
 
-/// The main app window: a sidebar (Installed / Explore / Settings) with a detail pane — the
-/// standard "pro" macOS layout. Opened from the menu bar's "Open Primo Engine".
+/// The main app window: a glass top-nav bar (Installed / Explore / Settings) over a full-width
+/// detail pane — a more modern layout than the old sidebar. Opened from the menu bar's
+/// "Open Primo Engine". Each section's `.toolbar` items still land in the window titlebar, so the
+/// per-section actions (Generate/Import, Reset) are unchanged.
 struct MainView: View {
     @ObservedObject var model: AppModel
     /// Bridges the selected section name to the NSWindow title (navigationTitle doesn't reach the
@@ -11,23 +13,12 @@ struct MainView: View {
     @State private var section: Section = {
         if let raw = ProcessInfo.processInfo.environment["LW_SECTION"],
            let s = Section(rawValue: raw) { return s }
-        // Open on Catalog: that's where the discovery happens (Featured, new releases,
-        // search), and it's the natural first impression for new users. Returning users
-        // usually go straight to a specific wallpaper, which is one click from here.
-        return .explore
+        return .installed
     }()
 
     enum Section: String, CaseIterable, Identifiable {
-        case installed, explore, settings
+        case installed = "Installed", explore = "Catalog", settings = "Settings"
         var id: String { rawValue }
-        /// The user-visible label in the navigation sidebar. Localized.
-        var label: String {
-            switch self {
-            case .installed: return String(localized: "nav.section.installed")
-            case .explore: return String(localized: "nav.section.catalog")
-            case .settings: return String(localized: "nav.section.settings")
-            }
-        }
         var icon: String {
             switch self {
             case .installed: return "square.grid.2x2"
@@ -38,36 +29,93 @@ struct MainView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            List(Section.allCases, selection: $section) { s in
-                Label(s.label, systemImage: s.icon).tag(s)
+        // A NavigationStack so each section's `.navigationTitle`/`.toolbar` still populate the
+        // window titlebar exactly as they did under the old NavigationSplitView detail pane.
+        NavigationStack {
+            Group {
+                switch section {
+                case .installed: InstalledView(model: model)
+                case .explore: ExploreView(model: model)
+                case .settings: SettingsTab(model: model)
+                }
             }
-            .navigationSplitViewColumnWidth(min: 176, ideal: 196, max: 240)
-            .safeAreaInset(edge: .bottom) { activeFooter }
-        } detail: {
-            switch section {
-            case .installed: InstalledView(model: model)
-            case .explore: ExploreView(model: model)
-            case .settings: SettingsTab(model: model)
+            // The nav floats as a top safe-area inset so each section's scroll content passes *under*
+            // the glass — that's what makes the Liquid Glass actually refract (like an iPad tab bar).
+            .safeAreaInset(edge: .top, spacing: 0) {
+                TopNav(section: $section, model: model)
             }
         }
-        .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 800, minHeight: 520)
-        .onChange(of: section) { onTitle(section.label) }
-        .task { onTitle(section.label) }
+        .onChange(of: section) { onTitle(section.rawValue) }
+        .task { onTitle(section.rawValue) }
         .sheet(item: $model.paywall) { ctx in PaywallSheet(reason: ctx.reason) }
     }
+}
 
-    private var activeFooter: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "sparkles").foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(String(localized: "footer.nowPlaying")).font(.caption2).foregroundStyle(.secondary)
-                Text(model.title(forID: model.currentID)).font(.caption.weight(.medium)).lineLimit(1)
+/// The top navigation bar: a floating, centered Liquid Glass segmented control (macOS 26), like the
+/// tab bar on iPadOS. The three sections live in one continuous glass block; the selection is a
+/// tinted glass pill that morphs across it. A compact "Now playing" glass chip floats at the trailing
+/// edge as an overlay so it never shifts the centered group.
+struct TopNav: View {
+    @Binding var section: MainView.Section
+    @ObservedObject var model: AppModel
+    @Namespace private var glass
+
+    var body: some View {
+        segmentedControl
+            .frame(maxWidth: .infinity)                 // center the segmented control
+            .overlay(alignment: .trailing) { nowPlaying }
+            .padding(.horizontal, 16)
+            .padding(.top, 10).padding(.bottom, 12)
+    }
+
+    /// One continuous glass capsule holding the three tabs, with a single tinted-glass pill sliding
+    /// behind the selected one (morphed via `glassEffectID` inside the shared container).
+    private var segmentedControl: some View {
+        GlassEffectContainer(spacing: 0) {
+            HStack(spacing: 2) {
+                ForEach(MainView.Section.allCases) { tab($0) }
             }
-            Spacer()
+            .padding(4)
+            .glassEffect(.regular, in: .capsule)
         }
-        .padding(10)
+    }
+
+    private func tab(_ s: MainView.Section) -> some View {
+        let selected = section == s
+        return Button {
+            withAnimation(.smooth(duration: 0.28)) { section = s }
+        } label: {
+            Label(s.rawValue, systemImage: s.icon)
+                .labelStyle(.titleAndIcon)
+                .font(.callout.weight(selected ? .semibold : .regular))
+                .foregroundStyle(selected ? Color.accentColor : Color.primary)
+                .padding(.horizontal, 18).padding(.vertical, 9)
+                .contentShape(.capsule)
+                // The moving selection: only the active tab carries glass, and it shares one
+                // `glassEffectID`, so it morphs from tab to tab inside the container above.
+                .background {
+                    if selected {
+                        Color.clear
+                            .glassEffect(.regular.tint(.accentColor.opacity(0.22)).interactive(),
+                                         in: .capsule)
+                            .glassEffectID("selection", in: glass)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        .help(s.rawValue)
+    }
+
+    private var nowPlaying: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "sparkles").font(.caption).foregroundStyle(.secondary)
+            Text(model.title(forID: model.currentID))
+                .font(.caption.weight(.medium)).lineLimit(1)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .glassEffect(.regular, in: .capsule)
+        .help("Now playing")
     }
 }
 
@@ -94,24 +142,12 @@ struct PlaceholderThumb: View {
     }
 }
 
-/// Load a preview thumbnail for an entry. Order:
-/// 1. A `thumbnail.png` shipped at the root of an installed package (the cheapest, sharpest path).
-/// 2. A `previewImage` PNG shipped at the root of a built-in wallpaper (same idea, for built-ins).
-/// 3. A rendered shader frame (built-in metal).
-/// 4. A static video frame (built-in or installed video).
-/// 5. A snapshot of the web wallpaper (built-in or installed web).
-/// Returns nil and lets the caller fall back to a `PlaceholderThumb`.
+/// Load a preview thumbnail for an entry: a rendered shader frame, a static video frame, or nil
+/// (callers fall back to `PlaceholderThumb`). Shared by every tile so the logic lives in one place.
 @MainActor
 func loadThumb(_ entry: AppModel.Entry) async -> NSImage? {
-    if let url = entry.thumbnailFileURL,
-       let img = NSImage(contentsOf: url), img.size.width > 1 {
-        return img
-    }
     if let src = entry.previewSource { return ThumbnailRenderer.image(forShader: src) }
     if let url = entry.previewVideoURL { return await ThumbnailRenderer.image(forVideoAt: url) }
-    if let web = entry.previewWeb {
-        return await ThumbnailRenderer.image(forWebRoot: web.root, entry: web.entry, allowlist: web.allowlist)
-    }
     return nil
 }
 
@@ -124,9 +160,12 @@ struct WallpaperTile: View {
     /// Open the live preview sheet for this wallpaper (tap the thumbnail).
     var onOpen: (AppModel.Entry) -> Void = { _ in }
     @State private var thumb: NSImage?
+    @State private var showCustomize = false
     @ObservedObject private var entitlement = Entitlement.shared
 
     private var isStarred: Bool { model.isStarred(entry.id) }
+    /// This wallpaper exposes tweakable parameters ⇒ it can be customized.
+    private var isCustomizable: Bool { !(model.schemas[entry.id] ?? []).isEmpty }
     private var multiMonitor: Bool { model.screens.count > 1 }
     private var isLocked: Bool { entry.isPremium && !entitlement.isPremium }
     /// Is this wallpaper already applied to whatever "Set" would target?
@@ -149,12 +188,13 @@ struct WallpaperTile: View {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
                 } else {
                     Button("Set") { applySet() }
-                        .controlSize(.small).buttonStyle(.borderedProminent)
+                        .controlSize(.small).buttonStyle(.glassProminent)
                 }
                 actionsMenu
             }
         }
         .task(id: entry.id) { thumb = await loadThumb(entry) }
+        .sheet(isPresented: $showCustomize) { CustomizeSheet(model: model, entry: entry) }
     }
 
     /// The "…" actions menu — always shown: Preview, Apply-to-display (multi-monitor), Share
@@ -162,6 +202,9 @@ struct WallpaperTile: View {
     private var actionsMenu: some View {
         Menu {
             Button { onOpen(entry) } label: { Label("Preview", systemImage: "eye") }
+            if isCustomizable {
+                Button { showCustomize = true } label: { Label("Customize…", systemImage: "slider.horizontal.3") }
+            }
             if multiMonitor {
                 Menu("Apply to") {
                     Button("All displays") { model.attemptApply(entry) }
@@ -201,6 +244,12 @@ struct WallpaperTile: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .contentShape(RoundedRectangle(cornerRadius: 10))
         .onTapGesture { onOpen(entry) }
+        .contextMenu {
+            Button { onOpen(entry) } label: { Label("Preview", systemImage: "eye") }
+            if isCustomizable {
+                Button { showCustomize = true } label: { Label("Customize…", systemImage: "slider.horizontal.3") }
+            }
+        }
         .help("Preview")
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(appliesHere ? Color.accentColor : .clear, lineWidth: 2))
         .overlay(alignment: .topLeading) {
@@ -277,9 +326,11 @@ struct WallpaperPreviewSheet: View {
     var target: String?
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var entitlement = Entitlement.shared
+    @State private var showCustomize = false
 
     private var multiMonitor: Bool { model.screens.count > 1 }
     private var isLocked: Bool { entry.isPremium && !entitlement.isPremium }
+    private var isCustomizable: Bool { !(model.schemas[entry.id] ?? []).isEmpty }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -294,6 +345,10 @@ struct WallpaperPreviewSheet: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
+                if isCustomizable {
+                    Button { showCustomize = true } label: { Label("Customize…", systemImage: "slider.horizontal.3") }
+                        .help("Adjust this wallpaper's parameters")
+                }
                 if entry.isShareable {
                     Button { model.onExport?(entry.id) } label: { Label("Share…", systemImage: "square.and.arrow.up") }
                         .help("Export a .livewallpaper to share with someone")
@@ -324,6 +379,7 @@ struct WallpaperPreviewSheet: View {
             .padding(16)
         }
         .frame(width: 660)
+        .sheet(isPresented: $showCustomize) { CustomizeSheet(model: model, entry: entry) }
     }
 
     private func apply(_ key: String?) {
@@ -346,29 +402,27 @@ struct PaywallSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 8) {
                 Image(systemName: "sparkles").font(.title2).foregroundStyle(.tint)
-                Text(String(localized: "paywall.title")).font(.title2.bold())
+                Text("Primo Engine Premium").font(.title2.bold())
             }
             Text(reason).foregroundStyle(.secondary)
 
             VStack(alignment: .leading, spacing: 8) {
-                benefit(String(localized: "paywall.benefit.catalog"), "square.stack")
-                benefit(String(localized: "paywall.benefit.shaders"), "sparkles")
-                benefit(String(localized: "paywall.benefit.rotation"), "display.2")
-                benefit(String(localized: "paywall.benefit.ai"), "wand.and.stars")
+                benefit("The full wallpaper catalog", "square.stack")
+                benefit("Every Metal shader & web wallpaper", "sparkles")
+                benefit("Per-display rotation & playlists", "display.2")
+                benefit("AI-generated wallpapers (coming soon)", "wand.and.stars")
             }
-            Text(String(localized: "paywall.pricing")).font(.caption).foregroundStyle(.secondary)
+            Text("One-time purchase · no subscription").font(.caption).foregroundStyle(.secondary)
 
             Divider()
-            Text(String(localized: "paywall.note"))
+            Text("Purchasing isn't in this pre-release build yet. Once this Mac is activated on the backend, tap Check activation — the license is signed and bound to this device.")
                 .font(.caption2).foregroundStyle(.secondary)
 
             HStack {
                 Spacer()
-                Button(String(localized: "paywall.notNow")) { dismiss() }.keyboardShortcut(.cancelAction)
-                Button(String(localized: "paywall.checkActivation")) {
-                    Task { await entitlement.refresh(); dismiss() }
-                }
-                .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+                Button("Not now") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Check activation") { Task { await entitlement.refresh(); dismiss() } }
+                    .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
             }
         }
         .padding(20)
@@ -403,9 +457,9 @@ struct GenerateSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: "wand.and.stars").foregroundStyle(.tint)
-                Text(String(localized: "ai.sheet.title")).font(.headline)
+                Text("Generate a wallpaper").font(.headline)
             }
-            Text(String(localized: "ai.sheet.body"))
+            Text("Describe a look — we generate a live wallpaper (validated before it's applied).")
                 .font(.caption).foregroundStyle(.secondary)
 
             Picker("Type", selection: $kind) {
@@ -413,12 +467,26 @@ struct GenerateSheet: View {
             }
             .pickerStyle(.segmented).labelsHidden()
 
-            TextField(String(localized: "ai.sheet.fieldPlaceholder"),
-                      text: $prompt, axis: .vertical)
-                .textFieldStyle(.roundedBorder).lineLimit(2...4)
+            // A TextEditor (not a line-capped TextField): scrolls natively for long prompts and
+            // pastes cleanly. Placeholder is an overlay since TextEditor has none of its own.
+            ZStack(alignment: .topLeading) {
+                if prompt.isEmpty {
+                    Text("e.g. slow aurora over a dark ocean, teal and violet")
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 9).padding(.vertical, 10)
+                        .allowsHitTesting(false)
+                }
+                TextEditor(text: $prompt)
+                    .font(.body)
+                    .scrollContentBackground(.hidden)
+                    .padding(5)
+            }
+            .frame(height: 150)
+            .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .textBackgroundColor)))
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color(nsColor: .separatorColor)))
 
             if !AIConfig.isConfigured {
-                Text(String(localized: "ai.sheet.notConfigured"))
+                Text("Set up an AI provider in Settings → AI Generation first.")
                     .font(.caption).foregroundStyle(.orange)
             }
             if let err = model.aiError {
@@ -431,12 +499,10 @@ struct GenerateSheet: View {
                     Text("Generating…").font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button(String(localized: "action.cancel")) { dismiss() }.keyboardShortcut(.cancelAction)
-                Button(String(localized: "tab.installed.generate")) {
-                    started = true; model.generate(prompt, kind: kind)
-                }
-                .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
-                .disabled(!canGenerate)
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Generate") { started = true; model.generate(prompt, kind: kind) }
+                    .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+                    .disabled(!canGenerate)
             }
         }
         .padding(20)
@@ -457,8 +523,6 @@ struct InstalledView: View {
     /// The wallpaper being previewed in the sheet (nil ⇒ no sheet).
     @State private var preview: AppModel.Entry?
     @State private var showGenerate = false
-    /// Live search text — filters the grid by title, kind, and built-in vs imported.
-    @State private var search = ""
     @ObservedObject private var entitlement = Entitlement.shared
     private let columns = [GridItem(.adaptive(minimum: 200), spacing: 18)]
 
@@ -471,18 +535,6 @@ struct InstalledView: View {
         model.screens.first(where: { $0.id == effectiveTarget })?.name ?? "All displays"
     }
 
-    /// The wallpapers currently visible in the grid. Empty-state strings are picked to match the
-    /// action a user would take next ("clear the search" vs. "browse the catalog").
-    private var filtered: [AppModel.Entry] {
-        let term = search.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !term.isEmpty else { return model.available }
-        return model.available.filter { e in
-            e.title.lowercased().contains(term)
-                || e.kind.lowercased().contains(term)
-                || (e.isBuiltIn ? "built-in" : "imported").contains(term)
-        }
-    }
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -491,63 +543,33 @@ struct InstalledView: View {
                     Text("Setting: \(targetName) — tap a monitor to target it, or use “…” on a wallpaper.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                if filtered.isEmpty {
-                    VStack(spacing: 6) {
-                        Image(systemName: "magnifyingglass").font(.title2).foregroundStyle(.secondary)
-                        if search.isEmpty {
-                            Text(String(localized: "tab.installed.empty"))
-                                .font(.subheadline).foregroundStyle(.secondary)
-                            Button(String(localized: "tab.installed.browseCatalog")) {}
-                                .buttonStyle(.link)
-                        } else {
-                            Text(String(format: String(localized: "tab.installed.noMatch"), search))
-                                .font(.subheadline).foregroundStyle(.secondary)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 60)
-                } else {
-                    LazyVGrid(columns: columns, spacing: 18) {
-                        ForEach(filtered) {
-                            WallpaperTile(model: model, entry: $0, target: effectiveTarget) { preview = $0 }
-                        }
+                LazyVGrid(columns: columns, spacing: 18) {
+                    ForEach(model.available) {
+                        WallpaperTile(model: model, entry: $0, target: effectiveTarget) { preview = $0 }
                     }
                 }
             }
             .padding(20)
         }
-        .navigationTitle(String(localized: "tab.installed.title"))
-        .navigationSubtitle(subtitle)
-        .searchable(text: $search, placement: .toolbar, prompt: String(localized: "tab.installed.searchPrompt"))
+        .navigationTitle("Installed")
+        .navigationSubtitle("\(model.available.count) wallpapers · pin up to \(AppModel.maxStars) ★")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     if entitlement.isPremium { showGenerate = true }
-                    else { model.showPaywall(String(localized: "paywall.feature.ai")) }
-                } label: { Label(String(localized: "tab.installed.generate"),
-                                 systemImage: "wand.and.stars") }
-                .help(String(localized: "tab.installed.generate.help"))
+                    else { model.showPaywall("AI wallpaper generation is a Premium feature.") }
+                } label: { Label("Generate", systemImage: "wand.and.stars") }
+                .help("Generate a wallpaper with AI")
             }
             ToolbarItem(placement: .primaryAction) {
-                Button { model.onImport?() } label: { Label(String(localized: "tab.installed.import"),
-                                                           systemImage: "plus") }
-                    .help(String(localized: "tab.installed.import.help"))
+                Button { model.onImport?() } label: { Label("Import", systemImage: "plus") }
+                    .help("Import a local .livewallpaper")
             }
         }
         .sheet(item: $preview) { entry in
             WallpaperPreviewSheet(model: model, entry: entry, target: effectiveTarget)
         }
         .sheet(isPresented: $showGenerate) { GenerateSheet(model: model) }
-    }
-
-    private var subtitle: String {
-        let total = model.available.count
-        let showing = filtered.count
-        if showing == total {
-            return String(format: String(localized: "tab.installed.subtitle"), total, AppModel.maxStars)
-        }
-        return String(format: String(localized: "tab.installed.subtitle.filtered"),
-                      showing, total, AppModel.maxStars)
     }
 }
 
@@ -655,7 +677,7 @@ struct ExploreView: View {
             onInstallToScreen: { item, key in await model.onInstallToScreen?(item, key) ?? "Install unavailable." },
             onLocked: { item in model.showPaywall("“\(item.title)” is a Premium wallpaper.") },
             installedChecksums: model.installedChecksums)
-        .navigationTitle(String(localized: "tab.catalog.title"))
+        .navigationTitle("Catalog")
     }
 }
 
@@ -1015,27 +1037,6 @@ struct SettingsTab: View {
                     .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
                 }
                 AISettings()
-                GroupBox("Language") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Picker("Language", selection: $prefs.language) {
-                            ForEach(AppLanguage.allCases) { lang in
-                                Text(lang.displayName).tag(lang)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .onChange(of: prefs.language) { _ in
-                            // SwiftUI re-renders localized strings automatically when
-                            // AppleLanguages changes; the picker writes the value, the system
-                            // honors it on the next localized lookup. For the user-facing
-                            // effect to be immediate, we re-mount the main window — but the
-                            // natural way (closing + reopening) is heavy for a Settings change.
-                            // A toast at the bottom of the tab hints them instead.
-                        }
-                        Text("Restart the app to see every string switch over. Tabs you have open right now update on the next view-refresh.")
-                            .font(.caption2).foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
-                }
                 GroupBox("Power") {
                     VStack(alignment: .leading, spacing: 8) {
                         Picker("On battery", selection: $prefs.batteryBehavior) {
@@ -1066,18 +1067,12 @@ struct SettingsTab: View {
                     .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
                 }
                 ScheduleSettings(model: model)
-                if let schema = model.schemas[model.currentID], !schema.isEmpty {
-                    GroupBox("Parameters · \(model.title(forID: model.currentID))") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            WallpaperParamRows(model: model, schema: schema).id(model.currentID)
-                        }
-                        .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
+                // Per-wallpaper parameters now live on the wallpaper itself: use "Customize…" from a
+                // wallpaper's actions menu (the "…"), its right-click menu, or its preview.
             }
             .padding(20)
-            .frame(maxWidth: 660, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: 640)                    // a comfortable reading column…
+            .frame(maxWidth: .infinity)              // …centered in the now full-width window
         }
         .navigationTitle("Settings")
         .navigationSubtitle("Preferences")
@@ -1094,12 +1089,12 @@ struct SettingsTab: View {
     }
 }
 
-/// The active wallpaper's parameter controls, backed by a `ConfigStore` recreated per wallpaper.
+/// A wallpaper's parameter controls, backed by a `ConfigStore` recreated per wallpaper. Changes are
+/// persisted (and applied live if that wallpaper is currently rendering) via `onApplyConfig`.
 struct WallpaperParamRows: View {
     @StateObject private var store: ConfigStore
 
-    init(model: AppModel, schema: [ConfigParameter]) {
-        let id = model.currentID
+    init(model: AppModel, schema: [ConfigParameter], id: String) {
         let s = ConfigStore(schema: schema, values: model.configFor?(id) ?? .defaults(for: schema))
         s.onChange = { [weak model] values in model?.onApplyConfig?(id, values) }
         _store = StateObject(wrappedValue: s)
@@ -1108,17 +1103,55 @@ struct WallpaperParamRows: View {
     var body: some View { ConfigControls(store: store) }
 }
 
+/// A modal for tweaking one wallpaper's parameters, reached from the wallpaper's own actions menu
+/// (or its preview) — so customization lives with the wallpaper instead of buried in Settings. Only
+/// shown for wallpapers that actually expose parameters.
+struct CustomizeSheet: View {
+    @ObservedObject var model: AppModel
+    let entry: AppModel.Entry
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        let schema = model.schemas[entry.id] ?? []
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 10) {
+                Image(systemName: "slider.horizontal.3").font(.title3).foregroundStyle(.tint)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Customize").font(.headline)
+                    Text(entry.title).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+
+            if schema.isEmpty {
+                Text("This wallpaper has no adjustable parameters.")
+                    .font(.callout).foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 12) {
+                    WallpaperParamRows(model: model, schema: schema, id: entry.id).id(entry.id)
+                }
+                Text("Changes apply live while this wallpaper is running, and are remembered.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+
+            HStack {
+                Spacer()
+                Button("Done") { dismiss() }
+                    .keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(20)
+        .frame(width: 380)
+    }
+}
+
 // MARK: - Window controller
 
 @MainActor
-final class MainWindowController: NSObject, NSWindowDelegate {
+final class MainWindowController {
     private var window: NSWindow?
 
     func show(model: AppModel) {
-        // Switch the app out of .accessory while the main window is open so the Dock icon
-        // and full menu bar appear — it's disorienting to launch a window and have nowhere
-        // to right-click / quit-from. We drop back to .accessory when the window closes.
-        NSApp.setActivationPolicy(.regular)
         if let window {
             NSApp.activate(ignoringOtherApps: true)
             window.makeKeyAndOrderFront(nil)
@@ -1132,21 +1165,11 @@ final class MainWindowController: NSObject, NSWindowDelegate {
         w.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         w.toolbarStyle = .unified
         w.titlebarSeparatorStyle = .automatic
-        w.setContentSize(NSSize(width: 860, height: 560))
+        w.setContentSize(NSSize(width: 1075, height: 700))
         w.isReleasedWhenClosed = false
-        w.delegate = self
         window = w
         NSApp.activate(ignoringOtherApps: true)
         w.center()
         w.makeKeyAndOrderFront(nil)
-    }
-
-    // MARK: NSWindowDelegate — return to .accessory on close so the wallpaper window stays
-    // a clean menu-bar app, and the user gets their screen back.
-
-    func windowWillClose(_ notification: Notification) {
-        // Hand the activation policy back at the next runloop tick. If we do it synchronously
-        // while -close is still unwinding, AppKit logs a warning about an unbalanced state.
-        DispatchQueue.main.async { NSApp.setActivationPolicy(.accessory) }
     }
 }

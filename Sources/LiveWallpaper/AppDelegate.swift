@@ -19,6 +19,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var rotationTimer: Timer?
     private var scheduleTimer: Timer?
+    /// Feeds now-playing (track + album art) to wallpapers that declare the capability. Runs only
+    /// while such a wallpaper is on screen.
+    private let nowPlaying = NowPlayingMonitor()
     /// The wallpaper the schedule last applied — so we don't re-apply every tick, and the user can
     /// manually override until the next scheduled time.
     private var lastScheduleWallpaperID: String?
@@ -188,6 +191,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         syncModel()
         reportOcclusion()
+        refreshNowPlaying()
     }
 
     private func rebuildScreenlets() {
@@ -211,6 +215,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         syncModel()
         reportOcclusion()
         rebuildMenu()
+        refreshNowPlaying()
+    }
+
+    /// Start the now-playing monitor iff at least one on-screen wallpaper opted in, and route its
+    /// updates to those wallpapers. Keeps us from scripting the music apps when nothing consumes it.
+    private func refreshNowPlaying() {
+        let sinks = screenlets.compactMap { $0.renderer as? NowPlayingSink }.filter(\.acceptsNowPlaying)
+        guard !sinks.isEmpty else { nowPlaying.stop(); return }
+        nowPlaying.onUpdate = { [weak self] json in
+            guard let self else { return }
+            for s in self.screenlets {
+                if let sink = s.renderer as? NowPlayingSink, sink.acceptsNowPlaying {
+                    sink.updateNowPlaying(json: json)
+                }
+            }
+        }
+        nowPlaying.start()
     }
 
     private func makeRenderer(forID id: String) -> (any WallpaperRenderer, [ConfigParameter], String) {
@@ -568,6 +589,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private static func isValidWeb(_ html: String) -> Bool {
         let lower = html.lowercased()
         guard lower.contains("<html") || lower.contains("<canvas") || lower.contains("<script") else { return false }
+        // Reject a truncated reply (hit max_tokens mid-JS): it opens tags but never closes the document,
+        // so it loads to a black screen. Require the doc to close and every <script> to be terminated.
+        guard lower.contains("</html>") else { return false }
+        let opens = lower.components(separatedBy: "<script").count - 1
+        let closes = lower.components(separatedBy: "</script>").count - 1
+        guard opens == closes else { return false }
         return WebValidator.warnings(source: html, filename: "index.html").isEmpty
     }
 

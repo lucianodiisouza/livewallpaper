@@ -108,7 +108,8 @@ struct WallpaperPackage {
             return WebRenderer(diskRoot: entryURL.deletingLastPathComponent(),
                                entry: entryURL.lastPathComponent,
                                allowlist: manifest.capabilities?.network ?? [],
-                               schema: manifest.configSchema())
+                               schema: manifest.configSchema(),
+                               nowPlaying: manifest.capabilities?.nowPlaying ?? false)
         }
     }
 }

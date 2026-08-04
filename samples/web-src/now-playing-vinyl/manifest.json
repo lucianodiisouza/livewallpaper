@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "b7e1c2a4-9f30-4d51-8a2c-6e0f1d7c4b90",
+  "version": "0.1.0",
+  "title": "Now Playing · Vinyl (cartoon)",
+  "author": { "id": "00000000-0000-0000-0000-000000000000", "handle": "@oprimodev" },
+  "type": "web",
+  "entry": "content/web/index.html",
+  "minMacOS": "26.0",
+  "checksum": "sha256-PLACEHOLDER",
+  "config": [
+    { "key": "bgTop",    "type": "color", "default": "#2a2440", "label": "Background top" },
+    { "key": "bgBottom", "type": "color", "default": "#0f0c1c", "label": "Background bottom" },
+    { "key": "deck",     "type": "color", "default": "#7a4a2b", "label": "Turntable base" },
+    { "key": "disc",     "type": "color", "default": "#141018", "label": "Record color" }
+  ],
+  "capabilities": {
+    "network": [],
+    "audio": false,
+    "nowPlaying": true
+  },
+  "_note": "nowPlaying capability feeds the current track + album art from Music/Spotify."
+}

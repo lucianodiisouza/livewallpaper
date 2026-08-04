@@ -99,13 +99,20 @@ enum SampleMaker {
             return 1
         }
         var failed = 0
+        var skipped = 0
         for url in pkgs {
             let id = url.deletingPathExtension().lastPathComponent
             do {
                 let data = try Data(contentsOf: url)
                 let files = try ZipArchive.extract(data)
+                // Only Metal shaders render through this headless path. Web/video thumbnails need a
+                // run loop (WKWebView) or the video asset, which this pre-launch CLI hook doesn't
+                // spin up — skip them cleanly so a mixed batch still succeeds. Those items fall back
+                // to the app's client-side PlaceholderThumb until CLI web/video capture is wired in.
                 guard let shader = files["content/shader.metal"].flatMap({ String(data: $0, encoding: .utf8) }) else {
-                    throw NSError(domain: "thumbs", code: 1, userInfo: [NSLocalizedDescriptionKey: "missing content/shader.metal"])
+                    print("  – \(id): skipped (no Metal shader — web/video thumbs not supported here)")
+                    skipped += 1
+                    continue
                 }
                 // Compile-check via MetalLibrary compile path before rendering.
                 if let device = MTLCreateSystemDefaultDevice() {
@@ -127,7 +134,8 @@ enum SampleMaker {
                 failed += 1
             }
         }
-        print("rendered \(pkgs.count - failed)/\(pkgs.count) thumbnails → \(outURL.path)")
+        let rendered = pkgs.count - failed - skipped
+        print("rendered \(rendered)/\(pkgs.count) thumbnails (\(skipped) skipped) → \(outURL.path)")
         return failed == 0 ? 0 : 1
     }
 

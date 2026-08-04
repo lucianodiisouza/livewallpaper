@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "c7f2a9e4-3d18-4b6a-9e21-5a8d6c0f4b73",
+  "version": "1.0.0",
+  "title": "Midnight Ocean",
+  "author": { "id": "00000000-0000-0000-0000-000000000000", "handle": "@oprimodev" },
+  "type": "web",
+  "entry": "content/web/index.html",
+  "minMacOS": "26.0",
+  "checksum": "sha256-PLACEHOLDER",
+  "config": [
+    { "key": "speed",    "type": "float", "min": 0.25, "max": 2.5, "default": 1.0, "label": "Speed" },
+    { "key": "moonTint", "type": "color", "default": "#9FB4D8", "label": "Moonlight tint" },
+    { "key": "meteors",  "type": "bool",  "default": true, "label": "Shooting stars" },
+    { "key": "twinkle",  "type": "bool",  "default": true, "label": "Star twinkle" }
+  ],
+  "capabilities": {
+    "network": [],
+    "audio": false
+  }
+}

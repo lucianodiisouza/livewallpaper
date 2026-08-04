@@ -125,7 +125,7 @@ final class Library {
             author: Manifest.Author(id: nil, handle: authorHandle),
             type: .metal, entry: "content/\(entryRel)", minMacOS: "26.0",
             checksum: checksum, config: config,
-            capabilities: Manifest.Capabilities(network: [], audio: false))
+            capabilities: Manifest.Capabilities(network: [], audio: false, nowPlaying: false))
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -152,7 +152,7 @@ final class Library {
             author: Manifest.Author(id: nil, handle: authorHandle),
             type: .web, entry: "content/\(entryRel)", minMacOS: "26.0",
             checksum: checksum, config: [],
-            capabilities: Manifest.Capabilities(network: [], audio: false))
+            capabilities: Manifest.Capabilities(network: [], audio: false, nowPlaying: false))
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
