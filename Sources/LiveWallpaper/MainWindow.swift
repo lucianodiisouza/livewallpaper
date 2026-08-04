@@ -444,6 +444,8 @@ struct InstalledView: View {
     /// The wallpaper being previewed in the sheet (nil ⇒ no sheet).
     @State private var preview: AppModel.Entry?
     @State private var showGenerate = false
+    /// Live search text — filters the grid by title, kind, and built-in vs imported.
+    @State private var search = ""
     @ObservedObject private var entitlement = Entitlement.shared
     private let columns = [GridItem(.adaptive(minimum: 200), spacing: 18)]
 
@@ -456,6 +458,18 @@ struct InstalledView: View {
         model.screens.first(where: { $0.id == effectiveTarget })?.name ?? "All displays"
     }
 
+    /// The wallpapers currently visible in the grid. Empty-state strings are picked to match the
+    /// action a user would take next ("clear the search" vs. "browse the catalog").
+    private var filtered: [AppModel.Entry] {
+        let term = search.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !term.isEmpty else { return model.available }
+        return model.available.filter { e in
+            e.title.lowercased().contains(term)
+                || e.kind.lowercased().contains(term)
+                || (e.isBuiltIn ? "built-in" : "imported").contains(term)
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -464,16 +478,31 @@ struct InstalledView: View {
                     Text("Setting: \(targetName) — tap a monitor to target it, or use “…” on a wallpaper.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                LazyVGrid(columns: columns, spacing: 18) {
-                    ForEach(model.available) {
-                        WallpaperTile(model: model, entry: $0, target: effectiveTarget) { preview = $0 }
+                if filtered.isEmpty {
+                    VStack(spacing: 6) {
+                        Image(systemName: "magnifyingglass").font(.title2).foregroundStyle(.secondary)
+                        Text(search.isEmpty ? "No wallpapers installed yet." : "No matches for “\(search)”.")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                        if search.isEmpty {
+                            Button("Browse the Catalog") {}
+                                .buttonStyle(.link)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 60)
+                } else {
+                    LazyVGrid(columns: columns, spacing: 18) {
+                        ForEach(filtered) {
+                            WallpaperTile(model: model, entry: $0, target: effectiveTarget) { preview = $0 }
+                        }
                     }
                 }
             }
             .padding(20)
         }
         .navigationTitle("Installed")
-        .navigationSubtitle("\(model.available.count) wallpapers · pin up to \(AppModel.maxStars) ★")
+        .navigationSubtitle(subtitle)
+        .searchable(text: $search, placement: .toolbar, prompt: "Search installed")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -491,6 +520,15 @@ struct InstalledView: View {
             WallpaperPreviewSheet(model: model, entry: entry, target: effectiveTarget)
         }
         .sheet(isPresented: $showGenerate) { GenerateSheet(model: model) }
+    }
+
+    private var subtitle: String {
+        let total = model.available.count
+        let showing = filtered.count
+        if showing == total {
+            return "\(total) wallpapers · pin up to \(AppModel.maxStars) ★"
+        }
+        return "Showing \(showing) of \(total) · pin up to \(AppModel.maxStars) ★"
     }
 }
 
