@@ -245,12 +245,12 @@ struct WallpaperTile: View {
         .contentShape(RoundedRectangle(cornerRadius: 10))
         .onTapGesture { onOpen(entry) }
         .contextMenu {
-            Button { onOpen(entry) } label: { Label("Preview", systemImage: "eye") }
+            Button { onOpen(entry) } label: { Label(LocalizedStringKey("preview.menu.preview"), systemImage: "eye") }
             if isCustomizable {
-                Button { showCustomize = true } label: { Label("Customize…", systemImage: "slider.horizontal.3") }
+                Button { showCustomize = true } label: { Label(LocalizedStringKey("preview.menu.customize"), systemImage: "slider.horizontal.3") }
             }
         }
-        .help("Preview")
+        .help(LocalizedStringKey("preview.help"))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(appliesHere ? Color.accentColor : .clear, lineWidth: 2))
         .overlay(alignment: .topLeading) {
             if isLocked {
@@ -260,7 +260,7 @@ struct WallpaperTile: View {
                     .background(.black.opacity(0.6)).foregroundStyle(.yellow)
                     .clipShape(Capsule()).padding(8)
             } else if appliesHere {
-                Text("ACTIVE").font(.caption2.weight(.bold))
+                Text(LocalizedStringKey("main.active")).font(.caption2.weight(.bold))
                     .padding(.horizontal, 6).padding(.vertical, 2)
                     .background(.green.opacity(0.9)).foregroundStyle(.white)
                     .clipShape(Capsule()).padding(8)
@@ -275,7 +275,9 @@ struct WallpaperTile: View {
             .foregroundStyle(isStarred ? .yellow : .white)
             .padding(8)
             .disabled(!isStarred && !model.canStarMore)
-            .help(isStarred ? "Unpin from menu bar" : (model.canStarMore ? "Pin to menu bar" : "Menu bar full (\(AppModel.maxStars))"))
+            .help(isStarred ? String(localized: "preview.menu.unpin", bundle: .main)
+                           : (model.canStarMore ? String(localized: "preview.menu.pin", bundle: .main)
+                                              : String(format: String(localized: "main.menuBarFull", bundle: .main), AppModel.maxStars)))
         }
     }
 }
@@ -402,26 +404,26 @@ struct PaywallSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 8) {
                 Image(systemName: "sparkles").font(.title2).foregroundStyle(.tint)
-                Text("Primo Engine Premium").font(.title2.bold())
+                Text(LocalizedStringKey("paywall.title")).font(.title2.bold())
             }
             Text(reason).foregroundStyle(.secondary)
 
             VStack(alignment: .leading, spacing: 8) {
-                benefit("The full wallpaper catalog", "square.stack")
-                benefit("Every Metal shader & web wallpaper", "sparkles")
-                benefit("Per-display rotation & playlists", "display.2")
-                benefit("AI-generated wallpapers (coming soon)", "wand.and.stars")
+                benefit(String(localized: "paywall.benefit.catalog", bundle: .main), "square.stack")
+                benefit(String(localized: "paywall.benefit.shaders", bundle: .main), "sparkles")
+                benefit(String(localized: "paywall.benefit.rotation", bundle: .main), "display.2")
+                benefit(String(localized: "paywall.benefit.ai", bundle: .main), "wand.and.stars")
             }
-            Text("One-time purchase · no subscription").font(.caption).foregroundStyle(.secondary)
+            Text(LocalizedStringKey("paywall.pricing")).font(.caption).foregroundStyle(.secondary)
 
             Divider()
-            Text("Purchasing isn't in this pre-release build yet. Once this Mac is activated on the backend, tap Check activation — the license is signed and bound to this device.")
+            Text(LocalizedStringKey("paywall.note"))
                 .font(.caption2).foregroundStyle(.secondary)
 
             HStack {
                 Spacer()
-                Button("Not now") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Check activation") { Task { await entitlement.refresh(); dismiss() } }
+                Button(LocalizedStringKey("paywall.notNow")) { dismiss() }.keyboardShortcut(.cancelAction)
+                Button(LocalizedStringKey("paywall.checkActivation")) { Task { await entitlement.refresh(); dismiss() } }
                     .buttonStyle(.glassProminent).keyboardShortcut(.defaultAction)
             }
         }
@@ -457,12 +459,12 @@ struct GenerateSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: "wand.and.stars").foregroundStyle(.tint)
-                Text("Generate a wallpaper").font(.headline)
+                Text(LocalizedStringKey("generate.title")).font(.headline)
             }
-            Text("Describe a look — we generate a live wallpaper (validated before it's applied).")
+            Text(LocalizedStringKey("generate.body"))
                 .font(.caption).foregroundStyle(.secondary)
 
-            Picker("Type", selection: $kind) {
+            Picker(LocalizedStringKey("generate.type"), selection: $kind) {
                 ForEach(AppModel.GenerateKind.allCases) { Text($0.label).tag($0) }
             }
             .pickerStyle(.segmented).labelsHidden()
@@ -471,7 +473,7 @@ struct GenerateSheet: View {
             // pastes cleanly. Placeholder is an overlay since TextEditor has none of its own.
             ZStack(alignment: .topLeading) {
                 if prompt.isEmpty {
-                    Text("e.g. slow aurora over a dark ocean, teal and violet")
+                    Text(LocalizedStringKey("generate.placeholder"))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 9).padding(.vertical, 10)
                         .allowsHitTesting(false)
@@ -486,7 +488,7 @@ struct GenerateSheet: View {
             .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color(nsColor: .separatorColor)))
 
             if !AIConfig.isConfigured {
-                Text("Set up an AI provider in Settings → AI Generation first.")
+                Text(LocalizedStringKey("ai.sheet.notConfigured"))
                     .font(.caption).foregroundStyle(.orange)
             }
             if let err = model.aiError {
@@ -496,11 +498,11 @@ struct GenerateSheet: View {
             HStack {
                 if model.isGenerating {
                     ProgressView().controlSize(.small)
-                    Text("Generating…").font(.caption).foregroundStyle(.secondary)
+                    Text(LocalizedStringKey("generate.generating")).font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Generate") { started = true; model.generate(prompt, kind: kind) }
+                Button(LocalizedStringKey("generate.cancel")) { dismiss() }.keyboardShortcut(.cancelAction)
+                Button(LocalizedStringKey("generate.generate")) { started = true; model.generate(prompt, kind: kind) }
                     .buttonStyle(.glassProminent).keyboardShortcut(.defaultAction)
                     .disabled(!canGenerate)
             }
@@ -532,7 +534,7 @@ struct InstalledView: View {
         return target
     }
     private var targetName: String {
-        model.screens.first(where: { $0.id == effectiveTarget })?.name ?? "All displays"
+        model.screens.first(where: { $0.id == effectiveTarget })?.name ?? String(localized: "main.allDisplays", bundle: .main)
     }
 
     var body: some View {
@@ -540,7 +542,7 @@ struct InstalledView: View {
             VStack(alignment: .leading, spacing: 16) {
                 if model.screens.count > 1 {
                     MonitorStrip(model: model, target: $target)
-                    Text("Setting: \(targetName) — tap a monitor to target it, or use “…” on a wallpaper.")
+                    Text(LocalizedStringKey("tab.installed.targetLine"))
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 LazyVGrid(columns: columns, spacing: 18) {
@@ -551,19 +553,19 @@ struct InstalledView: View {
             }
             .padding(20)
         }
-        .navigationTitle("Installed")
-        .navigationSubtitle("\(model.available.count) wallpapers · pin up to \(AppModel.maxStars) ★")
+        .navigationTitle(Text(LocalizedStringKey("tab.installed.title")))
+        .navigationSubtitle(Text(String(format: String(localized: "tab.installed.subtitle", bundle: .main), model.available.count, AppModel.maxStars)))
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     if entitlement.isPremium { showGenerate = true }
-                    else { model.showPaywall("AI wallpaper generation is a Premium feature.") }
-                } label: { Label("Generate", systemImage: "wand.and.stars") }
-                .help("Generate a wallpaper with AI")
+                    else { model.showPaywall(String(localized: "paywall.feature.ai", bundle: .main)) }
+                } label: { Label(LocalizedStringKey("tab.installed.generate"), systemImage: "wand.and.stars") }
+                .help(LocalizedStringKey("tab.installed.generate.help"))
             }
             ToolbarItem(placement: .primaryAction) {
-                Button { model.onImport?() } label: { Label("Import", systemImage: "plus") }
-                    .help("Import a local .livewallpaper")
+                Button { model.onImport?() } label: { Label(LocalizedStringKey("tab.installed.import"), systemImage: "plus") }
+                    .help(LocalizedStringKey("tab.installed.import.help"))
             }
         }
         .sheet(item: $preview) { entry in
@@ -672,12 +674,12 @@ struct ExploreView: View {
         WorkshopView(
             client: model.workshop,
             model: model,
-            onInstall: { item in await model.onInstall?(item) ?? "Install unavailable." },
+            onInstall: { item in await model.onInstall?(item) ?? String(localized: "workshop.error.installUnavailable", bundle: .main) },
             screens: model.screens,
-            onInstallToScreen: { item, key in await model.onInstallToScreen?(item, key) ?? "Install unavailable." },
-            onLocked: { item in model.showPaywall("“\(item.title)” is a Premium wallpaper.") },
+            onInstallToScreen: { item, key in await model.onInstallToScreen?(item, key) ?? String(localized: "workshop.error.installUnavailable", bundle: .main) },
+            onLocked: { item in model.showPaywall(String(format: String(localized: "paywall.premiumRequired", bundle: .main), item.title)) },
             installedChecksums: model.installedChecksums)
-        .navigationTitle("Catalog")
+        .navigationTitle(LocalizedStringKey("tab.catalog.title"))
     }
 }
 
@@ -692,28 +694,31 @@ struct AISettings: View {
     @State private var apiKey = ""
 
     var body: some View {
-        GroupBox("AI Generation") {
+        GroupBox {
             VStack(alignment: .leading, spacing: 8) {
-                Picker("Provider", selection: $provider) {
+                Picker(LocalizedStringKey("settings.ai.provider"), selection: $provider) {
                     ForEach(AIConfig.Provider.allCases) { Text($0.label).tag($0) }
                 }
                 .onChange(of: provider) { AIConfig.provider = provider; load() }
 
-                TextField("Base URL", text: $baseURL)
+                TextField(LocalizedStringKey("settings.ai.baseURL"), text: $baseURL)
                     .textFieldStyle(.roundedBorder)
                     .onChange(of: baseURL) { AIConfig.setBaseURL(baseURL, for: provider) }
-                TextField("Model", text: $model)
+                TextField(LocalizedStringKey("settings.ai.model"), text: $model)
                     .textFieldStyle(.roundedBorder)
                     .onChange(of: model) { AIConfig.setModel(model, for: provider) }
-                SecureField(provider.requiresKey ? "API key" : "API key (optional for local)", text: $apiKey)
+                SecureField(LocalizedStringKey(provider.requiresKey ? "settings.ai.apiKey" : "settings.ai.apiKeyLocal"),
+                            text: $apiKey)
                     .textFieldStyle(.roundedBorder)
                     .onChange(of: apiKey) { AIConfig.setAPIKey(apiKey.isEmpty ? nil : apiKey, for: provider) }
 
                 Text(provider.hint).font(.caption).foregroundStyle(.secondary)
-                Text("Bring your own key: the app calls your chosen provider directly and the key stays in your Keychain. AI generation is free — you pay only your provider (Anthropic/OpenRouter/OpenAI), or nothing at all with a local Ollama / LM Studio.")
+                Text(LocalizedStringKey("settings.ai.byok"))
                     .font(.caption2).foregroundStyle(.secondary)
             }
             .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
+        } label: {
+            Text(LocalizedStringKey("settings.ai"))
         }
         .onAppear(perform: load)
     }
@@ -738,23 +743,25 @@ struct PremiumSettings: View {
     @State private var showCancel = false
 
     var body: some View {
-        GroupBox("Premium") {
+        GroupBox {
             VStack(alignment: .leading, spacing: 10) {
                 header
                 if entitlement.isPremium { premiumBody } else { freeBody }
                 if let error { Text(error).font(.caption).foregroundStyle(.red) }
                 if let info { Text(info).font(.caption).foregroundStyle(.secondary) }
                 Divider().padding(.vertical, 1)
-                Text("This Mac: \(Device.id)")
+                Text(String(format: String(localized: "settings.general.device", bundle: .main), Device.id))
                     .font(.caption2).foregroundStyle(.tertiary).textSelection(.enabled)
-                    .help("Your machine id — give this to support to register or move a license.")
+                    .help(LocalizedStringKey("settings.general.deviceHelp"))
             }
             .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
+        } label: {
+            Text(LocalizedStringKey("settings.premium"))
         }
         .sheet(isPresented: $showCancel) {
             CancellationSheet { didCancel in
                 showCancel = false
-                if didCancel { entitlement.recompute(); info = "Subscription canceled. You keep Premium until it ends." }
+                if didCancel { entitlement.recompute(); info = String(localized: "settings.premium.infoCanceled", bundle: .main) }
             }
         }
     }
@@ -775,26 +782,33 @@ struct PremiumSettings: View {
     }
 
     private var statusTitle: String {
-        guard entitlement.isPremium else { return "Free" }
-        if entitlement.isTrial { return "Free trial" }
-        if entitlement.isLifetime { return "Premium — Lifetime" }
-        if entitlement.isSubscription { return "Premium — \(entitlement.claims?.plan == "annual" ? "Annual" : "Monthly")" }
-        return "Premium active"
+        guard entitlement.isPremium else { return String(localized: "settings.premium.statusFree", bundle: .main) }
+        if entitlement.isTrial { return String(localized: "settings.premium.statusTrial", bundle: .main) }
+        if entitlement.isLifetime { return String(localized: "settings.premium.statusLifetime", bundle: .main) }
+        if entitlement.isSubscription {
+            let planKey = entitlement.claims?.plan == "annual" ? "settings.premium.statusAnnual" : "settings.premium.statusMonthly"
+            return NSLocalizedString(planKey, bundle: .main, comment: "")
+        }
+        return String(localized: "settings.premium.statusActive", bundle: .main)
     }
 
     private var statusSubtitle: String {
         guard entitlement.isPremium else {
-            return "Unlock the full catalog, per-display rotation, AI generation, and more."
+            return String(localized: "settings.premium.subtitleFree", bundle: .main)
         }
         if let ends = entitlement.planEndsDate {
             let d = ends.formatted(date: .abbreviated, time: .omitted)
             if entitlement.isTrial {
                 let days = max(0, Calendar.current.dateComponents([.day], from: Date(), to: ends).day ?? 0)
-                return "\(days) day\(days == 1 ? "" : "s") left — ends \(d). Choose a plan to keep Premium."
+                let unit = days == 1
+                    ? String(localized: "settings.premium.subtitleTrial.day", bundle: .main)
+                    : String(localized: "settings.premium.subtitleTrial.days", bundle: .main)
+                return String(format: String(localized: "settings.premium.subtitleTrial", bundle: .main),
+                              days, unit, d)
             }
-            return "Licensed to this Mac. Renews/ends \(d)."
+            return String(format: String(localized: "settings.premium.subtitleLicensed", bundle: .main), d)
         }
-        return "Unlocked on this Mac."
+        return String(localized: "settings.premium.subtitleActive", bundle: .main)
     }
 
     // MARK: Premium state
@@ -802,24 +816,24 @@ struct PremiumSettings: View {
     @ViewBuilder private var premiumBody: some View {
         if entitlement.isLifetime {
             HStack {
-                Button("Deactivate this Mac") { run { await entitlement.deactivate(); info = "This Mac was deactivated." } }
-                    .help("Free this Mac's slot so you can activate another")
+                Button(LocalizedStringKey("settings.premium.deactivate")) { run { await entitlement.deactivate(); info = String(localized: "settings.premium.infoDeactivated", bundle: .main) } }
+                    .help(LocalizedStringKey("settings.premium.deactivate.help"))
                 Spacer()
             }
-            Text("Lifetime covers up to \(Licensing.DEFAULT_DEVICE_CAP) Macs. Deactivate one here to move to another.")
+            Text(String(format: String(localized: "settings.premium.lifetimeMacs", bundle: .main), Licensing.DEFAULT_DEVICE_CAP))
                 .font(.caption2).foregroundStyle(.secondary)
         } else if entitlement.isSubscription {
             HStack {
-                Button("Cancel subscription…", role: .destructive) { showCancel = true }
+                Button(LocalizedStringKey("settings.premium.cancelSubscription"), role: .destructive) { showCancel = true }
                 Spacer()
             }
-            Text("Your plan is licensed to this Mac. To use Premium on a different Mac, contact support.")
+            Text(LocalizedStringKey("settings.premium.subscriptionNote"))
                 .font(.caption2).foregroundStyle(.secondary)
         } else if entitlement.isTrial {
-            Text("Your free trial is licensed to this Mac. Choose a plan before it ends to keep Premium — it won't renew automatically.")
+            Text(LocalizedStringKey("settings.premium.trialNote"))
                 .font(.caption2).foregroundStyle(.secondary)
         } else {
-            Text("Premium is active on this Mac.").font(.caption2).foregroundStyle(.secondary)
+            Text(LocalizedStringKey("settings.premium.activeNote")).font(.caption2).foregroundStyle(.secondary)
         }
     }
 
@@ -827,33 +841,33 @@ struct PremiumSettings: View {
 
     @ViewBuilder private var freeBody: some View {
         HStack(spacing: 8) {
-            Button("Start 7-day free trial") { startTrial() }
+            Button(LocalizedStringKey("settings.premium.startTrial")) { startTrial() }
                 .buttonStyle(.glassProminent)
                 .disabled(busy)
-            Text("No card required").font(.caption2).foregroundStyle(.secondary)
+            Text(LocalizedStringKey("settings.premium.noCard")).font(.caption2).foregroundStyle(.secondary)
             Spacer()
         }
         Divider().padding(.vertical, 2)
         HStack {
-            TextField("License code", text: $code)
+            TextField(LocalizedStringKey("settings.premium.licenseCode"), text: $code)
                 .textFieldStyle(.roundedBorder)
                 .onSubmit(activate)
-            Button("Activate", action: activate)
+            Button(LocalizedStringKey("settings.premium.activate"), action: activate)
                 .buttonStyle(.bordered)
                 .disabled(busy || code.trimmingCharacters(in: .whitespaces).isEmpty)
         }
         HStack {
-            Button("Check activation") { run { await entitlement.refresh(); if !entitlement.isPremium { info = "No active license for this Mac yet." } } }
-                .help("Fetch a device-bound license from the backend")
+            Button(LocalizedStringKey("paywall.checkActivation")) { run { await entitlement.refresh(); if !entitlement.isPremium { info = String(localized: "settings.premium.infoNoActiveLicense", bundle: .main) } } }
+                .help(LocalizedStringKey("paywall.checkActivation"))
             Spacer()
         }
-        Text("After buying a plan you'll get a license code — enter it to unlock this Mac. Each license is tied to your machine.")
+        Text(LocalizedStringKey("settings.premium.licenseNote"))
             .font(.caption2).foregroundStyle(.secondary)
     }
 
     private func startTrial() {
         run {
-            do { try await entitlement.startTrial(); info = "Your 7-day free trial is active on this Mac." }
+            do { try await entitlement.startTrial(); info = String(localized: "settings.premium.infoTrialActive", bundle: .main) }
             catch { self.error = error.localizedDescription }
         }
     }
@@ -862,7 +876,7 @@ struct PremiumSettings: View {
         let c = code.trimmingCharacters(in: .whitespaces)
         guard !c.isEmpty else { return }
         run {
-            do { try await entitlement.activate(code: c); code = ""; info = "Premium activated on this Mac." }
+            do { try await entitlement.activate(code: c); code = ""; info = String(localized: "settings.premium.infoActivated", bundle: .main) }
             catch { self.error = error.localizedDescription }
         }
     }
@@ -882,14 +896,14 @@ struct ScheduleSettings: View {
     @ObservedObject private var entitlement = Entitlement.shared
 
     var body: some View {
-        GroupBox("Schedule") {
+        GroupBox {
             VStack(alignment: .leading, spacing: 8) {
-                Toggle("Change wallpaper on a schedule", isOn: $prefs.scheduleEnabled)
+                Toggle(LocalizedStringKey("settings.schedule.toggle"), isOn: $prefs.scheduleEnabled)
                     .disabled(!entitlement.isPremium)
 
                 if !entitlement.isPremium {
-                    Button { model.showPaywall("Scheduling is a Premium feature.") } label: {
-                        Label("Premium feature — Unlock", systemImage: "lock.fill")
+                    Button { model.showPaywall(String(localized: "paywall.feature.schedule", bundle: .main)) } label: {
+                        Label(LocalizedStringKey("settings.premium.unlockLabel"), systemImage: "lock.fill")
                     }
                     .buttonStyle(.link).font(.caption)
                 } else {
@@ -906,15 +920,17 @@ struct ScheduleSettings: View {
                                 .buttonStyle(.borderless)
                         }
                     }
-                    Button { addEntry() } label: { Label("Add time", systemImage: "plus") }
+                    Button { addEntry() } label: { Label(LocalizedStringKey("settings.schedule.addTime"), systemImage: "plus") }
                         .disabled(model.available.isEmpty)
                     Text(prefs.scheduleEntries.isEmpty
-                         ? "Add times to switch wallpapers automatically through the day."
-                         : "Switches at each time, every day. Manual changes hold until the next scheduled time.")
+                         ? LocalizedStringKey("settings.schedule.empty")
+                         : LocalizedStringKey("settings.schedule.populated"))
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
             .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
+        } label: {
+            Text(LocalizedStringKey("settings.schedule"))
         }
     }
 
@@ -962,13 +978,15 @@ struct EnergySettings: View {
     }
 
     var body: some View {
-        GroupBox("Energy") {
+        GroupBox {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 10) {
                     Circle().fill(model.renderState.paused ? Color.gray : Color.green)
                         .frame(width: 10, height: 10)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(model.renderState.paused ? "Paused" : "Running @ \(model.renderState.fps)fps")
+                        Text(model.renderState.paused
+                             ? String(localized: "settings.energy.paused", bundle: .main)
+                             : String(format: String(localized: "settings.energy.running", bundle: .main), model.renderState.fps))
                             .font(.subheadline.weight(.medium))
                         Text(model.renderState.reason).font(.caption).foregroundStyle(.secondary)
                     }
@@ -980,7 +998,7 @@ struct EnergySettings: View {
                 Divider()
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Estimated cost by type (this display, full rate)")
+                    Text(LocalizedStringKey("settings.energy.estimateNote"))
                         .font(.caption).foregroundStyle(.secondary)
                     ForEach(["metal", "web", "video"], id: \.self) { kind in
                         let est = EnergyModel.estimate(kind: kind, fps: 60, paused: false, pixels: pixels)
@@ -994,15 +1012,23 @@ struct EnergySettings: View {
                     }
                 }
 
-                Text("Estimates, not live measurements — the app can't read GPU energy directly. Reproduce real CPU/GPU/power numbers with the scripts in docs/perf (see docs/PERFORMANCE_REPRODUCE.md). The biggest real saving is automatic: wallpapers drop to ~0 when covered.")
+                Text(LocalizedStringKey("settings.energy.disclaimer"))
                     .font(.caption2).foregroundStyle(.secondary)
             }
             .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
+        } label: {
+            Text(LocalizedStringKey("settings.energy"))
         }
     }
 
     private func label(_ kind: String) -> String {
-        switch kind { case "video": return "Video"; case "web": return "Web"; default: return "Shader" }
+        let key: String
+        switch kind {
+        case "video": key = "settings.energy.kind.video"; break
+        case "web":   key = "settings.energy.kind.web"; break
+        default:      key = "settings.energy.kind.shader"; break
+        }
+        return NSLocalizedString(key, bundle: .main, comment: "")
     }
     private func color(_ level: EnergyEstimate.Level) -> Color {
         switch level {
@@ -1024,47 +1050,53 @@ struct SettingsTab: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 PremiumSettings()
-                GroupBox("General") {
+                GroupBox {
                     VStack(alignment: .leading, spacing: 8) {
-                        Toggle("Launch at login", isOn: $prefs.launchAtLogin)
-                        Toggle("Solid backdrop under wallpapers", isOn: $prefs.solidBackdrop)
-                        Text("Replaces your macOS desktop picture with a neutral colour so you never see it behind the wallpaper. Your original is restored when you quit or turn this off.")
+                        Toggle(LocalizedStringKey("settings.general.launchAtLogin"), isOn: $prefs.launchAtLogin)
+                        Toggle(LocalizedStringKey("settings.general.solidBackdrop"), isOn: $prefs.solidBackdrop)
+                        Text(LocalizedStringKey("settings.general.solidBackdrop.help"))
                             .font(.caption).foregroundStyle(.secondary)
                         Divider()
-                        Button("Show welcome again") { model.onShowOnboarding?() }
-                            .help("Replay the first-run walkthrough")
+                        Button(LocalizedStringKey("settings.general.showWelcome")) { model.onShowOnboarding?() }
+                            .help(LocalizedStringKey("settings.general.showWelcome.help"))
                     }
                     .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
+                } label: {
+                    Text(LocalizedStringKey("settings.general"))
                 }
                 AISettings()
-                GroupBox("Power") {
+                GroupBox {
                     VStack(alignment: .leading, spacing: 8) {
-                        Picker("On battery", selection: $prefs.batteryBehavior) {
+                        Picker(LocalizedStringKey("settings.power.battery"), selection: $prefs.batteryBehavior) {
                             ForEach(BatteryBehavior.allCases, id: \.self) { Text($0.label).tag($0) }
                         }
-                        Text("Wallpapers always pause when covered, on lock, or when the display sleeps.")
+                        Text(LocalizedStringKey("settings.power.note"))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
+                } label: {
+                    Text(LocalizedStringKey("settings.power"))
                 }
                 EnergySettings(model: model)
-                GroupBox("Rotation") {
+                GroupBox {
                     VStack(alignment: .leading, spacing: 8) {
-                        Toggle("Rotate through all wallpapers", isOn: $prefs.rotationEnabled)
+                        Toggle(LocalizedStringKey("settings.rotation.toggle"), isOn: $prefs.rotationEnabled)
                             .disabled(!entitlement.isPremium)
-                        Stepper("Every \(prefs.rotationMinutes) min", value: $prefs.rotationMinutes, in: 1...240)
+                        Stepper(LocalizedStringKey("settings.rotation.interval"), value: $prefs.rotationMinutes, in: 1...240)
                             .disabled(!prefs.rotationEnabled || !entitlement.isPremium)
                         if !entitlement.isPremium {
-                            Button { model.showPaywall("Rotation is a Premium feature.") } label: {
-                                Label("Premium feature — Unlock", systemImage: "lock.fill")
+                            Button { model.showPaywall(String(localized: "paywall.feature.rotation", bundle: .main)) } label: {
+                                Label(LocalizedStringKey("settings.premium.unlockLabel"), systemImage: "lock.fill")
                             }
                             .buttonStyle(.link).font(.caption)
                         } else if model.screens.count > 1 {
-                            Text("Each display rotates independently from its current wallpaper.")
+                            Text(LocalizedStringKey("settings.rotation.note"))
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
                     .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
+                } label: {
+                    Text(LocalizedStringKey("settings.rotation"))
                 }
                 ScheduleSettings(model: model)
                 // Per-wallpaper parameters now live on the wallpaper itself: use "Customize…" from a
@@ -1074,16 +1106,16 @@ struct SettingsTab: View {
             .frame(maxWidth: 640)                    // a comfortable reading column…
             .frame(maxWidth: .infinity)              // …centered in the now full-width window
         }
-        .navigationTitle("Settings")
-        .navigationSubtitle("Preferences")
+        .navigationTitle(LocalizedStringKey("settings.title"))
+        .navigationSubtitle(LocalizedStringKey("settings.subtitle"))
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     prefs.batteryBehavior = .throttle
                     prefs.rotationEnabled = false
                     prefs.rotationMinutes = 15
-                } label: { Label("Reset", systemImage: "arrow.counterclockwise") }
-                .help("Reset preferences to defaults")
+                } label: { Label(LocalizedStringKey("settings.reset"), systemImage: "arrow.counterclockwise") }
+                .help(LocalizedStringKey("settings.reset"))
             }
         }
     }
@@ -1117,26 +1149,26 @@ struct CustomizeSheet: View {
             HStack(spacing: 10) {
                 Image(systemName: "slider.horizontal.3").font(.title3).foregroundStyle(.tint)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Customize").font(.headline)
+                    Text(LocalizedStringKey("preview.menu.customize")).font(.headline)
                     Text(entry.title).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
                 Spacer(minLength: 0)
             }
 
             if schema.isEmpty {
-                Text("This wallpaper has no adjustable parameters.")
+                Text(LocalizedStringKey("customize.empty"))
                     .font(.callout).foregroundStyle(.secondary)
             } else {
                 VStack(alignment: .leading, spacing: 12) {
                     WallpaperParamRows(model: model, schema: schema, id: entry.id).id(entry.id)
                 }
-                Text("Changes apply live while this wallpaper is running, and are remembered.")
+                Text(LocalizedStringKey("customize.live"))
                     .font(.caption2).foregroundStyle(.secondary)
             }
 
             HStack {
                 Spacer()
-                Button("Done") { dismiss() }
+                Button(LocalizedStringKey("action.close")) { dismiss() }
                     .keyboardShortcut(.defaultAction).buttonStyle(.glassProminent)
             }
         }

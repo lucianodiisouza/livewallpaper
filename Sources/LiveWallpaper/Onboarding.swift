@@ -53,16 +53,16 @@ struct OnboardingView: View {
     private var header: some View {
         HStack {
             Spacer()
-            Button("Skip") { dismiss(false) }
+            Button(String(localized: "onboarding.button.skip", bundle: .main)) { dismiss(false) }
                 .buttonStyle(.plain).foregroundStyle(.secondary)
-                .help("Skip the intro — you can reopen it from Settings")
+                .help(String(localized: "onboarding.help.skip", bundle: .main))
         }
         .padding(.horizontal, 16).padding(.vertical, 10)
     }
 
     private var footer: some View {
         HStack {
-            Button("Back") { advance(-1) }
+            Button(String(localized: "onboarding.button.back", bundle: .main)) { advance(-1) }
                 .opacity(step == .welcome ? 0 : 1)
                 .disabled(step == .welcome)
 
@@ -77,10 +77,10 @@ struct OnboardingView: View {
             Spacer()
 
             if step == .premium {
-                Button("Get Started") { dismiss(true) }
+                Button(String(localized: "onboarding.button.getStarted", bundle: .main)) { dismiss(true) }
                     .keyboardShortcut(.defaultAction).buttonStyle(.glassProminent)
             } else {
-                Button("Continue") { advance(1) }
+                Button(String(localized: "onboarding.button.continue", bundle: .main)) { advance(1) }
                     .keyboardShortcut(.defaultAction).buttonStyle(.glassProminent)
             }
         }
@@ -126,15 +126,18 @@ private struct StepScaffold<Content: View>: View {
 private struct WelcomeStep: View {
     var body: some View {
         StepScaffold(symbol: "sparkles",
-                     title: "Welcome to Primo Engine",
-                     subtitle: "Live wallpapers for your Mac — Metal shaders, web animations, and video — built to be native and easy on your battery.") {
+                     title: String(localized: "onboarding.welcome", bundle: .main),
+                     subtitle: String(localized: "onboarding.tagline", bundle: .main)) {
             VStack(alignment: .leading, spacing: 12) {
-                FeatureRow("bolt.fill", "Pauses when covered",
-                           "Rendering drops to near-zero GPU whenever the wallpaper can't be seen.")
-                FeatureRow("cpu", "Native, no Chromium",
-                           "Pure Swift, Metal, and WebKit — not an Electron shell.")
-                FeatureRow("square.stack.3d.up.fill", "Shaders, web & video",
-                           "Tiny, GPU-native wallpapers you can't get from a video-only app.")
+                FeatureRow("bolt.fill",
+                           String(localized: "onboarding.feature.pauses.title", bundle: .main),
+                           String(localized: "onboarding.feature.pauses.detail", bundle: .main))
+                FeatureRow("cpu",
+                           String(localized: "onboarding.feature.native.title", bundle: .main),
+                           String(localized: "onboarding.feature.native.detail", bundle: .main))
+                FeatureRow("square.stack.3d.up.fill",
+                           String(localized: "onboarding.feature.formats.title", bundle: .main),
+                           String(localized: "onboarding.feature.formats.detail", bundle: .main))
             }
             .frame(maxWidth: 420)
         }
@@ -146,8 +149,8 @@ private struct LanguageStep: View {
 
     var body: some View {
         StepScaffold(symbol: "globe",
-                     title: "Choose your language",
-                     subtitle: "Pick the language for Primo Engine. You can change it any time from Settings.") {
+                     title: String(localized: "onboarding.chooseLanguage.title", bundle: .main),
+                     subtitle: String(localized: "onboarding.chooseLanguage.subtitle", bundle: .main)) {
             Picker(LocalizedStringKey("settings.language"), selection: $prefs.language) {
                 ForEach(AppLanguage.allCases) { lang in
                     Text(lang.displayName).tag(lang)
@@ -156,7 +159,7 @@ private struct LanguageStep: View {
             .pickerStyle(.menu)
             .labelsHidden()
             .frame(maxWidth: 280)
-            Text("Tip: 'System default' follows your Mac's language setting.")
+            Text(LocalizedStringKey("onboarding.chooseLanguage.tip"))
                 .font(.caption).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center).frame(maxWidth: 420)
         }
@@ -172,8 +175,8 @@ private struct PickStep: View {
 
     var body: some View {
         StepScaffold(symbol: "wand.and.stars",
-                     title: "Pick your first wallpaper",
-                     subtitle: "Tap one to try it live on your desktop right now. You can change it any time.") {
+                     title: String(localized: "onboarding.pick.title", bundle: .main),
+                     subtitle: String(localized: "onboarding.pick.subtitle", bundle: .main)) {
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(picks) { entry in
@@ -229,15 +232,18 @@ private struct OnboardingPickTile: View {
 private struct DisplaysStep: View {
     var body: some View {
         StepScaffold(symbol: "display.2",
-                     title: "One app, every display",
-                     subtitle: "Give each monitor its own wallpaper, or the same one everywhere — you're in control.") {
+                     title: String(localized: "onboarding.displays.title", bundle: .main),
+                     subtitle: String(localized: "onboarding.displays.subtitle", bundle: .main)) {
             VStack(alignment: .leading, spacing: 12) {
-                FeatureRow("rectangle.on.rectangle", "Per-display wallpapers",
-                           "A to-scale monitor strip lets you target any screen and set it independently.")
-                FeatureRow("arrow.triangle.2.circlepath", "Rotation & playlists",
-                           "Cycle through your wallpapers automatically — each display on its own. (Premium)")
-                FeatureRow("moon.zzz.fill", "Battery-aware",
-                           "Choose what happens on battery: pause, throttle, or keep full speed.")
+                FeatureRow("rectangle.on.rectangle",
+                           String(localized: "onboarding.feature.perdisplay.title", bundle: .main),
+                           String(localized: "onboarding.feature.perdisplay.detail", bundle: .main))
+                FeatureRow("arrow.triangle.2.circlepath",
+                           String(localized: "onboarding.feature.rotation.title", bundle: .main),
+                           String(localized: "onboarding.feature.rotation.detail", bundle: .main))
+                FeatureRow("moon.zzz.fill",
+                           String(localized: "onboarding.feature.battery.title", bundle: .main),
+                           String(localized: "onboarding.feature.battery.detail", bundle: .main))
             }
             .frame(maxWidth: 420)
         }
@@ -247,15 +253,21 @@ private struct DisplaysStep: View {
 private struct PremiumStep: View {
     var body: some View {
         StepScaffold(symbol: "checkmark.seal.fill",
-                     title: "Free to use — Premium when you want more",
-                     subtitle: "The core app is free. Premium unlocks the full catalog and the marquee features, one time — no subscription.") {
+                     title: String(localized: "onboarding.premium.title", bundle: .main),
+                     subtitle: String(localized: "onboarding.premium.subtitle", bundle: .main)) {
             VStack(alignment: .leading, spacing: 12) {
-                FeatureRow("square.stack", "The full wallpaper catalog", "Every curated shader, web, and video wallpaper.")
-                FeatureRow("wand.and.stars", "AI-generated wallpapers", "Describe a look and generate a live wallpaper of your own.")
-                FeatureRow("display.2", "Per-display rotation & playlists", "Keep every screen fresh, automatically.")
+                FeatureRow("square.stack",
+                           String(localized: "onboarding.feature.catalog.title", bundle: .main),
+                           String(localized: "onboarding.feature.catalog.detail", bundle: .main))
+                FeatureRow("wand.and.stars",
+                           String(localized: "onboarding.feature.ai.title", bundle: .main),
+                           String(localized: "onboarding.feature.ai.detail", bundle: .main))
+                FeatureRow("display.2",
+                           String(localized: "onboarding.feature.rotationPlaylists.title", bundle: .main),
+                           String(localized: "onboarding.feature.rotationPlaylists.detail", bundle: .main))
             }
             .frame(maxWidth: 420)
-            Text("You can explore everything free first — the paywall only appears when you try a Premium wallpaper or feature.")
+            Text(LocalizedStringKey("onboarding.premium.note"))
                 .font(.caption).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center).frame(maxWidth: 420)
         }

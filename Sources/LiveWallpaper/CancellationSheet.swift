@@ -27,11 +27,11 @@ struct CancellationSheet: View {
         var id: String { rawValue }
         var label: String {
             switch self {
-            case .tooExpensive: return "Too expensive"
-            case .notUsing: return "Not using it enough"
-            case .missingFeature: return "Missing a feature I need"
-            case .technical: return "Technical problems"
-            case .other: return "Something else"
+            case .tooExpensive: return String(localized: "cancel.reason.tooExpensive", bundle: .main)
+            case .notUsing: return String(localized: "cancel.reason.notUsing", bundle: .main)
+            case .missingFeature: return String(localized: "cancel.reason.missingFeature", bundle: .main)
+            case .technical: return String(localized: "cancel.reason.technical", bundle: .main)
+            case .other: return String(localized: "cancel.reason.other", bundle: .main)
             }
         }
     }
@@ -54,17 +54,18 @@ struct CancellationSheet: View {
     @ViewBuilder private var content: some View {
         switch step {
         case .intro:
-            stepHeader("Manage your subscription", step: 1)
-            let planName = entitlement.claims?.plan == "annual" ? "Annual" : "Monthly"
-            Text("You're on the \(planName) plan.")
+            stepHeader(String(localized: "cancel.intro.title", bundle: .main), step: 1)
+            let planName = NSLocalizedString(entitlement.claims?.plan == "annual" ? "cancel.plan.annual" : "cancel.plan.monthly",
+                                             bundle: .main, comment: "")
+            Text(String(format: NSLocalizedString("cancel.intro.body", bundle: .main, comment: ""), planName))
             if let ends = endsText {
-                Text("If you cancel, you'll keep Premium until \(ends), then this Mac returns to Free.")
+                Text(String(format: NSLocalizedString("cancel.intro.note", bundle: .main, comment: ""), ends))
                     .foregroundStyle(.secondary).font(.callout)
             }
 
         case .reason:
-            stepHeader("Why are you canceling?", step: 2)
-            Text("This helps us improve Primo Engine.").foregroundStyle(.secondary).font(.callout)
+            stepHeader(String(localized: "cancel.reason.title", bundle: .main), step: 2)
+            Text(LocalizedStringKey("cancel.reason.body")).foregroundStyle(.secondary).font(.callout)
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(Reason.allCases) { r in
                     Button { reason = r } label: {
@@ -81,15 +82,16 @@ struct CancellationSheet: View {
             }
 
         case .confirm:
-            stepHeader("Anything you'd like us to know?", step: 3)
+            stepHeader(String(localized: "cancel.confirm.title", bundle: .main), step: 3)
             TextEditor(text: $feedback)
                 .font(.body)
                 .frame(height: 100)
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.3)))
-            Text("Optional — your feedback goes straight to the team.")
+            Text(LocalizedStringKey("cancel.confirm.placeholder"))
                 .font(.caption).foregroundStyle(.secondary)
             if let ends = endsText {
-                Label("You'll keep Premium until \(ends).", systemImage: "checkmark.circle")
+                Label(String(format: String(localized: "cancel.confirm.note", bundle: .main), ends),
+                      systemImage: "checkmark.circle")
                     .font(.callout).foregroundStyle(.secondary)
             }
         }
@@ -97,7 +99,8 @@ struct CancellationSheet: View {
 
     private func stepHeader(_ title: String, step n: Int) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Step \(n) of 3").font(.caption2).foregroundStyle(.secondary)
+            Text(String(format: String(localized: "cancel.step", bundle: .main), n))
+                .font(.caption2).foregroundStyle(.secondary)
             Text(title).font(.title3).bold()
         }
     }
@@ -106,18 +109,18 @@ struct CancellationSheet: View {
         HStack {
             switch step {
             case .intro:
-                Button("Keep subscription") { onDone(false) }.keyboardShortcut(.defaultAction)
+                Button(LocalizedStringKey("cancel.button.keep")) { onDone(false) }.keyboardShortcut(.defaultAction)
                 Spacer()
-                Button("Continue to cancel") { step = .reason }
+                Button(LocalizedStringKey("cancel.button.continue")) { step = .reason }
             case .reason:
-                Button("Back") { step = .intro }
+                Button(LocalizedStringKey("cancel.button.back")) { step = .intro }
                 Spacer()
-                Button("Next") { step = .confirm }.disabled(reason == nil)
+                Button(LocalizedStringKey("cancel.button.next")) { step = .confirm }.disabled(reason == nil)
             case .confirm:
-                Button("Back") { step = .reason }
+                Button(LocalizedStringKey("cancel.button.back")) { step = .reason }
                 Spacer()
                 if busy { ProgressView().controlSize(.small).padding(.trailing, 4) }
-                Button("Confirm cancellation", role: .destructive, action: confirm).disabled(busy)
+                Button(LocalizedStringKey("cancel.button.confirm"), role: .destructive, action: confirm).disabled(busy)
             }
         }
     }
