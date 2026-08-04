@@ -63,6 +63,21 @@ actor WorkshopCache {
         catalogMemo[key] = (Date(), items)
     }
 
+    // MARK: - Rotation
+
+    /// Memo of active rotations by request URL. Same shape as the catalog memo — short TTL
+    /// because the operator's switch in the backoffice should land within minutes, not hours.
+    private var rotationMemo: [String: (at: Date, value: WorkshopClient.Rotation)] = [:]
+
+    func cachedRotation(forKey key: String, maxAge: TimeInterval) -> WorkshopClient.Rotation? {
+        guard let hit = rotationMemo[key], Date().timeIntervalSince(hit.at) < maxAge else { return nil }
+        return hit.value
+    }
+
+    func storeRotation(_ r: WorkshopClient.Rotation, forKey key: String) {
+        rotationMemo[key] = (Date(), r)
+    }
+
     // MARK: - Bundles
 
     /// Path a bundle with this checksum would occupy on disk, whether or not it exists.

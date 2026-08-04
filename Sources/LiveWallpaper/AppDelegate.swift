@@ -95,6 +95,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             showOnboarding()
         }
 
+        // Pull the active rotation set on launch and again every hour, so the operator's switch
+        // in the backoffice lands without a manual refresh. Failures are silent.
+        Task { await self.model.refreshRotation() }
+        let rotTimer = Timer(timeInterval: 3600, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            Task { await self.model.refreshRotation() }
+        }
+        RunLoop.main.add(rotTimer, forMode: .common)
+
         maybeAutoCheckForUpdates()
     }
 

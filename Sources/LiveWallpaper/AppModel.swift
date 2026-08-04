@@ -60,6 +60,14 @@ final class AppModel: ObservableObject {
     /// (an item's `checksum` equals its manifest checksum, per the seed) to mark already-installed
     /// wallpapers as installed across launches — not just ones installed in the current session.
     @Published var installedChecksums: Set<String> = []
+    /// Wallpaper ids in the current rotation pool — Premium items temporarily free for everyone.
+    /// Driven by the backoffice; the client just reads it. Empty when rotation is off.
+    @Published private(set) var rotationIDs: Set<String> = []
+    /// Headline the operator set for the active rotation (e.g. "Black Friday picks"). Empty when
+    /// rotation is off — callers fall back to default copy ("Free this period").
+    @Published private(set) var rotationHeadline: String = ""
+    /// When the active rotation ends. `nil` when rotation is off.
+    @Published private(set) var rotationEndsAt: Date?
     /// Connected displays + per-screen assignment (drives the in-Installed monitor strip).
     @Published var screens: [ScreenInfo] = []
     /// The currently-rendering wallpaper id.
@@ -112,6 +120,24 @@ final class AppModel: ObservableObject {
 
     func title(forID id: String) -> String { available.first { $0.id == id }?.title ?? id }
 
+    // MARK: - Rotation
+
+    /// Pull the current rotation from the backend. Idempotent; called on launch + when Settings
+    /// tells us the entitlement changed. Failures are silent — the rotation pool is opt-in and
+    /// the UI simply doesn't surface the badge if the backend is unreachable.
+    func refreshRotation() async {
+        guard let r = await workshop.fetchRotation() else {
+            rotationIDs = []; rotationHeadline = ""; rotationEndsAt = nil; return
+        }
+        rotationIDs = Set(r.items.map(\.id))
+        rotationHeadline = r.headline
+        rotationEndsAt = r.endsAt
+    }
+
+    /// Is `id` currently in the active rotation pool? Premium items in the pool are free for
+    /// everyone (including free members) until `rotationEndsAt`.
+    func isInRotation(_ id: String) -> Bool { rotationIDs.contains(id) }
+
     // MARK: - Actions
 
     func setActive(_ id: String) {
@@ -128,9 +154,11 @@ final class AppModel: ObservableObject {
 
     /// Apply a wallpaper, but if it's Premium and the user isn't entitled, open the paywall instead.
     /// `key` = a display to target (nil ⇒ all). Returns true if applied, false if the paywall opened.
+    /// Items in the active rotation pool are an exception: they're free for everyone for the
+    /// rotation window, so we let the apply through even when the user isn't Premium.
     @discardableResult
     func attemptApply(_ entry: Entry, toScreen key: String? = nil) -> Bool {
-        if entry.isPremium && !Entitlement.shared.isPremium {
+        if entry.isPremium && !Entitlement.shared.isPremium && !isInRotation(entry.id) {
             paywall = PaywallContext(reason: "“\(entry.title)” is a Premium wallpaper.")
             return false
         }

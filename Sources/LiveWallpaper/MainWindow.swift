@@ -630,6 +630,7 @@ struct ExploreView: View {
     var body: some View {
         WorkshopView(
             client: model.workshop,
+            model: model,
             onInstall: { item in await model.onInstall?(item) ?? "Install unavailable." },
             screens: model.screens,
             onInstallToScreen: { item, key in await model.onInstallToScreen?(item, key) ?? "Install unavailable." },

@@ -6,6 +6,9 @@ import SwiftUI
 /// so checksum + shader-gate verification still apply.
 struct WorkshopView: View {
     let client: WorkshopClient
+    /// The shared app model — observed here so the rotation badges + free-for-period logic
+    /// update when the active rotation flips (or when its end date passes).
+    @ObservedObject var model: AppModel
     let onInstall: @MainActor (WorkshopItem) async -> String?
     /// Connected displays + a per-display install path — enables the "…" per-monitor menu.
     var screens: [AppModel.ScreenInfo] = []
@@ -76,10 +79,11 @@ struct WorkshopView: View {
                         FeaturedCarousel(items: featured,
                                          installing: installing,
                                          installed: { isInstalled($0) },
-                                         locked: { $0.isPremium && !entitlement.isPremium },
+                                         locked: { $0.isPremium && !entitlement.isPremium && !model.rotationIDs.contains($0.id) },
+                                         inRotation: { model.rotationIDs.contains($0.id) },
                                          screens: screens,
                                          onInstall: { item, key in
-                            if item.isPremium && !entitlement.isPremium { onLocked?(item) }
+                            if item.isPremium && !entitlement.isPremium && !model.rotationIDs.contains(item.id) { onLocked?(item) }
                             else { install(item, toScreen: key) }
                         })
                         .padding(.top, 4)
@@ -94,9 +98,11 @@ struct WorkshopView: View {
                                              installing: installing.contains(item.id),
                                              installed: isInstalled(item),
                                              locked: item.isPremium && !entitlement.isPremium,
+                                             inRotation: model.rotationIDs.contains(item.id),
                                              screens: screens) { key in
-                                    if item.isPremium && !entitlement.isPremium { onLocked?(item) }
-                                    else { install(item, toScreen: key) }
+                                    if item.isPremium && !entitlement.isPremium && !model.rotationIDs.contains(item.id) {
+                                        onLocked?(item)
+                                    } else { install(item, toScreen: key) }
                                 }
                             }
                         }
@@ -158,6 +164,9 @@ struct WorkshopTile: View {
     let installed: Bool
     /// True for a Premium item when the user isn't entitled — install becomes an "Unlock" action.
     var locked: Bool = false
+    /// True if the item is in the active rotation pool. Drives the "Free this period" badge and
+    /// the install affordance (rotation items can be installed by anyone, even free users).
+    var inRotation: Bool = false
     var screens: [AppModel.ScreenInfo] = []
     /// Install the item, then apply it to one display (key) or all (nil). For a locked item the
     /// parent intercepts this and opens the paywall instead of installing.
@@ -174,6 +183,15 @@ struct WorkshopTile: View {
                             .labelStyle(.titleAndIcon).font(.caption2.weight(.bold))
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(.black.opacity(0.6)).foregroundStyle(.yellow)
+                            .clipShape(Capsule()).padding(8)
+                    }
+                }
+                .overlay(alignment: .topTrailing) {
+                    if inRotation {
+                        Label("Free this period", systemImage: "gift.fill")
+                            .labelStyle(.titleAndIcon).font(.caption2.weight(.bold))
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(.green.opacity(0.9)).foregroundStyle(.white)
                             .clipShape(Capsule()).padding(8)
                     }
                 }
@@ -256,6 +274,7 @@ struct FeaturedCarousel: View {
     let installing: Set<String>
     let installed: (WorkshopItem) -> Bool
     let locked: (WorkshopItem) -> Bool
+    let inRotation: (WorkshopItem) -> Bool
     let screens: [AppModel.ScreenInfo]
     let onInstall: (WorkshopItem, String?) -> Void
 
@@ -276,6 +295,7 @@ struct FeaturedCarousel: View {
                                      installing: installing.contains(item.id),
                                      installed: installed(item),
                                      locked: locked(item),
+                                     inRotation: inRotation(item),
                                      screens: screens,
                                      onInstall: onInstall)
                     }
@@ -294,6 +314,7 @@ struct FeaturedCard: View {
     let installing: Bool
     let installed: Bool
     let locked: Bool
+    let inRotation: Bool
     let screens: [AppModel.ScreenInfo]
     let onInstall: (WorkshopItem, String?) -> Void
 
@@ -316,6 +337,15 @@ struct FeaturedCard: View {
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(.black.opacity(0.6)).foregroundStyle(.yellow)
                             .clipShape(Capsule()).padding(8)
+                    }
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    if inRotation {
+                        Label("Free this period", systemImage: "gift.fill")
+                            .labelStyle(.titleAndIcon).font(.caption2.weight(.bold))
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(.green.opacity(0.9)).foregroundStyle(.white)
+                            .clipShape(Capsule()).padding(10)
                     }
                 }
 
