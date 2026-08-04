@@ -168,7 +168,7 @@ struct WorkshopTile: View {
     let installed: Bool
     /// True for a Premium item when the user isn't entitled — install becomes an "Unlock" action.
     var locked: Bool = false
-    /// True if the item is in the active rotation pool. Drives the "Free this period" badge and
+    /// True if the item is in the active rotation pool. Drives the "Week Rotation" badge and
     /// the install affordance (rotation items can be installed by anyone, even free users).
     var inRotation: Bool = false
     var screens: [AppModel.ScreenInfo] = []

@@ -69,7 +69,7 @@ final class AppModel: ObservableObject {
     /// Driven by the backoffice; the client just reads it. Empty when rotation is off.
     @Published private(set) var rotationIDs: Set<String> = []
     /// Headline the operator set for the active rotation (e.g. "Black Friday picks"). Empty when
-    /// rotation is off — callers fall back to default copy ("Free this period").
+    /// rotation is off — callers fall back to default copy ("Week Rotation").
     @Published private(set) var rotationHeadline: String = ""
     /// When the active rotation ends. `nil` when rotation is off.
     @Published private(set) var rotationEndsAt: Date?
