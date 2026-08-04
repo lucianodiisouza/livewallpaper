@@ -31,21 +31,12 @@
      bottom, providing the "wood side" of the box. The deck sits on top. */
   .deck-frame{position:relative;flex:1.55;display:block;overflow:visible;}
   .deck-frame{position:relative;flex:1.55;display:block;overflow:visible;}
-  /* Side faces are rendered as children INSIDE the deck (anchored to
-     the deck's right and bottom edges), so they move with the deck and
-     stay aligned with the deck's border-radius. */
-  .deck-side{position:absolute;pointer-events:none;z-index:0;}
-  .deck-side.right{right:-16px;top:14px;bottom:16px;width:16px;
-    background:linear-gradient(90deg, var(--deck-dark) 0%, var(--deck-edge) 60%, #1a0d04 100%);
-    border-radius:0 4px 4px 0;
-    box-shadow:inset 1px 0 0 rgba(255,255,255,.05), inset -1px 0 2px rgba(0,0,0,.4);}
-  .deck-side.bottom{left:14px;right:-16px;bottom:-16px;height:16px;
-    background:linear-gradient(180deg, #4a2a16 0%, var(--deck-edge) 60%, #1a0d04 100%);
-    border-radius:0 0 4px 4px;
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.05), inset 0 -1px 2px rgba(0,0,0,.4);}
-  .deck-side.corner{right:-16px;bottom:-16px;width:16px;height:16px;
-    background:linear-gradient(135deg, transparent 50%, var(--deck-edge) 50%, #1a0d04 100%);
-    border-radius:0 0 4px 0;}
+  /* The deck's 3D side walls are drawn as a diagonal box-shadow extrusion
+     on .deck itself (see its box-shadow below). A shadow stack hugs the
+     deck's rounded silhouette exactly, so the right + bottom walls stay
+     gap-free at every corner — unlike the old straight .deck-side strips,
+     which left a notch of background wherever the 28px corners curved
+     away from them. */
 
   /* ============================================================
      DECK — wide slab on the left
@@ -56,8 +47,16 @@
       radial-gradient(130% 120% at 22% 8%, var(--deck-hi), rgba(0,0,0,0) 55%),
       linear-gradient(158deg, var(--deck), var(--deck-dark));
     box-shadow:
-      /* cast shadow on the floor (soft, far) */
-      0 90px 140px -28px rgba(0,0,0,.85),
+      /* extruded 3D edge — a 1px diagonal stack toward bottom-right that
+         hugs the deck's 28px rounded silhouette, so the right + bottom
+         walls stay continuous and gap-free at every corner. Grades from
+         the lit near edge (deck-dark) to the dark far edge. */
+      1px 1px 0 #4b2c19, 2px 2px 0 #482a18, 3px 3px 0 #462917, 4px 4px 0 #432716,
+      5px 5px 0 #412515, 6px 6px 0 #3e2414, 7px 7px 0 #3c2213, 8px 8px 0 #392012,
+      9px 9px 0 #371f11, 10px 10px 0 #341d10, 11px 11px 0 #321b0f, 12px 12px 0 #2f1a0e,
+      13px 13px 0 #2d180d, 14px 14px 0 #2a160c, 15px 15px 0 #28150b, 16px 16px 0 #25130a,
+      /* cast shadow on the floor (soft, far) — offset to sit under the base */
+      6px 96px 140px -28px rgba(0,0,0,.85),
       /* top edge highlight */
       0 -2px 0 rgba(255,255,255,.08),
       /* inner depth shading */
@@ -267,9 +266,6 @@
     <!-- DECK with 3D frame: side faces peek out from the right and bottom -->
     <div class="deck-frame">
       <div class="deck">
-        <div class="deck-side right"></div>
-        <div class="deck-side bottom"></div>
-        <div class="deck-side corner"></div>
         <div class="deck-inner"></div>
       <svg class="wood" viewBox="0 0 100 78" preserveAspectRatio="none">
         <filter id="woodgrain"><feTurbulence type="fractalNoise" baseFrequency="0.012 0.09" numOctaves="4" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter>
