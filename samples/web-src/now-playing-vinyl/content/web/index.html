@@ -94,13 +94,13 @@
      so the gap between the led and the eq is visibly larger than
      the gap between the knobs and the led.
      ============================================================ */
-  .console{position:absolute;right:4%;top:14%;width:36%;height:82%;
-    display:flex;flex-direction:column;gap:5%;}
+  .console{position:absolute;right:4%;top:14%;width:36%;height:62%;
+    display:flex;flex-direction:column;gap:8%;}
 
   /* knobs row — 3 knobs distributed evenly across the LED's width
      (left, center, right). With space-between, 3 items → left/center/right. */
   .knobs{display:flex;align-items:center;justify-content:space-between;
-    width:100%;padding:0 0.3%;flex:none;margin-bottom:2%;}
+    width:100%;padding:0 0.3%;flex:none;margin-bottom:4%;}
   .knob{width:22%;aspect-ratio:1/1;border-radius:50%;position:relative;
     background:radial-gradient(circle at 38% 30%, #524c58, #16131b 80%);
     box-shadow:inset 0 2px 5px rgba(255,255,255,.22), inset 0 -3px 6px rgba(0,0,0,.6),
@@ -118,11 +118,10 @@
   .knob.c .ind{background:var(--accent-2);
     box-shadow:0 0 8px rgba(255,109,143,.7), inset 0 1px 0 rgba(255,255,255,.4);}
 
-  /* ----- 2-row LED display — shorter, fixed height so the EQ gets more room ----- */
+  /* ----- 2-row LED display — shorter, fixed height so the EQ gets its own row ----- */
   .display-wrap{position:relative;flex:0 0 auto;height:20%;padding:3px;border-radius:16px;
     background:linear-gradient(180deg,#2a1d18,#110a08);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 2px 0 rgba(0,0,0,.4);
-    margin-bottom:6%;}
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 2px 0 rgba(0,0,0,.4);}
   .display{position:relative;height:100%;border-radius:14px;padding:6% 8%;
     display:flex;flex-direction:column;justify-content:center;gap:6%;overflow:hidden;
     background:
@@ -141,9 +140,16 @@
             mask-image:radial-gradient(circle at center, #000 0 46%, transparent 52%);
     -webkit-mask-size:var(--dot) var(--dot); mask-size:var(--dot) var(--dot);
     -webkit-mask-position:center; mask-position:center;}
-  .led .txt{display:inline-block;will-change:transform;}
-  .led.scroll .txt{animation:marquee 9s ease-in-out infinite alternate;}
-  @keyframes marquee{0%,12%{transform:translateX(0)}88%,100%{transform:translateX(var(--shift,0))}}
+  .led .txt{display:inline-block;will-change:transform;padding-right:2em;}
+  /* Marquee: always running, even when text fits. For short text the shift is
+     0 so the animation is visually a no-op; for long text it scrolls the
+     full overflow plus a small gap, with a hold at the start, a slow glide,
+     and a hold at the end before looping. */
+  .led .txt{animation:marquee 11s linear infinite;}
+  @keyframes marquee{
+    0%, 8%   { transform:translateX(0); }
+    92%,100% { transform:translateX(var(--shift,0)); }
+  }
   .led.t1{font-size:1.25vw;height:1.3em;}
   .led.t2{font-size:0.9vw;opacity:.92;}
   /* faint "off" pixels behind */
@@ -157,15 +163,19 @@
       linear-gradient(0deg, rgba(0,0,0,.18), rgba(0,0,0,0) 30%);
     box-shadow:inset 0 0 24px rgba(0,0,0,.55);}
 
-  /* ----- 3-band equalizer: HORIZONTAL slot faders, full LED width -----
-     One long track per band, equal to the LED display's outer width.
-     3 caps ride left↔right on the same track. The outer bands default
-     to the left/right thirds; the middle band sits in the center. */
-  .eq-wrap{position:relative;width:100%;flex:0 0 30%;align-self:stretch;}
+  /* ----- 3-band equalizer: HORIZONTAL slot faders, RIGHT COLUMN -----
+     The EQ is a separate row at the bottom of the right column (where the
+     console lives), spanning from the vinyl/platter's right border to the
+     deck's right border. The left edge of the EQ aligns with the vinyl's
+     right edge, so the LED (above) sits centered between the vinyl (to
+     its left) and the deck's right edge — with proper lateral breathing
+     room. */
+  .eq-wrap{position:absolute;left:62%;right:4%;bottom:8%;height:18%;
+    display:flex;align-items:stretch;justify-content:stretch;}
   .eq{position:relative;width:100%;height:100%;
     display:flex;flex-direction:column;justify-content:space-between;gap:10%;}
   .eq-row{position:relative;flex:1;}
-  /* the recessed slot — thin, horizontal, full LED width */
+  /* the recessed slot — thin, horizontal, full EQ row width */
   .eq-slot{position:absolute;left:0;right:0;top:50%;height:18%;
     transform:translateY(-50%);border-radius:99px;
     background:
@@ -173,8 +183,8 @@
       linear-gradient(90deg,#07050a 0%,#1a131a 50%,#07050a 100%);
     box-shadow:inset 0 2px 4px rgba(0,0,0,.95), inset 0 0 0 1px rgba(0,0,0,.9),
       0 0 0 1px rgba(255,255,255,.04);}
-  /* narrower cap (a small button, 50% less wide than the previous puck).
-     width ≈ 11% of the LED width, height 90% of the band.
+  /* narrow cap (a small slider button).
+     width ≈ 11% of the EQ row, height 90% of the band.
      Travel range: left 0%..(100-11)% = 0..89%. */
   .eq-cap{position:absolute;top:50%;width:11%;height:90%;
     transform:translateY(-50%);border-radius:4px;z-index:2;
@@ -262,12 +272,12 @@
             <div class="led t2" id="l-artist"><span class="txt"></span></div>
           </div>
         </div>
-        <div class="eq-wrap">
-          <div class="eq">
-            <div class="eq-row"><div class="eq-slot"></div><div class="eq-cap" id="eq1" style="left:20%"></div></div>
-            <div class="eq-row"><div class="eq-slot"></div><div class="eq-cap" id="eq2" style="left:45%"></div></div>
-            <div class="eq-row"><div class="eq-slot"></div><div class="eq-cap" id="eq3" style="left:70%"></div></div>
-          </div>
+      </div>
+      <div class="eq-wrap">
+        <div class="eq">
+          <div class="eq-row"><div class="eq-slot"></div><div class="eq-cap" id="eq1" style="left:22%"></div></div>
+          <div class="eq-row"><div class="eq-slot"></div><div class="eq-cap" id="eq2" style="left:47%"></div></div>
+          <div class="eq-row"><div class="eq-slot"></div><div class="eq-cap" id="eq3" style="left:72%"></div></div>
         </div>
       </div>
     </div>
@@ -312,14 +322,17 @@ function setArm(progress, playing){
   el('armHead').setAttribute('cx',S.x.toFixed(2)); el('armHead').setAttribute('cy',S.y.toFixed(2));
 }
 
-/* LED line: set text, then scroll it (marquee) only if it overflows the panel */
+/* LED line: set text, then measure overflow so the marquee animation knows
+   how far to translate. The animation always runs (it pauses visually when
+   the overflow is 0, since translateX(0) = translateX(0)). The --shift
+   variable is always set, even when 0, so the keyframes have a valid value. */
 function setLine(lineId, text){
   const line = el(lineId), span = line.firstElementChild;
   span.textContent = text || '';
-  line.classList.remove('scroll'); span.style.removeProperty('--shift');
+  span.style.removeProperty('--shift');
   requestAnimationFrame(() => {
     const over = span.scrollWidth - line.clientWidth;
-    if (over > 2){ span.style.setProperty('--shift', (-over - 2) + 'px'); line.classList.add('scroll'); }
+    span.style.setProperty('--shift', (-over - 8) + 'px');   // 8px gap before wrap
   });
 }
 
