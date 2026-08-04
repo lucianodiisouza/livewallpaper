@@ -79,29 +79,44 @@ jobs:
       - name: Write release notes
         run: |
           V="${{ steps.ver.outputs.version }}"
-          cat > dist/RELEASE_NOTES.md <<'NOTES'
-          ## Primo Engine __VERSION__ (unsigned test build)
-
-          A power-aware live-wallpaper engine for macOS. This is an **unsigned**
-          build for testers — it is not yet notarized by Apple, so macOS
-          Gatekeeper will block the first launch. This is expected.
-
-          ### Install
-          1. Download `PrimoEngine-__VERSION__.dmg` below and open it.
-          2. Drag **Primo Engine** onto the **Applications** shortcut in the window.
-          3. **First launch:** open `/Applications`, right-click **Primo Engine** → **Open** → **Open** again.
-             (Or: **System Settings → Privacy & Security → Open Anyway**.)
-          4. Look for the 🖼️ icon in the menu bar. Quit from there.
-
-          Requires **macOS 26** or later.
-
-          ### Verify the download (optional)
-          ```
-          shasum -a 256 PrimoEngine-__VERSION__.dmg
-          ```
-          Compare against `PrimoEngine-__VERSION__.dmg.sha256` attached below.
-          NOTES
-          sed -i '' "s/__VERSION__/${V}/g" dist/RELEASE_NOTES.md
+          # Extract the matching section from CHANGELOG.md so the GitHub Release carries the
+          # curated notes. Matches `## [x.y.z]` until the next `## [` heading or EOF. Empty if
+          # the version isn't in the changelog yet (workflow keeps working with template-only).
+          CHANGELOG_SECTION="$(awk -v v="[${V}]" '
+            /^## \[Unreleased\]/ { next }
+            /^## \[/ && index($0, v) { in_section = 1; next }
+            /^## \[/ && in_section { exit }
+            /^\[.*\]:/ && in_section { exit }
+            in_section { print }
+          ' CHANGELOG.md)"
+          {
+            echo "## Primo Engine ${V} (unsigned test build)"
+            echo
+            echo "A power-aware live-wallpaper engine for macOS. This is an **unsigned**"
+            echo "build for testers — it is not yet notarized by Apple, so macOS"
+            echo "Gatekeeper will block the first launch. This is expected."
+            echo
+            if [ -n "${CHANGELOG_SECTION}" ]; then
+              echo "### What's changed in ${V}"
+              echo
+              echo "${CHANGELOG_SECTION}"
+              echo
+            fi
+            echo "### Install"
+            echo "1. Download \`PrimoEngine-${V}.dmg\` below and open it."
+            echo "2. Drag **Primo Engine** onto the **Applications** shortcut in the window."
+            echo "3. **First launch:** open \`/Applications\`, right-click **Primo Engine** → **Open** → **Open** again."
+            echo "   (Or: **System Settings → Privacy & Security → Open Anyway**.)"
+            echo "4. Look for the 🖼️ icon in the menu bar. Quit from there."
+            echo
+            echo "Requires **macOS 26** or later."
+            echo
+            echo "### Verify the download (optional)"
+            echo '```'
+            echo "shasum -a 256 PrimoEngine-${V}.dmg"
+            echo '```'
+            echo "Compare against \`PrimoEngine-${V}.dmg.sha256\` attached below."
+          } > dist/RELEASE_NOTES.md
 
       - name: Create GitHub Release
         if: github.event_name == 'push'   # only tag pushes publish a real release
