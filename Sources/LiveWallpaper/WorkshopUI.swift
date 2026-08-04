@@ -266,9 +266,10 @@ struct CachedThumb: View {
 
 // MARK: - Featured carousel
 
-/// Horizontally-scrolling row of wider featured cards (top 5 by install count), shown above the
-/// main catalog grid. Each card is ~1.6× a regular tile's width with a "Featured" ribbon, the live
-/// thumbnail, the install count, and an Install/Unlock/Installed action.
+/// Full-width, one-card-at-a-time paged carousel of featured wallpapers (top 5 by installs), shown
+/// above the main catalog grid. The card spans the carousel's own width, auto-advances every 6s,
+/// pauses while the user is interacting, and shows a page-indicator strip ("ball markers") below
+/// so the user always knows where they are in the rotation.
 struct FeaturedCarousel: View {
     let items: [WorkshopItem]
     let installing: Set<String>
@@ -277,6 +278,22 @@ struct FeaturedCarousel: View {
     let inRotation: (WorkshopItem) -> Bool
     let screens: [AppModel.ScreenInfo]
     let onInstall: (WorkshopItem, String?) -> Void
+
+    /// Auto-advance interval. Long enough to read the title + count, short enough to feel alive.
+    private let autoAdvanceSeconds: TimeInterval = 6
+
+    @State private var currentIndex: Int = 0
+    /// Mirror of the ScrollView's `scrollPosition` — keeps `currentIndex` in sync with manual swipes
+    /// (programmatic jumps use `proxy.scrollTo`, which doesn't round-trip through this binding).
+    @State private var scrolledID: Int? = nil
+    /// Set briefly when the user touches the pager; suppresses auto-advance so the rotation respects
+    /// the manual swipe. Re-arms 4s after the last interaction.
+    @State private var userInteracting: Bool = false
+    /// Inner width of the carousel row, measured via a non-layout background probe. Drives the card
+    /// size *and* the explicit row height — a plain `GeometryReader` can't do the latter because it
+    /// has no intrinsic height, so inside the vertical ScrollView it collapses and the cards spill
+    /// over the grid below.
+    @State private var rowWidth: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -288,27 +305,136 @@ struct FeaturedCarousel: View {
             }
             .padding(.horizontal, 20)
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .top, spacing: 18) {
-                    ForEach(items) { item in
-                        FeaturedCard(item: item,
-                                     installing: installing.contains(item.id),
-                                     installed: installed(item),
-                                     locked: locked(item),
-                                     inRotation: inRotation(item),
-                                     screens: screens,
-                                     onInstall: onInstall)
+            // A fixed-height hero band — NOT a full-width 16:9 card. On a wide window a full-width
+            // 16:9 card is ~1000pt tall and swallows the whole view; a featured strip should be a
+            // short, wide band. Height scales gently with width but is clamped so it never dominates.
+            let bandHeight = min(max(230, rowWidth * 0.32), 340)
+            // Each card is slightly narrower than the row so the next one peeks in — the signature
+            // "there's more" cue of a good carousel. `spacing` is the gap between cards.
+            let cardSpacing: CGFloat = 16
+            let cardWidth = max(320, rowWidth - 44)
+
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: cardSpacing) {
+                        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                            FeaturedCard(item: item,
+                                         installing: installing.contains(item.id),
+                                         installed: installed(item),
+                                         locked: locked(item),
+                                         inRotation: inRotation(item),
+                                         screens: screens,
+                                         onInstall: onInstall)
+                            .frame(width: cardWidth, height: bandHeight)
+                            .id(index)
+                        }
+                    }
+                    .scrollTargetLayout()
+                }
+                // View-aligned (not paging) so each card snaps to the leading edge with the peek
+                // preserved; paging would snap by the full container width and hide the peek.
+                .scrollTargetBehavior(.viewAligned)
+                .scrollPosition(id: $scrolledID)       // mirrors manual swipes back to currentIndex
+                .gesture(
+                    DragGesture(minimumDistance: 5)
+                        .onChanged { _ in userInteracting = true }
+                )
+                // Programmatic jumps (auto-advance, dot tap) → scroll. Manual swipes flow back
+                // through scrollPosition → currentIndex, so the dots and the page stay in sync.
+                .onChange(of: currentIndex) { _, new in
+                    withAnimation(.easeInOut(duration: 0.35)) {
+                        proxy.scrollTo(new, anchor: .leading)
                     }
                 }
-                .padding(.horizontal, 20)
+                .onChange(of: scrolledID) { _, new in
+                    if let new, new != currentIndex { currentIndex = new }
+                }
+                .onAppear {
+                    proxy.scrollTo(currentIndex, anchor: .leading)
+                }
             }
+            // Pin the row to the band height so the vertical stack reserves the space — without this
+            // the carousel drew on top of the "All Wallpapers" grid. Top padding gives the card's
+            // shadow room to breathe so it isn't clipped at the top.
+            .frame(height: bandHeight)
+            .padding(.top, 2)
+            // Non-layout width probe: reports the row's inner width without stealing height the way
+            // a wrapping GeometryReader would.
+            .background(
+                GeometryReader { geo in
+                    Color.clear
+                        .onAppear { rowWidth = geo.size.width }
+                        .onChange(of: geo.size.width) { _, w in rowWidth = w }
+                }
+            )
+            .padding(.horizontal, 20)
+            .modifier(CarouselHeight(autoAdvanceSeconds: autoAdvanceSeconds,
+                                     count: items.count,
+                                     currentIndex: $currentIndex,
+                                     userInteracting: $userInteracting))
+
+            // Page-indicator dots ("ball markers"). One per featured item; the current one is
+            // tinted, the rest are secondary. Tapping a dot jumps the pager to that card.
+            HStack(spacing: 6) {
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, _ in
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.25)) { currentIndex = index }
+                        userInteracting = true
+                    } label: {
+                        Circle()
+                            .fill(index == currentIndex ? Color.accentColor : Color.secondary.opacity(0.4))
+                            .frame(width: 7, height: 7)
+                    }
+                    .buttonStyle(.plain)
+                    .help(items[index].title)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, 2)
         }
     }
 }
 
-/// One wider featured card. Live preview (when shipped), title, type + install count, and the
-/// same Install / Unlock / Installed states as a regular tile — so a user who acts on the
-/// featured card doesn't need to learn a second pattern.
+/// Drives the Featured carousel's auto-advance timer and re-arms it after the user stops
+/// interacting. Lives in a `ViewModifier` so the parent body stays readable.
+private struct CarouselHeight: ViewModifier {
+    let autoAdvanceSeconds: TimeInterval
+    let count: Int
+    @Binding var currentIndex: Int
+    @Binding var userInteracting: Bool
+    @State private var rearmTask: Task<Void, Never>?
+
+    func body(content: Content) -> some View {
+        content
+            .task(id: count) {
+                guard count > 1 else { return }
+                while !Task.isCancelled {
+                    try? await Task.sleep(nanoseconds: UInt64(autoAdvanceSeconds * 1_000_000_000))
+                    if Task.isCancelled { return }
+                    if !userInteracting && count > 1 {
+                        await MainActor.run {
+                            withAnimation(.easeInOut(duration: 0.35)) {
+                                currentIndex = (currentIndex + 1) % count
+                            }
+                        }
+                    }
+                }
+            }
+            .onChange(of: userInteracting) { interacting in
+                rearmTask?.cancel()
+                guard interacting else { return }
+                // Re-arm userInteracting=false 4s after the last interaction so auto-advance resumes.
+                rearmTask = Task {
+                    try? await Task.sleep(nanoseconds: 4_000_000_000)
+                    if !Task.isCancelled { await MainActor.run { userInteracting = false } }
+                }
+            }
+    }
+}
+
+/// One full-width featured card. Live preview (when shipped) sized to the carousel's 16:9 area,
+/// title, type + install count, and the same Install / Unlock / Installed states as a regular tile
+/// — so a user who acts on the featured card doesn't need to learn a second pattern.
 struct FeaturedCard: View {
     let item: WorkshopItem
     let installing: Bool
@@ -319,59 +445,86 @@ struct FeaturedCard: View {
     let onInstall: (WorkshopItem, String?) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            preview
-                .frame(width: 320, height: 180)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(alignment: .topLeading) {
-                    Label("Featured", systemImage: "sparkles")
-                        .labelStyle(.titleAndIcon).font(.caption2.weight(.bold))
-                        .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(.black.opacity(0.55)).foregroundStyle(.white)
-                        .clipShape(Capsule()).padding(10)
-                }
-                .overlay(alignment: .topTrailing) {
-                    if item.isPremium {
-                        Label("Premium", systemImage: "lock.fill")
-                            .labelStyle(.titleAndIcon).font(.caption2.weight(.bold))
-                            .padding(.horizontal, 6).padding(.vertical, 2)
-                            .background(.black.opacity(0.6)).foregroundStyle(.yellow)
-                            .clipShape(Capsule()).padding(8)
-                    }
-                }
-                .overlay(alignment: .bottomTrailing) {
-                    if inRotation {
-                        Label("Free this period", systemImage: "gift.fill")
-                            .labelStyle(.titleAndIcon).font(.caption2.weight(.bold))
-                            .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(.green.opacity(0.9)).foregroundStyle(.white)
-                            .clipShape(Capsule()).padding(10)
-                    }
-                }
+        // The whole card is the preview image; text and actions sit *on* it over a bottom scrim.
+        // This reads far more "featured/hero" than an image with a separate label row below it, and
+        // fills the fixed band height cleanly with no cropped title.
+        ZStack(alignment: .bottom) {
+            // A definite-size box the image fills into. `preview` uses aspectRatio(.fill), which is
+            // greedy vertically — placed directly in the ZStack it inflates the card past bandHeight
+            // and the ScrollView clips the top (badge) and bottom (title). Hosting it as an overlay
+            // on a greedy Color pins the card to bandHeight and crops the *image* instead.
+            Color.black.opacity(0.25)
+                .overlay { preview }
+                .clipped()
 
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(item.title).font(.headline).lineLimit(1)
+            // Bottom scrim so white text stays legible over any preview.
+            LinearGradient(colors: [.clear, .black.opacity(0.15), .black.opacity(0.78)],
+                           startPoint: .center, endPoint: .bottom)
+
+            // Title + meta on the left, the action on the right — anchored to the bottom.
+            HStack(alignment: .bottom, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.title)
+                        .font(.title3.weight(.semibold)).foregroundStyle(.white)
+                        .lineLimit(1)
                     Text("\(item.type.rawValue) · \(item.downloadCount) installs")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(.white.opacity(0.75))
                 }
                 Spacer(minLength: 8)
-                if installing {
-                    ProgressView().controlSize(.small)
-                } else if installed {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                        .help("Already installed")
-                } else if locked {
-                    Button("Unlock") { onInstall(item, nil) }
-                        .controlSize(.small).buttonStyle(.borderedProminent).tint(.yellow)
-                } else {
-                    Button("Install") { onInstall(item, nil) }
-                        .controlSize(.small).buttonStyle(.bordered)
-                    if screens.count > 1 { perDisplayMenu }
-                }
+                action
+            }
+            .padding(16)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)   // fill the card's fixed band frame
+        .background(Color.black.opacity(0.2))   // fallback behind a transparent preview
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+        )
+        .overlay(alignment: .topLeading) {
+            Label("Featured", systemImage: "sparkles")
+                .labelStyle(.titleAndIcon).font(.caption2.weight(.bold))
+                .padding(.horizontal, 9).padding(.vertical, 4)
+                .background(.ultraThinMaterial, in: Capsule())
+                .foregroundStyle(.white).padding(12)
+        }
+        .overlay(alignment: .topTrailing) {
+            if inRotation {
+                badge("Free this period", "gift.fill", .green.opacity(0.9), .white)
+            } else if item.isPremium {
+                badge("Premium", "lock.fill", .black.opacity(0.55), .yellow)
             }
         }
-        .frame(width: 320)
+        .shadow(color: .black.opacity(0.35), radius: 16, x: 0, y: 8)
+    }
+
+    private func badge(_ text: String, _ icon: String, _ bg: Color, _ fg: Color) -> some View {
+        Label(text, systemImage: icon)
+            .labelStyle(.titleAndIcon).font(.caption2.weight(.bold))
+            .padding(.horizontal, 9).padding(.vertical, 4)
+            .background(bg, in: Capsule()).foregroundStyle(fg).padding(12)
+    }
+
+    @ViewBuilder private var action: some View {
+        if installing {
+            ProgressView().controlSize(.small).tint(.white)
+        } else if installed {
+            Label("Installed", systemImage: "checkmark.circle.fill")
+                .labelStyle(.titleAndIcon).font(.caption.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10).padding(.vertical, 6)
+                .background(.ultraThinMaterial, in: Capsule())
+        } else if locked {
+            Button("Unlock") { onInstall(item, nil) }
+                .controlSize(.large).buttonStyle(.borderedProminent).tint(.yellow)
+        } else {
+            HStack(spacing: 6) {
+                Button("Install") { onInstall(item, nil) }
+                    .controlSize(.large).buttonStyle(.borderedProminent)
+                if screens.count > 1 { perDisplayMenu }
+            }
+        }
     }
 
     private var perDisplayMenu: some View {
@@ -381,7 +534,7 @@ struct FeaturedCard: View {
             ForEach(screens) { s in
                 Button("Install · \(s.name)") { onInstall(item, s.id) }
             }
-        } label: { Image(systemName: "ellipsis") }
+        } label: { Image(systemName: "ellipsis.circle.fill").foregroundStyle(.white) }
             .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
     }
 

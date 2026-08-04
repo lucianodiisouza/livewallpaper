@@ -1165,7 +1165,7 @@ final class MainWindowController {
         w.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         w.toolbarStyle = .unified
         w.titlebarSeparatorStyle = .automatic
-        w.setContentSize(NSSize(width: 860, height: 560))
+        w.setContentSize(NSSize(width: 1075, height: 700))
         w.isReleasedWhenClosed = false
         window = w
         NSApp.activate(ignoringOtherApps: true)
