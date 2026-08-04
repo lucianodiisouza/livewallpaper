@@ -118,12 +118,11 @@
   .knob.c .ind{background:var(--accent-2);
     box-shadow:0 0 8px rgba(255,109,143,.7), inset 0 1px 0 rgba(255,255,255,.4);}
 
-  /* ----- 2-row LED display — separate row, vertically centered between knobs
-     and the EQ slider. The console (knobs) sits at top:14% with height:14%
-     (ends at ~28% of deck). The EQ starts at 74% of deck (bottom:8%, height:18%).
-     The midpoint of that gap is ~51%, so the LED is placed with top:42% and
-     height:18% to land centered. */
-  .display-wrap{position:absolute;right:4%;top:42%;width:36%;height:18%;
+  /* ----- 2-row LED display — separate row, vertically between knobs and EQ.
+     Knobs end at ~28% of deck, EQ starts at 74%. LED is shifted up 5% from
+     center (top:37%) and inset 3% more on the left to keep clearance from
+     the vinyl. */
+  .display-wrap{position:absolute;right:7%;top:37%;width:33%;height:18%;
     padding:3px;border-radius:16px;
     background:linear-gradient(180deg,#2a1d18,#110a08);
     box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 2px 0 rgba(0,0,0,.4);}
@@ -175,7 +174,7 @@
      right edge, so the LED (above) sits centered between the vinyl (to
      its left) and the deck's right edge — with proper lateral breathing
      room. */
-  .eq-wrap{position:absolute;left:62%;right:4%;bottom:8%;height:18%;
+  .eq-wrap{position:absolute;left:62%;right:7%;bottom:8%;height:18%;
     display:flex;align-items:stretch;justify-content:stretch;}
   .eq{position:relative;width:100%;height:100%;
     display:flex;flex-direction:column;justify-content:space-between;gap:10%;}
