@@ -13,8 +13,21 @@ final class AppModel: ObservableObject {
         let isBuiltIn: Bool
         var previewSource: String? = nil   // shader source for the preview thumbnail (metal only)
         var previewVideoURL: URL? = nil    // video file for a static frame preview (video only)
+        /// Source files for a built-in or installed web wallpaper, used to snapshot a thumb when
+        /// no `thumbnail.png` is shipped. Nil for non-web kinds.
+        var previewWeb: WebPreviewSource? = nil
+        /// A pre-rendered thumbnail shipped with the package (or bundled with the app). Used as the
+        /// first-resort preview, ahead of any on-the-fly rendering.
+        var thumbnailFileURL: URL? = nil
         var isShareable: Bool = false      // user-imported ⇒ P2P-shareable (catalog content isn't)
         var isPremium: Bool = false        // locked behind the Premium entitlement
+    }
+
+    /// Source files for a web wallpaper preview render.
+    struct WebPreviewSource: Hashable, Sendable {
+        let root: URL           // directory containing the entry file (or the bundle root for built-ins)
+        let entry: String       // entry path relative to `root`
+        let allowlist: [String] // network allowlist to honour while capturing
     }
 
     /// Drives the paywall sheet (nil ⇒ hidden). `reason` explains what the user tried to unlock.

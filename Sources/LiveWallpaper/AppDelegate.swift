@@ -224,19 +224,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             AppModel.Entry(id: $0.id, title: $0.title, kind: $0.kind, isBuiltIn: true,
                            previewSource: WallpaperCatalog.shaderSource(forID: $0.id),
                            previewVideoURL: $0.kind == "video" ? bundledLoop : nil,
+                           previewWeb: WallpaperCatalog.webPreview(forID: $0.id),
+                           thumbnailFileURL: WallpaperCatalog.thumbnailFile(forID: $0.id),
                            isPremium: $0.isPremium)
         }
         entries += installed.map { pkg -> AppModel.Entry in
             var source: String?
             var videoURL: URL?
-            if pkg.manifest.type == .metal {
+            var web: AppModel.WebPreviewSource?
+            // Prefer a shipped `thumbnail.png` over any on-the-fly render.
+            let thumb = pkg.directory.appendingPathComponent("thumbnail.png")
+            let shippedThumb = FileManager.default.fileExists(atPath: thumb.path) ? thumb : nil
+            switch pkg.manifest.type {
+            case .metal:
                 source = try? String(contentsOf: pkg.directory.appendingPathComponent(pkg.manifest.entry), encoding: .utf8)
-            } else if pkg.manifest.type == .video {
+            case .video:
                 videoURL = pkg.directory.appendingPathComponent(pkg.manifest.entry)
+            case .web:
+                let entryURL = pkg.directory.appendingPathComponent(pkg.manifest.entry)
+                web = AppModel.WebPreviewSource(
+                    root: entryURL.deletingLastPathComponent(),
+                    entry: entryURL.lastPathComponent,
+                    allowlist: pkg.manifest.capabilities?.network ?? [])
             }
             return AppModel.Entry(id: pkg.manifest.id, title: pkg.manifest.title,
                                   kind: pkg.manifest.type.rawValue, isBuiltIn: false,
-                                  previewSource: source, previewVideoURL: videoURL,
+                                  previewSource: source, previewVideoURL: videoURL, previewWeb: web,
+                                  thumbnailFileURL: shippedThumb,
                                   isShareable: library.isImported(pkg.manifest.id))
         }
         model.available = entries

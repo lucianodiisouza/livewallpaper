@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 import Security
 
 /// Configuration for AI wallpaper generation — **bring your own key**.
@@ -119,7 +120,9 @@ enum AIConfig {
         // Fail closed: if the OS would have to prompt to satisfy the read (e.g. keychain locked
         // and no UI allowed), return nil instead of blocking Settings with a password prompt.
         // The user just needs to unlock their Mac once and the next read succeeds silently.
-        query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
+        let ctx = LAContext()
+        ctx.interactionNotAllowed = true
+        query[kSecUseAuthenticationContext as String] = ctx
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
         guard status == errSecSuccess, let data = item as? Data else { return nil }

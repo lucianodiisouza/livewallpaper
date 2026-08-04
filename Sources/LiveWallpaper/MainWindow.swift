@@ -86,12 +86,24 @@ struct PlaceholderThumb: View {
     }
 }
 
-/// Load a preview thumbnail for an entry: a rendered shader frame, a static video frame, or nil
-/// (callers fall back to `PlaceholderThumb`). Shared by every tile so the logic lives in one place.
+/// Load a preview thumbnail for an entry. Order:
+/// 1. A `thumbnail.png` shipped at the root of an installed package (the cheapest, sharpest path).
+/// 2. A `previewImage` PNG shipped at the root of a built-in wallpaper (same idea, for built-ins).
+/// 3. A rendered shader frame (built-in metal).
+/// 4. A static video frame (built-in or installed video).
+/// 5. A snapshot of the web wallpaper (built-in or installed web).
+/// Returns nil and lets the caller fall back to a `PlaceholderThumb`.
 @MainActor
 func loadThumb(_ entry: AppModel.Entry) async -> NSImage? {
+    if let url = entry.thumbnailFileURL,
+       let img = NSImage(contentsOf: url), img.size.width > 1 {
+        return img
+    }
     if let src = entry.previewSource { return ThumbnailRenderer.image(forShader: src) }
     if let url = entry.previewVideoURL { return await ThumbnailRenderer.image(forVideoAt: url) }
+    if let web = entry.previewWeb {
+        return await ThumbnailRenderer.image(forWebRoot: web.root, entry: web.entry, allowlist: web.allowlist)
+    }
     return nil
 }
 
