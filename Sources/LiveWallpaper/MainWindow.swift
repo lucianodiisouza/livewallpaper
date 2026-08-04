@@ -18,8 +18,16 @@ struct MainView: View {
     }()
 
     enum Section: String, CaseIterable, Identifiable {
-        case installed = "Installed", explore = "Catalog", settings = "Settings"
+        case installed, explore, settings
         var id: String { rawValue }
+        /// The user-visible label in the navigation sidebar. Localized.
+        var label: String {
+            switch self {
+            case .installed: return String(localized: "nav.section.installed")
+            case .explore: return String(localized: "nav.section.catalog")
+            case .settings: return String(localized: "nav.section.settings")
+            }
+        }
         var icon: String {
             switch self {
             case .installed: return "square.grid.2x2"
@@ -32,7 +40,7 @@ struct MainView: View {
     var body: some View {
         NavigationSplitView {
             List(Section.allCases, selection: $section) { s in
-                Label(s.rawValue, systemImage: s.icon).tag(s)
+                Label(s.label, systemImage: s.icon).tag(s)
             }
             .navigationSplitViewColumnWidth(min: 176, ideal: 196, max: 240)
             .safeAreaInset(edge: .bottom) { activeFooter }
@@ -45,8 +53,8 @@ struct MainView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 800, minHeight: 520)
-        .onChange(of: section) { onTitle(section.rawValue) }
-        .task { onTitle(section.rawValue) }
+        .onChange(of: section) { onTitle(section.label) }
+        .task { onTitle(section.label) }
         .sheet(item: $model.paywall) { ctx in PaywallSheet(reason: ctx.reason) }
     }
 
@@ -54,7 +62,7 @@ struct MainView: View {
         HStack(spacing: 8) {
             Image(systemName: "sparkles").foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 0) {
-                Text("Now playing").font(.caption2).foregroundStyle(.secondary)
+                Text(String(localized: "footer.nowPlaying")).font(.caption2).foregroundStyle(.secondary)
                 Text(model.title(forID: model.currentID)).font(.caption.weight(.medium)).lineLimit(1)
             }
             Spacer()
@@ -338,27 +346,29 @@ struct PaywallSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 8) {
                 Image(systemName: "sparkles").font(.title2).foregroundStyle(.tint)
-                Text("Primo Engine Premium").font(.title2.bold())
+                Text(String(localized: "paywall.title")).font(.title2.bold())
             }
             Text(reason).foregroundStyle(.secondary)
 
             VStack(alignment: .leading, spacing: 8) {
-                benefit("The full wallpaper catalog", "square.stack")
-                benefit("Every Metal shader & web wallpaper", "sparkles")
-                benefit("Per-display rotation & playlists", "display.2")
-                benefit("AI-generated wallpapers (coming soon)", "wand.and.stars")
+                benefit(String(localized: "paywall.benefit.catalog"), "square.stack")
+                benefit(String(localized: "paywall.benefit.shaders"), "sparkles")
+                benefit(String(localized: "paywall.benefit.rotation"), "display.2")
+                benefit(String(localized: "paywall.benefit.ai"), "wand.and.stars")
             }
-            Text("One-time purchase · no subscription").font(.caption).foregroundStyle(.secondary)
+            Text(String(localized: "paywall.pricing")).font(.caption).foregroundStyle(.secondary)
 
             Divider()
-            Text("Purchasing isn't in this pre-release build yet. Once this Mac is activated on the backend, tap Check activation — the license is signed and bound to this device.")
+            Text(String(localized: "paywall.note"))
                 .font(.caption2).foregroundStyle(.secondary)
 
             HStack {
                 Spacer()
-                Button("Not now") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Check activation") { Task { await entitlement.refresh(); dismiss() } }
-                    .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+                Button(String(localized: "paywall.notNow")) { dismiss() }.keyboardShortcut(.cancelAction)
+                Button(String(localized: "paywall.checkActivation")) {
+                    Task { await entitlement.refresh(); dismiss() }
+                }
+                .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
             }
         }
         .padding(20)
@@ -393,9 +403,9 @@ struct GenerateSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: "wand.and.stars").foregroundStyle(.tint)
-                Text("Generate a wallpaper").font(.headline)
+                Text(String(localized: "ai.sheet.title")).font(.headline)
             }
-            Text("Describe a look — we generate a live wallpaper (validated before it's applied).")
+            Text(String(localized: "ai.sheet.body"))
                 .font(.caption).foregroundStyle(.secondary)
 
             Picker("Type", selection: $kind) {
@@ -403,11 +413,12 @@ struct GenerateSheet: View {
             }
             .pickerStyle(.segmented).labelsHidden()
 
-            TextField("e.g. slow aurora over a dark ocean, teal and violet", text: $prompt, axis: .vertical)
+            TextField(String(localized: "ai.sheet.fieldPlaceholder"),
+                      text: $prompt, axis: .vertical)
                 .textFieldStyle(.roundedBorder).lineLimit(2...4)
 
             if !AIConfig.isConfigured {
-                Text("Set up an AI provider in Settings → AI Generation first.")
+                Text(String(localized: "ai.sheet.notConfigured"))
                     .font(.caption).foregroundStyle(.orange)
             }
             if let err = model.aiError {
@@ -420,10 +431,12 @@ struct GenerateSheet: View {
                     Text("Generating…").font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Generate") { started = true; model.generate(prompt, kind: kind) }
-                    .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
-                    .disabled(!canGenerate)
+                Button(String(localized: "action.cancel")) { dismiss() }.keyboardShortcut(.cancelAction)
+                Button(String(localized: "tab.installed.generate")) {
+                    started = true; model.generate(prompt, kind: kind)
+                }
+                .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+                .disabled(!canGenerate)
             }
         }
         .padding(20)
@@ -481,11 +494,14 @@ struct InstalledView: View {
                 if filtered.isEmpty {
                     VStack(spacing: 6) {
                         Image(systemName: "magnifyingglass").font(.title2).foregroundStyle(.secondary)
-                        Text(search.isEmpty ? "No wallpapers installed yet." : "No matches for “\(search)”.")
-                            .font(.subheadline).foregroundStyle(.secondary)
                         if search.isEmpty {
-                            Button("Browse the Catalog") {}
+                            Text(String(localized: "tab.installed.empty"))
+                                .font(.subheadline).foregroundStyle(.secondary)
+                            Button(String(localized: "tab.installed.browseCatalog")) {}
                                 .buttonStyle(.link)
+                        } else {
+                            Text(String(format: String(localized: "tab.installed.noMatch"), search))
+                                .font(.subheadline).foregroundStyle(.secondary)
                         }
                     }
                     .frame(maxWidth: .infinity)
@@ -500,20 +516,22 @@ struct InstalledView: View {
             }
             .padding(20)
         }
-        .navigationTitle("Installed")
+        .navigationTitle(String(localized: "tab.installed.title"))
         .navigationSubtitle(subtitle)
-        .searchable(text: $search, placement: .toolbar, prompt: "Search installed")
+        .searchable(text: $search, placement: .toolbar, prompt: String(localized: "tab.installed.searchPrompt"))
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     if entitlement.isPremium { showGenerate = true }
-                    else { model.showPaywall("AI wallpaper generation is a Premium feature.") }
-                } label: { Label("Generate", systemImage: "wand.and.stars") }
-                .help("Generate a wallpaper with AI")
+                    else { model.showPaywall(String(localized: "paywall.feature.ai")) }
+                } label: { Label(String(localized: "tab.installed.generate"),
+                                 systemImage: "wand.and.stars") }
+                .help(String(localized: "tab.installed.generate.help"))
             }
             ToolbarItem(placement: .primaryAction) {
-                Button { model.onImport?() } label: { Label("Import", systemImage: "plus") }
-                    .help("Import a local .livewallpaper")
+                Button { model.onImport?() } label: { Label(String(localized: "tab.installed.import"),
+                                                           systemImage: "plus") }
+                    .help(String(localized: "tab.installed.import.help"))
             }
         }
         .sheet(item: $preview) { entry in
@@ -526,9 +544,10 @@ struct InstalledView: View {
         let total = model.available.count
         let showing = filtered.count
         if showing == total {
-            return "\(total) wallpapers · pin up to \(AppModel.maxStars) ★"
+            return String(format: String(localized: "tab.installed.subtitle"), total, AppModel.maxStars)
         }
-        return "Showing \(showing) of \(total) · pin up to \(AppModel.maxStars) ★"
+        return String(format: String(localized: "tab.installed.subtitle.filtered"),
+                      showing, total, AppModel.maxStars)
     }
 }
 
@@ -636,7 +655,7 @@ struct ExploreView: View {
             onInstallToScreen: { item, key in await model.onInstallToScreen?(item, key) ?? "Install unavailable." },
             onLocked: { item in model.showPaywall("“\(item.title)” is a Premium wallpaper.") },
             installedChecksums: model.installedChecksums)
-        .navigationTitle("Catalog")
+        .navigationTitle(String(localized: "tab.catalog.title"))
     }
 }
 
@@ -996,6 +1015,27 @@ struct SettingsTab: View {
                     .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
                 }
                 AISettings()
+                GroupBox("Language") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Picker("Language", selection: $prefs.language) {
+                            ForEach(AppLanguage.allCases) { lang in
+                                Text(lang.displayName).tag(lang)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .onChange(of: prefs.language) { _ in
+                            // SwiftUI re-renders localized strings automatically when
+                            // AppleLanguages changes; the picker writes the value, the system
+                            // honors it on the next localized lookup. For the user-facing
+                            // effect to be immediate, we re-mount the main window — but the
+                            // natural way (closing + reopening) is heavy for a Settings change.
+                            // A toast at the bottom of the tab hints them instead.
+                        }
+                        Text("Restart the app to see every string switch over. Tabs you have open right now update on the next view-refresh.")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4).frame(maxWidth: .infinity, alignment: .leading)
+                }
                 GroupBox("Power") {
                     VStack(alignment: .leading, spacing: 8) {
                         Picker("On battery", selection: $prefs.batteryBehavior) {

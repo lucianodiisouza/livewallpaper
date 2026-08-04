@@ -314,14 +314,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func rebuildMenu() {
         let menu = NSMenu()
 
-        let header = NSMenuItem(title: "Primo Engine", action: nil, keyEquivalent: "")
+        let header = NSMenuItem(title: String(localized: "menu.app"), action: nil, keyEquivalent: "")
         header.isEnabled = false
         menu.addItem(header)
         menu.addItem(.separator())
 
         let entries = model.menuEntries()
         if entries.isEmpty {
-            let none = NSMenuItem(title: "No wallpapers", action: nil, keyEquivalent: ""); none.isEnabled = false
+            let none = NSMenuItem(title: String(localized: "menu.noWallpapers"), action: nil, keyEquivalent: "")
+            none.isEnabled = false
             menu.addItem(none)
         } else {
             for e in entries {
@@ -335,16 +336,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(.separator())
         if let update = availableUpdate {
-            let banner = NSMenuItem(title: "🔔 Update available: v\(update.latestVersion)",
-                                    action: #selector(openReleasePage), keyEquivalent: "")
+            let banner = NSMenuItem(
+                title: String(format: String(localized: "menu.updateAvailable"), update.latestVersion),
+                action: #selector(openReleasePage), keyEquivalent: "")
             banner.target = self
             menu.addItem(banner)
         }
-        add(menu, "Open Primo Engine", #selector(openMainWindow), key: "o")
-        add(menu, "Check for Updates…", #selector(checkForUpdatesManually), key: "")
-        add(menu, "Quit Primo Engine", #selector(quit), key: "q")
+        add(menu, String(localized: "menu.open"), #selector(openMainWindow), key: "o")
+        add(menu, String(localized: "menu.checkUpdates"), #selector(checkForUpdatesManually), key: "")
+        add(menu, String(localized: "menu.quit"), #selector(quit), key: "q")
         menu.addItem(.separator())
-        let version = NSMenuItem(title: "v\(model.appVersion)", action: nil, keyEquivalent: ""); version.isEnabled = false
+        let version = NSMenuItem(title: "v\(model.appVersion)", action: nil, keyEquivalent: "")
+        version.isEnabled = false
         menu.addItem(version)
 
         statusItem?.menu = menu

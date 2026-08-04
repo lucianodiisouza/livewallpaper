@@ -1,0 +1,140 @@
+// Primo Engine — strings em português brasileiro.
+//
+// Mesmo formato do `en.lproj/Localizable.strings` (Foundation padrão). Para adicionar uma nova
+// chave, copie em todos os .lproj para evitar fallback silencioso para o inglês.
+
+// MARK: - Navegação
+"nav.section.installed" = "Instalados";
+"nav.section.catalog" = "Catálogo";
+"nav.section.settings" = "Ajustes";
+
+// MARK: - Menu bar
+"menu.app" = "Primo Engine";
+"menu.open" = "Abrir Primo Engine";
+"menu.checkUpdates" = "Procurar atualizações…";
+"menu.quit" = "Sair do Primo Engine";
+"menu.noWallpapers" = "Nenhum wallpaper";
+"menu.updateAvailable" = "🔔 Atualização disponível: v%@";
+
+// MARK: - Ações comuns
+"action.set" = "Aplicar";
+"action.install" = "Instalar";
+"action.unlock" = "Desbloquear";
+"action.preview" = "Pré-visualizar";
+"action.share" = "Compartilhar…";
+"action.delete" = "Excluir";
+"action.cancel" = "Cancelar";
+"action.apply" = "Aplicar";
+"action.close" = "Fechar";
+"action.ok" = "OK";
+"action.refresh" = "Atualizar";
+
+// MARK: - Títulos / subtítulos de abas
+"tab.installed.title" = "Instalados";
+"tab.installed.subtitle" = "%d wallpapers · fixe até %d ★";
+"tab.installed.subtitle.filtered" = "Mostrando %d de %d · fixe até %d ★";
+"tab.installed.empty" = "Nenhum wallpaper instalado ainda.";
+"tab.installed.noMatch" = "Nada encontrado para “%@”.";
+"tab.installed.browseCatalog" = "Explorar o Catálogo";
+"tab.installed.searchPrompt" = "Buscar instalados";
+"tab.installed.targetLine" = "Alvo: %@ — toque num monitor para defini-lo, ou use “…” no wallpaper.";
+"tab.installed.targetAll" = "Todos os monitores";
+"tab.installed.generate" = "Gerar";
+"tab.installed.generate.help" = "Gerar um wallpaper com IA";
+"tab.installed.import" = "Importar";
+"tab.installed.import.help" = "Importar um .livewallpaper local";
+
+"tab.catalog.title" = "Catálogo";
+"tab.catalog.subtitle" = "%d wallpapers";
+"tab.catalog.searchPrompt" = "Buscar wallpapers";
+"tab.catalog.featured" = "Em destaque";
+"tab.catalog.featured.subtitle" = "· Mais instalados";
+"tab.catalog.allWallpapers" = "Todos os wallpapers";
+"tab.catalog.featured.ribbon" = "Destaque";
+"tab.catalog.premiumBadge" = "Premium";
+"tab.catalog.installedBadge" = "Já instalado";
+"tab.catalog.freeThisPeriod" = "Grátis neste período";
+"tab.catalog.previewHelp" = "Pré-visualizar";
+"tab.catalog.perDisplay.all" = "Instalar · todos os monitores";
+
+// MARK: - Ajustes
+"settings.title" = "Ajustes";
+"settings.subtitle" = "Preferências";
+"settings.general" = "Geral";
+"settings.general.launchAtLogin" = "Abrir no login";
+"settings.general.solidBackdrop" = "Fundo sólido sob os wallpapers";
+"settings.general.solidBackdrop.help" = "Substitui o plano de fundo do macOS por uma cor neutra para ele nunca aparecer atrás do wallpaper. O original é restaurado ao sair ou desativar.";
+"settings.general.showWelcome" = "Mostrar boas-vindas novamente";
+"settings.general.showWelcome.help" = "Replay do tour de primeira execução";
+"settings.premium" = "Premium";
+"settings.premium.unlockLabel" = "Recurso Premium — Desbloquear";
+"settings.power" = "Energia";
+"settings.power.battery" = "Na bateria";
+"settings.power.note" = "Os wallpapers sempre pausam quando cobertos, ao bloquear, ou quando a tela dorme.";
+"settings.rotation" = "Rotação";
+"settings.rotation.toggle" = "Alternar entre todos os wallpapers";
+"settings.rotation.interval" = "A cada %d min";
+"settings.rotation.note" = "Cada monitor rotaciona de forma independente a partir do wallpaper atual.";
+"settings.ai" = "Geração com IA";
+"settings.ai.provider" = "Provedor";
+"settings.ai.baseURL" = "URL base";
+"settings.ai.model" = "Modelo";
+"settings.ai.apiKey" = "Chave de API";
+"settings.ai.apiKeyLocal" = "Chave de API (opcional para local)";
+"settings.ai.byok" = "Traga sua própria chave: o app chama o provedor que você escolheu diretamente, e a chave fica no seu Keychain. A geração com IA é grátis — você só paga o provedor (Anthropic/OpenRouter/OpenAI), ou nada se usar um Ollama / LM Studio local.";
+"settings.language" = "Idioma";
+"settings.language.en" = "English";
+"settings.language.ptBR" = "Português (Brasil)";
+"settings.reset" = "Restaurar";
+
+// MARK: - Paywall
+"paywall.title" = "Primo Engine Premium";
+"paywall.benefit.catalog" = "O catálogo completo de wallpapers";
+"paywall.benefit.shaders" = "Todos os shaders Metal e wallpapers web";
+"paywall.benefit.rotation" = "Rotação por monitor e playlists";
+"paywall.benefit.ai" = "Wallpapers gerados por IA (em breve)";
+"paywall.pricing" = "Compra única · sem assinatura";
+"paywall.note" = "A compra ainda não está disponível nesta versão. Quando este Mac for ativado no backend, toque em Verificar ativação — a licença é assinada e vinculada a este dispositivo.";
+"paywall.notNow" = "Agora não";
+"paywall.checkActivation" = "Verificar ativação";
+"paywall.premiumRequired" = "“%@” é um wallpaper Premium.";
+"paywall.feature.rotation" = "Rotação é um recurso Premium.";
+"paywall.feature.ai" = "Geração de wallpaper com IA é um recurso Premium.";
+
+// MARK: - Geração com IA
+"ai.sheet.title" = "Gerar um wallpaper";
+"ai.sheet.body" = "Descreva um visual — geramos um wallpaper ao vivo (validado antes de aplicar).";
+"ai.sheet.fieldPlaceholder" = "ex.: aurora lenta sobre um oceano escuro, verde-água e violeta";
+"ai.sheet.notConfigured" = "Configure um provedor de IA em Ajustes → Geração com IA primeiro.";
+"ai.sheet.kind.shader" = "Shader";
+"ai.sheet.kind.web" = "Web";
+
+// MARK: - Erros de IA
+"ai.error.notConfigured" = "Configure um provedor de IA em Ajustes → Geração com IA primeiro.";
+"ai.error.refused" = "O modelo recusou esta solicitação (pode violar a política de uso do provedor).";
+"ai.error.truncated" = "A resposta do modelo foi cortada: %@. Tente um prompt mais curto ou simples.";
+"ai.error.empty" = "O modelo retornou uma resposta vazia.";
+
+// MARK: - Onboarding
+"onboarding.welcome" = "Bem-vindo ao Primo Engine";
+"onboarding.tagline" = "Wallpapers animados que respeitam o seu Mac.";
+
+// MARK: - Atualizações
+"update.available.message" = "Há uma nova versão disponível";
+"update.available.informative" = "Primo Engine %@ está disponível — você tem a %@.";
+"update.latest.message" = "Você está em dia";
+"update.latest.informative" = "Primo Engine %@ é a versão mais recente.";
+
+// MARK: - Ordenação
+"sort.newest" = "Mais novos";
+"sort.popular" = "Populares";
+
+// MARK: - Rodapé
+"footer.nowPlaying" = "Tocando agora";
+
+// MARK: - Workshop
+"workshop.notConfigured.title" = "Workshop ainda não configurado";
+"workshop.notConfigured.body" = "Defina WorkshopConfig.pocketBaseURL para o seu host PocketBase. Veja docs/M4_PLAN.md.";
+"workshop.banner.installed" = "“%@” instalado.";
+"workshop.error.premiumLocked" = "Este wallpaper é Premium. Ative este dispositivo (Ajustes → Premium) para instalá-lo.";
+"workshop.error.notConfigured" = "O workshop ainda não está configurado (defina WorkshopConfig.pocketBaseURL).";

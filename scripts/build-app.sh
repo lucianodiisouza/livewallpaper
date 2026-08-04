@@ -52,6 +52,14 @@ else
     echo "⚠ Resources/AppIcon.icns missing — bundle will use the default icon."
 fi
 
+# Localizations: copy every `<lang>.lproj` from Resources/ into the bundle. Foundation picks up
+# Localizable.strings automatically; the user's language preference is honoured by AppKit.
+for lproj in "$ROOT"/Resources/*.lproj; do
+    if [[ -d "$lproj" ]]; then
+        cp -R "$lproj" "$RES/"
+    fi
+done
+
 cat > "$CONTENTS/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

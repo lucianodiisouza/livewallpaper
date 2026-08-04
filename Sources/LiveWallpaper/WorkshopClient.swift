@@ -30,7 +30,12 @@ struct WorkshopClient: Sendable {
     enum Sort: String, Sendable, CaseIterable {
         case newest, popular
         var apiValue: String { self == .newest ? "-created" : "-download_count" }
-        var label: String { self == .newest ? "Newest" : "Popular" }
+        var label: String {
+            switch self {
+            case .newest: return String(localized: "sort.newest")
+            case .popular: return String(localized: "sort.popular")
+            }
+        }
     }
 
     enum WorkshopError: LocalizedError {

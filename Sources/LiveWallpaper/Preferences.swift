@@ -17,6 +17,36 @@ enum BatteryBehavior: String, CaseIterable, Codable, Sendable {
     }
 }
 
+/// UI language. `auto` lets AppKit pick from the system locale; explicit codes force a specific
+/// `Localizable.strings` lookup. New languages ship by adding another `<lang>.lproj` directory
+/// under `Resources/` and a new case here.
+enum AppLanguage: String, CaseIterable, Codable, Sendable, Identifiable {
+    case auto = ""          // honour system
+    case en = "en"
+    case ptBR = "pt-BR"
+
+    var id: String { rawValue }
+    /// The AppleLanguages array to push to UserDefaults when the user picks this language.
+    /// Empty for `auto` — we don't touch the array, the system is the source of truth.
+    var appleLanguages: [String] {
+        switch self {
+        case .auto: return []           // intentionally empty; the picker doesn't write AppleLanguages
+        case .en: return ["en"]
+        case .ptBR: return ["pt-BR"]
+        }
+    }
+    /// Label rendered in the Settings picker. Uses the language's own name (i.e. "Português" shows
+    /// even when the user is reading in English), so a translator can recognise the row without
+    /// having to switch the app's language to find it.
+    var displayName: String {
+        switch self {
+        case .auto: return "System default"
+        case .en: return "English"
+        case .ptBR: return "Português (Brasil)"
+        }
+    }
+}
+
 /// App-level settings, persisted in UserDefaults. `onChange` fires after any mutation so the
 /// Governor / rotation timer / login item can react.
 @MainActor
@@ -44,6 +74,11 @@ final class Preferences: ObservableObject {
     /// entry's time. Independent of rotation — both can run.
     @Published var scheduleEnabled: Bool { didSet { persist(); onChange?() } }
     @Published var scheduleEntries: [ScheduleEntry] { didSet { persistSchedule(); onChange?() } }
+    /// UI language. `auto` defers to the system; setting a specific value writes the
+    /// `AppleLanguages` UserDefaults key so AppKit picks the right `Localizable.strings` on the
+    /// next launch. The app itself doesn't need to reload — `String(localized:)` reads the array
+    /// lazily and SwiftUI views re-render on `@Published` change.
+    @Published var language: AppLanguage { didSet { persistLanguage() } }
 
     private init() {
         launchAtLogin = d.bool(forKey: "launchAtLogin")
@@ -56,6 +91,7 @@ final class Preferences: ObservableObject {
         hasCompletedOnboarding = d.bool(forKey: Onboarding.completedKey)
         scheduleEnabled = d.bool(forKey: "scheduleEnabled")
         scheduleEntries = Self.loadSchedule(d)
+        language = AppLanguage(rawValue: d.string(forKey: "language") ?? "") ?? .auto
         // Reconcile the actual login-item state with the stored preference on launch.
         syncLoginItemState()
     }
@@ -74,6 +110,18 @@ final class Preferences: ObservableObject {
     private func persistSchedule() {
         if let data = try? JSONEncoder().encode(scheduleEntries) {
             d.set(data, forKey: "scheduleEntries")
+        }
+    }
+
+    /// Write the language preference to UserDefaults. For `.auto` we *remove* the key so the system
+    /// setting wins again. For explicit languages we push the full `AppleLanguages` array — that's
+    /// the supported knob for `String(localized:)` to pick a non-default bundle.
+    private func persistLanguage() {
+        d.set(language.rawValue, forKey: "language")
+        if language.appleLanguages.isEmpty {
+            d.removeObject(forKey: "AppleLanguages")
+        } else {
+            d.set(language.appleLanguages, forKey: "AppleLanguages")
         }
     }
 

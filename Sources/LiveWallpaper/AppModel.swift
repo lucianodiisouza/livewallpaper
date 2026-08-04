@@ -37,7 +37,12 @@ final class AppModel: ObservableObject {
     enum GenerateKind: String, CaseIterable, Identifiable {
         case shader, web
         var id: String { rawValue }
-        var label: String { self == .shader ? "Shader" : "Web" }
+        var label: String {
+            switch self {
+            case .shader: return String(localized: "ai.sheet.kind.shader")
+            case .web: return String(localized: "ai.sheet.kind.web")
+            }
+        }
     }
 
     /// Live render state from the Governor, shown in the energy panel. `reason` explains why we're
