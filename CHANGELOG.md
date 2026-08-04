@@ -16,6 +16,16 @@ on every `v*` tag push — see [`.github/workflows/release.yml`](.github/workflo
 
 ## [Unreleased]
 
+## [0.3.9] — 2026-08-04
+
+### Added
+- **Language selector in Preferences + Onboarding** — surfaces the language preference that was
+  already wired up in `Preferences.language` / `AppLanguage` (auto / English / Português). A new
+  `Language` section in Preferences lets you change it any time, and a dedicated onboarding step
+  (between Welcome and Pick) asks for it on first launch, so the rest of the intro shows in the
+  chosen language. The picker uses the language's own name ("Português" stays "Português" no
+  matter the active UI language) so a translator can recognise the row without switching first.
+
 ## [0.3.8] — 2026-08-04
 
 ### Added
@@ -37,6 +47,7 @@ on every `v*` tag push — see [`.github/workflows/release.yml`](.github/workflo
   and appends it to the GitHub Release notes on every `v*` tag push. Future releases
   should be curated here at cut time.
 
-[Unreleased]: https://github.com/lucianodiisouza/livewallpaper/compare/v0.3.8...HEAD
+[Unreleased]: https://github.com/lucianodiisouza/livewallpaper/compare/v0.3.9...HEAD
+[0.3.9]: https://github.com/lucianodiisouza/livewallpaper/compare/v0.3.8...v0.3.9
 [0.3.8]: https://github.com/lucianodiisouza/livewallpaper/compare/v0.3.7...v0.3.8
 [0.3.7]: https://github.com/lucianodiisouza/livewallpaper/compare/v0.3.6...v0.3.7

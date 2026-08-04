@@ -2,8 +2,9 @@ import AppKit
 import SwiftUI
 
 /// First-run onboarding: a short, skippable walkthrough shown once on first launch (and re-runnable
-/// from Settings → "Show welcome again"). Four steps — welcome, pick a first wallpaper, the
-/// multi-monitor/rotation story, and a Premium mention — then it hands off to the main window.
+/// from Settings → "Show welcome again"). Five steps — welcome, pick a UI language, pick a first
+/// wallpaper, the multi-monitor/rotation story, and a Premium mention — then it hands off to the
+/// main window.
 ///
 /// Completion is tracked by `Preferences.hasCompletedOnboarding`; closing the window any way (Get
 /// Started, Skip, or the red button) counts as done, so it never re-nags.
@@ -21,12 +22,13 @@ enum Onboarding {
 
 struct OnboardingView: View {
     @ObservedObject var model: AppModel
+    @ObservedObject var prefs: Preferences = .shared
     /// Close the onboarding window; `openMain == true` also brings up the main window (Get Started).
     var dismiss: (_ openMain: Bool) -> Void
 
     @State private var step: Step = .welcome
 
-    enum Step: Int, CaseIterable { case welcome, pick, displays, premium }
+    enum Step: Int, CaseIterable { case welcome, language, pick, displays, premium }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -35,6 +37,7 @@ struct OnboardingView: View {
             Group {
                 switch step {
                 case .welcome: WelcomeStep()
+                case .language: LanguageStep(prefs: prefs)
                 case .pick: PickStep(model: model)
                 case .displays: DisplaysStep()
                 case .premium: PremiumStep()
@@ -134,6 +137,28 @@ private struct WelcomeStep: View {
                            "Tiny, GPU-native wallpapers you can't get from a video-only app.")
             }
             .frame(maxWidth: 420)
+        }
+    }
+}
+
+private struct LanguageStep: View {
+    @ObservedObject var prefs: Preferences
+
+    var body: some View {
+        StepScaffold(symbol: "globe",
+                     title: "Choose your language",
+                     subtitle: "Pick the language for Primo Engine. You can change it any time from Settings.") {
+            Picker(LocalizedStringKey("settings.language"), selection: $prefs.language) {
+                ForEach(AppLanguage.allCases) { lang in
+                    Text(lang.displayName).tag(lang)
+                }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .frame(maxWidth: 280)
+            Text("Tip: 'System default' follows your Mac's language setting.")
+                .font(.caption).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center).frame(maxWidth: 420)
         }
     }
 }
@@ -288,7 +313,7 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
             window.makeKeyAndOrderFront(nil)
             return
         }
-        let hosting = NSHostingController(rootView: OnboardingView(model: model) { [weak self] wantsMain in
+        let hosting = NSHostingController(rootView: OnboardingView(model: model, prefs: Preferences.shared) { [weak self] wantsMain in
             self?.finish(openMain: wantsMain)
         })
         let w = NSWindow(contentViewController: hosting)
