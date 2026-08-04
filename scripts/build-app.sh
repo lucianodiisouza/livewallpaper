@@ -21,7 +21,20 @@ APP="$ROOT/dist/Primo Engine.app"
 CONTENTS="$APP/Contents"
 MACOS="$CONTENTS/MacOS"
 RES="$CONTENTS/Resources"
-VERSION="${APP_VERSION:-0.0.1}"
+
+# Derive the app version automatically so the menu bar / About pane always shows the right
+# value, without having to remember to pass `APP_VERSION=` at every release. Order of precedence:
+#   1. explicit APP_VERSION env var (release pipelines set this)
+#   2. `git describe --tags --always --dirty` for developer builds
+#   3. fallback "0.0.1" for an unversioned checkout
+if [[ -n "${APP_VERSION:-}" ]]; then
+    VERSION="$APP_VERSION"
+elif command -v git >/dev/null 2>&1 && git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+    VERSION="$(git -C "$ROOT" describe --tags --always --dirty 2>/dev/null | sed 's/^v//')"
+    [[ -z "$VERSION" ]] && VERSION="0.0.1"
+else
+    VERSION="0.0.1"
+fi
 
 echo "▶ Building ($CONFIG)…"
 swift build -c "$CONFIG"
