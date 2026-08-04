@@ -11,7 +11,10 @@ struct MainView: View {
     @State private var section: Section = {
         if let raw = ProcessInfo.processInfo.environment["LW_SECTION"],
            let s = Section(rawValue: raw) { return s }
-        return .installed
+        // Open on Catalog: that's where the discovery happens (Featured, new releases,
+        // search), and it's the natural first impression for new users. Returning users
+        // usually go straight to a specific wallpaper, which is one click from here.
+        return .explore
     }()
 
     enum Section: String, CaseIterable, Identifiable {
