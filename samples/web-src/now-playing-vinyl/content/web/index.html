@@ -18,7 +18,7 @@
   html,body{margin:0;height:100%;overflow:hidden;background:#0f0c1c;font-family:"Avenir Next","Segoe UI",system-ui,sans-serif;}
   #stage{position:fixed;inset:0;display:grid;place-items:center;
     background:radial-gradient(120% 105% at 50% 44%, var(--bg-top), var(--bg-bot) 80%);
-    perspective:2400px;}
+    perspective:1800px;}
   .glow{position:absolute;border-radius:50%;filter:blur(90px);opacity:.4;pointer-events:none;}
   .glow.a{width:52vw;height:52vw;left:-14vw;top:-16vw;background:var(--bg-top);opacity:.42;}
   .glow.b{width:44vw;height:44vw;right:-8vw;bottom:-16vw;background:var(--accent-2);opacity:.30;}
@@ -26,22 +26,48 @@
   /* stage — wider, text aside the deck (scaled to 0.9 of the available area) */
   .stage-row{position:relative;display:flex;align-items:center;gap:4vw;
     width:min(86vw,162vh);transform:rotateX(4deg) scale(.9);transform-origin:center;}
+  /* ===== 3D deck frame: gives the deck real visible side faces =====
+     A wrapper div that's slightly larger than the deck on the right and
+     bottom, providing the "wood side" of the box. The deck sits on top. */
+  .deck-frame{position:relative;flex:1.55;display:block;overflow:visible;}
+  .deck-frame{position:relative;flex:1.55;display:block;overflow:visible;}
+  /* Side faces are rendered as children INSIDE the deck (anchored to
+     the deck's right and bottom edges), so they move with the deck and
+     stay aligned with the deck's border-radius. */
+  .deck-side{position:absolute;pointer-events:none;z-index:0;}
+  .deck-side.right{right:-16px;top:14px;bottom:16px;width:16px;
+    background:linear-gradient(90deg, var(--deck-dark) 0%, var(--deck-edge) 60%, #1a0d04 100%);
+    border-radius:0 4px 4px 0;
+    box-shadow:inset 1px 0 0 rgba(255,255,255,.05), inset -1px 0 2px rgba(0,0,0,.4);}
+  .deck-side.bottom{left:14px;right:-16px;bottom:-16px;height:16px;
+    background:linear-gradient(180deg, #4a2a16 0%, var(--deck-edge) 60%, #1a0d04 100%);
+    border-radius:0 0 4px 4px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.05), inset 0 -1px 2px rgba(0,0,0,.4);}
+  .deck-side.corner{right:-16px;bottom:-16px;width:16px;height:16px;
+    background:linear-gradient(135deg, transparent 50%, var(--deck-edge) 50%, #1a0d04 100%);
+    border-radius:0 0 4px 0;}
 
   /* ============================================================
      DECK — wide slab on the left
      ============================================================ */
-  .deck{position:relative;flex:1.55;aspect-ratio:1/0.78;border-radius:28px;
+  .deck{position:relative;flex:1.55;aspect-ratio:1/0.78;border-radius:28px;z-index:1;
     background:
+      /* base wood face (top of the box) */
       radial-gradient(130% 120% at 22% 8%, var(--deck-hi), rgba(0,0,0,0) 55%),
       linear-gradient(158deg, var(--deck), var(--deck-dark));
     box-shadow:
-      0 60px 120px -28px rgba(0,0,0,.78),
-      0 22px 0 -2px var(--deck-edge),
-      0 26px 36px -10px rgba(0,0,0,.6),
+      /* cast shadow on the floor (soft, far) */
+      0 90px 140px -28px rgba(0,0,0,.85),
+      /* top edge highlight */
+      0 -2px 0 rgba(255,255,255,.08),
+      /* inner depth shading */
       inset 0 3px 0 rgba(255,255,255,.18), inset 0 -14px 30px rgba(0,0,0,.45),
-      inset 0 0 0 1px rgba(0,0,0,.28);}
-  .deck::after{content:"";position:absolute;inset:14px;border-radius:20px;
-    box-shadow:inset 0 0 0 1.5px rgba(0,0,0,.16), inset 0 3px 8px rgba(0,0,0,.24);pointer-events:none;}
+      inset 0 0 0 1px rgba(0,0,0,.28);
+    overflow:visible;}
+  /* Inner bevel ring (kept as a real element so it doesn't fight with
+     anything else in the pseudo-elements). */
+  .deck-inner{position:absolute;inset:14px;border-radius:20px;pointer-events:none;
+    box-shadow:inset 0 0 0 1.5px rgba(0,0,0,.16), inset 0 3px 8px rgba(0,0,0,.24);}
   /* wood grain — deeper, layered */
   .wood{position:absolute;inset:0;border-radius:28px;opacity:.22;mix-blend-mode:overlay;pointer-events:none;}
   /* brushed metal strip across the top of the deck */
@@ -238,8 +264,13 @@
 <div id="stage">
   <div class="glow a"></div><div class="glow b"></div>
   <div class="stage-row">
-    <!-- DECK -->
-    <div class="deck">
+    <!-- DECK with 3D frame: side faces peek out from the right and bottom -->
+    <div class="deck-frame">
+      <div class="deck">
+        <div class="deck-side right"></div>
+        <div class="deck-side bottom"></div>
+        <div class="deck-side corner"></div>
+        <div class="deck-inner"></div>
       <svg class="wood" viewBox="0 0 100 78" preserveAspectRatio="none">
         <filter id="woodgrain"><feTurbulence type="fractalNoise" baseFrequency="0.012 0.09" numOctaves="4" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter>
         <rect width="100" height="78" filter="url(#woodgrain)"/>
@@ -285,6 +316,7 @@
           <div class="eq-row"><div class="eq-slot"></div><div class="eq-cap" id="eq3" style="left:72%"></div></div>
         </div>
       </div>
+    </div>
     </div>
 
     <!-- SIDE TEXT — out of the deck, hanging in space -->
