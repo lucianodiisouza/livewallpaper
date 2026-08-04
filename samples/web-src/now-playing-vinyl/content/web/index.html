@@ -94,7 +94,7 @@
      so the gap between the led and the eq is visibly larger than
      the gap between the knobs and the led.
      ============================================================ */
-  .console{position:absolute;right:4%;top:14%;width:36%;height:14%;
+  .console{position:absolute;left:64%;right:7%;top:14%;height:14%;
     display:flex;flex-direction:column;gap:8%;}
 
   /* knobs row — 3 knobs distributed evenly across the LED's width
@@ -120,9 +120,10 @@
 
   /* ----- 2-row LED display — separate row, vertically between knobs and EQ.
      Knobs end at ~28% of deck, EQ starts at 74%. LED is shifted up 5% from
-     center (top:37%) and inset 3% more on the left to keep clearance from
-     the vinyl. */
-  .display-wrap{position:absolute;right:7%;top:37%;width:33%;height:18%;
+     center (top:37%) and aligned to the same column as the EQ (left:64%,
+     right:7%) so the LED/sliders/knobs all share the same horizontal
+     edges — with a 5% breathing gap from the vinyl's right border. */
+  .display-wrap{position:absolute;left:64%;right:7%;top:37%;height:18%;
     padding:3px;border-radius:16px;
     background:linear-gradient(180deg,#2a1d18,#110a08);
     box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 2px 0 rgba(0,0,0,.4);}
@@ -174,7 +175,7 @@
      right edge, so the LED (above) sits centered between the vinyl (to
      its left) and the deck's right edge — with proper lateral breathing
      room. */
-  .eq-wrap{position:absolute;left:62%;right:7%;bottom:8%;height:18%;
+  .eq-wrap{position:absolute;left:64%;right:7%;bottom:8%;height:18%;
     display:flex;align-items:stretch;justify-content:stretch;}
   .eq{position:relative;width:100%;height:100%;
     display:flex;flex-direction:column;justify-content:space-between;gap:10%;}
