@@ -309,48 +309,72 @@ struct FeaturedCarousel: View {
             // 16:9 card is ~1000pt tall and swallows the whole view; a featured strip should be a
             // short, wide band. Height scales gently with width but is clamped so it never dominates.
             let bandHeight = min(max(230, rowWidth * 0.32), 340)
-            // Each card is slightly narrower than the row so the next one peeks in — the signature
-            // "there's more" cue of a good carousel. `spacing` is the gap between cards.
-            let cardSpacing: CGFloat = 16
-            let cardWidth = max(320, rowWidth - 44)
+            // Full-bleed carousel: one card fills the row, no peek of the neighbour. The arrow
+            // buttons are the affordance for "there's more" — touchpad scroll works too, but
+            // without the peek the arrows are what makes navigation discoverable.
+            let cardWidth = rowWidth
 
             ScrollViewReader { proxy in
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .top, spacing: cardSpacing) {
-                        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                            FeaturedCard(item: item,
-                                         installing: installing.contains(item.id),
-                                         installed: installed(item),
-                                         locked: locked(item),
-                                         inRotation: inRotation(item),
-                                         screens: screens,
-                                         onInstall: onInstall)
-                            .frame(width: cardWidth, height: bandHeight)
-                            .id(index)
+                ZStack {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(alignment: .top, spacing: 0) {
+                            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                                FeaturedCard(item: item,
+                                             installing: installing.contains(item.id),
+                                             installed: installed(item),
+                                             locked: locked(item),
+                                             inRotation: inRotation(item),
+                                             screens: screens,
+                                             onInstall: onInstall)
+                                .frame(width: cardWidth, height: bandHeight)
+                                .id(index)
+                            }
+                        }
+                        .scrollTargetLayout()
+                    }
+                    // Paging (not view-aligned) so each card snaps to the full row width and the
+                    // adjacent card stays entirely off-screen — no peek.
+                    .scrollTargetBehavior(.paging)
+                    .scrollPosition(id: $scrolledID)       // mirrors manual swipes back to currentIndex
+                    .gesture(
+                        DragGesture(minimumDistance: 5)
+                            .onChanged { _ in userInteracting = true }
+                    )
+                    // Programmatic jumps (auto-advance, dot tap, arrow tap) → scroll. Manual swipes
+                    // flow back through scrollPosition → currentIndex, so the dots and the page
+                    // stay in sync.
+                    .onChange(of: currentIndex) { _, new in
+                        withAnimation(.easeInOut(duration: 0.35)) {
+                            proxy.scrollTo(new, anchor: .leading)
                         }
                     }
-                    .scrollTargetLayout()
-                }
-                // View-aligned (not paging) so each card snaps to the leading edge with the peek
-                // preserved; paging would snap by the full container width and hide the peek.
-                .scrollTargetBehavior(.viewAligned)
-                .scrollPosition(id: $scrolledID)       // mirrors manual swipes back to currentIndex
-                .gesture(
-                    DragGesture(minimumDistance: 5)
-                        .onChanged { _ in userInteracting = true }
-                )
-                // Programmatic jumps (auto-advance, dot tap) → scroll. Manual swipes flow back
-                // through scrollPosition → currentIndex, so the dots and the page stay in sync.
-                .onChange(of: currentIndex) { _, new in
-                    withAnimation(.easeInOut(duration: 0.35)) {
-                        proxy.scrollTo(new, anchor: .leading)
+                    .onChange(of: scrolledID) { _, new in
+                        if let new, new != currentIndex { currentIndex = new }
                     }
-                }
-                .onChange(of: scrolledID) { _, new in
-                    if let new, new != currentIndex { currentIndex = new }
-                }
-                .onAppear {
-                    proxy.scrollTo(currentIndex, anchor: .leading)
+                    .onAppear {
+                        proxy.scrollTo(currentIndex, anchor: .leading)
+                    }
+
+                    // Side arrow buttons. Always rendered (the user asked for an obvious
+                    // affordance), but disabled at the ends so they don't promise a page that
+                    // doesn't exist. Sit in a vertical center on top of the card.
+                    CarouselArrow(side: .left) {
+                        userInteracting = true
+                        withAnimation(.easeInOut(duration: 0.35)) {
+                            currentIndex = max(0, currentIndex - 1)
+                        }
+                    }
+                    .disabled(currentIndex == 0)
+                    .opacity(currentIndex == 0 ? 0.35 : 1)
+
+                    CarouselArrow(side: .right) {
+                        userInteracting = true
+                        withAnimation(.easeInOut(duration: 0.35)) {
+                            currentIndex = min(items.count - 1, currentIndex + 1)
+                        }
+                    }
+                    .disabled(currentIndex >= items.count - 1)
+                    .opacity(currentIndex >= items.count - 1 ? 0.35 : 1)
                 }
             }
             // Pin the row to the band height so the vertical stack reserves the space — without this
@@ -392,6 +416,31 @@ struct FeaturedCarousel: View {
             .frame(maxWidth: .infinity)
             .padding(.top, 2)
         }
+    }
+}
+
+/// Side navigation arrow for the Featured carousel. Circular, semi-transparent, sits centred
+/// vertically on the card. Always rendered so the affordance is discoverable; the parent
+/// disables + dims it at the carousel ends.
+private struct CarouselArrow: View {
+    enum Side { case left, right }
+    let side: Side
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: side == .left ? "chevron.left" : "chevron.right")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+                .background(Color.black.opacity(0.45), in: Circle())
+                .overlay(Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5))
+        }
+        .buttonStyle(.plain)
+        .help(side == .left ? "Previous featured" : "Next featured")
+        .accessibilityLabel(side == .left ? "Previous featured wallpaper" : "Next featured wallpaper")
+        .padding(side == .left ? .leading : .trailing, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: side == .left ? .leading : .trailing)
     }
 }
 
@@ -517,11 +566,11 @@ struct FeaturedCard: View {
                 .background(.ultraThinMaterial, in: Capsule())
         } else if locked {
             Button("Unlock") { onInstall(item, nil) }
-                .controlSize(.large).buttonStyle(.borderedProminent).tint(.yellow)
+                .controlSize(.large).buttonStyle(.glassProminent).tint(.yellow)
         } else {
             HStack(spacing: 6) {
                 Button("Install") { onInstall(item, nil) }
-                    .controlSize(.large).buttonStyle(.borderedProminent)
+                    .controlSize(.large).buttonStyle(.glassProminent)
                 if screens.count > 1 { perDisplayMenu }
             }
         }

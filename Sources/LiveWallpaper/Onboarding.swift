@@ -75,10 +75,10 @@ struct OnboardingView: View {
 
             if step == .premium {
                 Button("Get Started") { dismiss(true) }
-                    .keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction).buttonStyle(.glassProminent)
             } else {
                 Button("Continue") { advance(1) }
-                    .keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction).buttonStyle(.glassProminent)
             }
         }
         .padding(16)

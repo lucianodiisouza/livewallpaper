@@ -359,7 +359,7 @@ struct WallpaperPreviewSheet: View {
                         model.showPaywall("“\(entry.title)” is a Premium wallpaper.")
                     }
                     .keyboardShortcut(.defaultAction)
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.glassProminent)
                 } else {
                     if multiMonitor {
                         Menu("Apply to…") {
@@ -371,7 +371,7 @@ struct WallpaperPreviewSheet: View {
                     }
                     Button("Apply") { apply(target) }
                         .keyboardShortcut(.defaultAction)
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.glassProminent)
                 }
                 Button("Close") { dismiss() }
                     .keyboardShortcut(.cancelAction)
@@ -422,7 +422,7 @@ struct PaywallSheet: View {
                 Spacer()
                 Button("Not now") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Check activation") { Task { await entitlement.refresh(); dismiss() } }
-                    .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+                    .buttonStyle(.glassProminent).keyboardShortcut(.defaultAction)
             }
         }
         .padding(20)
@@ -501,7 +501,7 @@ struct GenerateSheet: View {
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Generate") { started = true; model.generate(prompt, kind: kind) }
-                    .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+                    .buttonStyle(.glassProminent).keyboardShortcut(.defaultAction)
                     .disabled(!canGenerate)
             }
         }
@@ -828,7 +828,7 @@ struct PremiumSettings: View {
     @ViewBuilder private var freeBody: some View {
         HStack(spacing: 8) {
             Button("Start 7-day free trial") { startTrial() }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.glassProminent)
                 .disabled(busy)
             Text("No card required").font(.caption2).foregroundStyle(.secondary)
             Spacer()
@@ -1137,7 +1137,7 @@ struct CustomizeSheet: View {
             HStack {
                 Spacer()
                 Button("Done") { dismiss() }
-                    .keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction).buttonStyle(.glassProminent)
             }
         }
         .padding(20)
