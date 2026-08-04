@@ -36,18 +36,20 @@ struct WorkshopView: View {
 
     var body: some View {
         content
-            .navigationSubtitle(WorkshopConfig.isConfigured ? "\(items.count) wallpapers" : "")
-            .searchable(text: $search, prompt: "Search wallpapers")
+            .navigationSubtitle(WorkshopConfig.isConfigured
+                                 ? String(format: String(localized: "tab.catalog.subtitle", bundle: .main), items.count)
+                                 : "")
+            .searchable(text: $search, prompt: String(localized: "tab.catalog.searchPrompt", bundle: .main))
             .toolbar {
                 if WorkshopConfig.isConfigured {
                     ToolbarItem(placement: .primaryAction) {
-                        Picker("Sort", selection: $sort) {
+                        Picker(LocalizedStringKey("workshop.sort.label"), selection: $sort) {
                             ForEach(WorkshopClient.Sort.allCases, id: \.self) { Text($0.label).tag($0) }
                         }
                     }
                     ToolbarItem(placement: .primaryAction) {
                         Button { Task { await load() } } label: { Image(systemName: "arrow.clockwise") }
-                            .help("Refresh")
+                            .help(LocalizedStringKey("workshop.help.refresh"))
                     }
                 }
             }
@@ -70,7 +72,7 @@ struct WorkshopView: View {
         } else if loading {
             VStack { Spacer(); ProgressView(); Spacer() }.frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if items.isEmpty {
-            VStack { Spacer(); Text("No wallpapers found.").foregroundStyle(.secondary); Spacer() }
+            VStack { Spacer(); Text(LocalizedStringKey("workshop.empty")).foregroundStyle(.secondary); Spacer() }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollView {
@@ -89,7 +91,7 @@ struct WorkshopView: View {
                         .padding(.top, 4)
                     }
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("All Wallpapers")
+                        Text(LocalizedStringKey("workshop.section.all"))
                             .font(.title3.weight(.semibold))
                             .padding(.horizontal, 20)
                         LazyVGrid(columns: columns, spacing: 18) {
@@ -117,8 +119,8 @@ struct WorkshopView: View {
     private var notConfigured: some View {
         VStack(spacing: 8) {
             Image(systemName: "cloud").font(.largeTitle).foregroundStyle(.secondary)
-            Text("Workshop not set up yet").font(.headline)
-            Text("Set WorkshopConfig.pocketBaseURL to your PocketBase host. See docs/M4_PLAN.md.")
+            Text(LocalizedStringKey("workshop.notConfigured.title")).font(.headline)
+            Text(LocalizedStringKey("workshop.notConfigured.body"))
                 .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
         }
         .padding(40)
@@ -151,7 +153,7 @@ struct WorkshopView: View {
             else { err = await onInstall(item) }
             installing.remove(item.id)
             if err == nil { installed.insert(item.id) }
-            banner = err ?? "Installed “\(item.title)”."
+            banner = err ?? String(format: String(localized: "workshop.banner.installed", bundle: .main), item.title)
             await load()
         }
     }
@@ -179,7 +181,7 @@ struct WorkshopTile: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .overlay(alignment: .topLeading) {
                     if item.isPremium {
-                        Label("Premium", systemImage: "lock.fill")
+                        Label(LocalizedStringKey("tab.catalog.premiumBadge"), systemImage: "lock.fill")
                             .labelStyle(.titleAndIcon).font(.caption2.weight(.bold))
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(.black.opacity(0.6)).foregroundStyle(.yellow)
@@ -188,7 +190,7 @@ struct WorkshopTile: View {
                 }
                 .overlay(alignment: .topTrailing) {
                     if inRotation {
-                        Label("Free this period", systemImage: "gift.fill")
+                        Label(LocalizedStringKey("tab.catalog.freeThisPeriod"), systemImage: "gift.fill")
                             .labelStyle(.titleAndIcon).font(.caption2.weight(.bold))
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(.green.opacity(0.9)).foregroundStyle(.white)
@@ -198,7 +200,7 @@ struct WorkshopTile: View {
             HStack(spacing: 6) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(item.title).font(.subheadline.weight(.medium)).lineLimit(1)
-                    Text("\(item.type.rawValue) · \(item.downloadCount) installs")
+                    Text(String(format: String(localized: "workshop.installs", bundle: .main), item.type.rawValue, item.downloadCount))
                         .font(.caption2).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 4)
@@ -207,10 +209,10 @@ struct WorkshopTile: View {
                 } else if installed {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
                 } else if locked {
-                    Button("Unlock") { onInstall(nil) }
+                    Button(LocalizedStringKey("workshop.action.unlock")) { onInstall(nil) }
                         .controlSize(.small).buttonStyle(.glassProminent).tint(.yellow)
                 } else {
-                    Button("Install") { onInstall(nil) }.controlSize(.small).buttonStyle(.glass)
+                    Button(LocalizedStringKey("workshop.action.install")) { onInstall(nil) }.controlSize(.small).buttonStyle(.glass)
                     if screens.count > 1 { perDisplayMenu }
                 }
             }
@@ -220,10 +222,10 @@ struct WorkshopTile: View {
     /// Install straight onto one named display (or all).
     private var perDisplayMenu: some View {
         Menu {
-            Button("Install · all displays") { onInstall(nil) }
+            Button(LocalizedStringKey("workshop.menu.all")) { onInstall(nil) }
             Divider()
             ForEach(screens) { s in
-                Button("Install · \(s.name)") { onInstall(s.id) }
+                Button(String(format: String(localized: "workshop.menu.perDisplay", bundle: .main), s.name)) { onInstall(s.id) }
             }
         } label: {
             Image(systemName: "ellipsis")
@@ -231,7 +233,7 @@ struct WorkshopTile: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help("Install and apply to a specific display")
+        .help(LocalizedStringKey("workshop.menu.help"))
     }
 
     @ViewBuilder private var preview: some View {
@@ -299,8 +301,8 @@ struct FeaturedCarousel: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Image(systemName: "sparkles").foregroundStyle(.tint)
-                Text("Featured").font(.title3.weight(.semibold))
-                Text("· Top by installs").font(.caption).foregroundStyle(.secondary)
+                Text(LocalizedStringKey("workshop.featured")).font(.title3.weight(.semibold))
+                Text(LocalizedStringKey("workshop.featured.subtitle")).font(.caption).foregroundStyle(.secondary)
                 Spacer()
             }
             .padding(.horizontal, 20)
@@ -309,48 +311,72 @@ struct FeaturedCarousel: View {
             // 16:9 card is ~1000pt tall and swallows the whole view; a featured strip should be a
             // short, wide band. Height scales gently with width but is clamped so it never dominates.
             let bandHeight = min(max(230, rowWidth * 0.32), 340)
-            // Each card is slightly narrower than the row so the next one peeks in — the signature
-            // "there's more" cue of a good carousel. `spacing` is the gap between cards.
-            let cardSpacing: CGFloat = 16
-            let cardWidth = max(320, rowWidth - 44)
+            // Full-bleed carousel: one card fills the row, no peek of the neighbour. The arrow
+            // buttons are the affordance for "there's more" — touchpad scroll works too, but
+            // without the peek the arrows are what makes navigation discoverable.
+            let cardWidth = rowWidth
 
             ScrollViewReader { proxy in
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .top, spacing: cardSpacing) {
-                        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                            FeaturedCard(item: item,
-                                         installing: installing.contains(item.id),
-                                         installed: installed(item),
-                                         locked: locked(item),
-                                         inRotation: inRotation(item),
-                                         screens: screens,
-                                         onInstall: onInstall)
-                            .frame(width: cardWidth, height: bandHeight)
-                            .id(index)
+                ZStack {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(alignment: .top, spacing: 0) {
+                            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                                FeaturedCard(item: item,
+                                             installing: installing.contains(item.id),
+                                             installed: installed(item),
+                                             locked: locked(item),
+                                             inRotation: inRotation(item),
+                                             screens: screens,
+                                             onInstall: onInstall)
+                                .frame(width: cardWidth, height: bandHeight)
+                                .id(index)
+                            }
+                        }
+                        .scrollTargetLayout()
+                    }
+                    // Paging (not view-aligned) so each card snaps to the full row width and the
+                    // adjacent card stays entirely off-screen — no peek.
+                    .scrollTargetBehavior(.paging)
+                    .scrollPosition(id: $scrolledID)       // mirrors manual swipes back to currentIndex
+                    .gesture(
+                        DragGesture(minimumDistance: 5)
+                            .onChanged { _ in userInteracting = true }
+                    )
+                    // Programmatic jumps (auto-advance, dot tap, arrow tap) → scroll. Manual swipes
+                    // flow back through scrollPosition → currentIndex, so the dots and the page
+                    // stay in sync.
+                    .onChange(of: currentIndex) { _, new in
+                        withAnimation(.easeInOut(duration: 0.35)) {
+                            proxy.scrollTo(new, anchor: .leading)
                         }
                     }
-                    .scrollTargetLayout()
-                }
-                // View-aligned (not paging) so each card snaps to the leading edge with the peek
-                // preserved; paging would snap by the full container width and hide the peek.
-                .scrollTargetBehavior(.viewAligned)
-                .scrollPosition(id: $scrolledID)       // mirrors manual swipes back to currentIndex
-                .gesture(
-                    DragGesture(minimumDistance: 5)
-                        .onChanged { _ in userInteracting = true }
-                )
-                // Programmatic jumps (auto-advance, dot tap) → scroll. Manual swipes flow back
-                // through scrollPosition → currentIndex, so the dots and the page stay in sync.
-                .onChange(of: currentIndex) { _, new in
-                    withAnimation(.easeInOut(duration: 0.35)) {
-                        proxy.scrollTo(new, anchor: .leading)
+                    .onChange(of: scrolledID) { _, new in
+                        if let new, new != currentIndex { currentIndex = new }
                     }
-                }
-                .onChange(of: scrolledID) { _, new in
-                    if let new, new != currentIndex { currentIndex = new }
-                }
-                .onAppear {
-                    proxy.scrollTo(currentIndex, anchor: .leading)
+                    .onAppear {
+                        proxy.scrollTo(currentIndex, anchor: .leading)
+                    }
+
+                    // Side arrow buttons. Always rendered (the user asked for an obvious
+                    // affordance), but disabled at the ends so they don't promise a page that
+                    // doesn't exist. Sit in a vertical center on top of the card.
+                    CarouselArrow(side: .left) {
+                        userInteracting = true
+                        withAnimation(.easeInOut(duration: 0.35)) {
+                            currentIndex = max(0, currentIndex - 1)
+                        }
+                    }
+                    .disabled(currentIndex == 0)
+                    .opacity(currentIndex == 0 ? 0.35 : 1)
+
+                    CarouselArrow(side: .right) {
+                        userInteracting = true
+                        withAnimation(.easeInOut(duration: 0.35)) {
+                            currentIndex = min(items.count - 1, currentIndex + 1)
+                        }
+                    }
+                    .disabled(currentIndex >= items.count - 1)
+                    .opacity(currentIndex >= items.count - 1 ? 0.35 : 1)
                 }
             }
             // Pin the row to the band height so the vertical stack reserves the space — without this
@@ -392,6 +418,33 @@ struct FeaturedCarousel: View {
             .frame(maxWidth: .infinity)
             .padding(.top, 2)
         }
+    }
+}
+
+/// Side navigation arrow for the Featured carousel. Circular, semi-transparent, sits centred
+/// vertically on the card. Always rendered so the affordance is discoverable; the parent
+/// disables + dims it at the carousel ends.
+private struct CarouselArrow: View {
+    enum Side { case left, right }
+    let side: Side
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: side == .left ? "chevron.left" : "chevron.right")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+                .background(Color.black.opacity(0.45), in: Circle())
+                .overlay(Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5))
+        }
+        .buttonStyle(.plain)
+        .help(side == .left ? String(localized: "workshop.carousel.prev", bundle: .main)
+                            : String(localized: "workshop.carousel.next", bundle: .main))
+        .accessibilityLabel(side == .left ? String(localized: "workshop.carousel.a11y.prev", bundle: .main)
+                                       : String(localized: "workshop.carousel.a11y.next", bundle: .main))
+        .padding(side == .left ? .leading : .trailing, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: side == .left ? .leading : .trailing)
     }
 }
 
@@ -467,7 +520,7 @@ struct FeaturedCard: View {
                     Text(item.title)
                         .font(.title3.weight(.semibold)).foregroundStyle(.white)
                         .lineLimit(1)
-                    Text("\(item.type.rawValue) · \(item.downloadCount) installs")
+                    Text(String(format: String(localized: "workshop.installs", bundle: .main), item.type.rawValue, item.downloadCount))
                         .font(.caption).foregroundStyle(.white.opacity(0.75))
                 }
                 Spacer(minLength: 8)
@@ -483,7 +536,7 @@ struct FeaturedCard: View {
                 .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
         )
         .overlay(alignment: .topLeading) {
-            Label("Featured", systemImage: "sparkles")
+            Label(LocalizedStringKey("tab.catalog.featured.ribbon"), systemImage: "sparkles")
                 .labelStyle(.titleAndIcon).font(.caption2.weight(.bold))
                 .padding(.horizontal, 9).padding(.vertical, 4)
                 .background(.ultraThinMaterial, in: Capsule())
@@ -491,9 +544,9 @@ struct FeaturedCard: View {
         }
         .overlay(alignment: .topTrailing) {
             if inRotation {
-                badge("Free this period", "gift.fill", .green.opacity(0.9), .white)
+                badge(String(localized: "tab.catalog.freeThisPeriod", bundle: .main), "gift.fill", .green.opacity(0.9), .white)
             } else if item.isPremium {
-                badge("Premium", "lock.fill", .black.opacity(0.55), .yellow)
+                badge(String(localized: "tab.catalog.premiumBadge", bundle: .main), "lock.fill", .black.opacity(0.55), .yellow)
             }
         }
         .shadow(color: .black.opacity(0.35), radius: 16, x: 0, y: 8)
@@ -510,18 +563,18 @@ struct FeaturedCard: View {
         if installing {
             ProgressView().controlSize(.small).tint(.white)
         } else if installed {
-            Label("Installed", systemImage: "checkmark.circle.fill")
+            Label(LocalizedStringKey("workshop.badge.installed"), systemImage: "checkmark.circle.fill")
                 .labelStyle(.titleAndIcon).font(.caption.weight(.semibold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 10).padding(.vertical, 6)
                 .background(.ultraThinMaterial, in: Capsule())
         } else if locked {
-            Button("Unlock") { onInstall(item, nil) }
-                .controlSize(.large).buttonStyle(.borderedProminent).tint(.yellow)
+            Button(LocalizedStringKey("workshop.action.unlock")) { onInstall(item, nil) }
+                .controlSize(.large).buttonStyle(.glassProminent).tint(.yellow)
         } else {
             HStack(spacing: 6) {
-                Button("Install") { onInstall(item, nil) }
-                    .controlSize(.large).buttonStyle(.borderedProminent)
+                Button(LocalizedStringKey("workshop.action.install")) { onInstall(item, nil) }
+                    .controlSize(.large).buttonStyle(.glassProminent)
                 if screens.count > 1 { perDisplayMenu }
             }
         }
@@ -529,10 +582,10 @@ struct FeaturedCard: View {
 
     private var perDisplayMenu: some View {
         Menu {
-            Button("Install · all displays") { onInstall(item, nil) }
+            Button(LocalizedStringKey("workshop.menu.all")) { onInstall(item, nil) }
             Divider()
             ForEach(screens) { s in
-                Button("Install · \(s.name)") { onInstall(item, s.id) }
+                Button(String(format: String(localized: "workshop.menu.perDisplay", bundle: .main), s.name)) { onInstall(item, s.id) }
             }
         } label: { Image(systemName: "ellipsis.circle.fill").foregroundStyle(.white) }
             .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()

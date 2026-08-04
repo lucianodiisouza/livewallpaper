@@ -100,6 +100,7 @@
 "paywall.premiumRequired" = "“%@” é um wallpaper Premium.";
 "paywall.feature.rotation" = "Rotação é um recurso Premium.";
 "paywall.feature.ai" = "Geração de wallpaper com IA é um recurso Premium.";
+"paywall.feature.schedule" = "Agendar wallpapers é um recurso Premium.";
 
 // MARK: - Geração com IA
 "ai.sheet.title" = "Gerar um wallpaper";
@@ -118,6 +119,41 @@
 // MARK: - Onboarding
 "onboarding.welcome" = "Bem-vindo ao Primo Engine";
 "onboarding.tagline" = "Wallpapers animados que respeitam o seu Mac.";
+"onboarding.chooseLanguage.title" = "Escolha seu idioma";
+"onboarding.chooseLanguage.subtitle" = "Selecione o idioma do Primo Engine. Você pode mudar a qualquer momento em Ajustes.";
+"onboarding.chooseLanguage.tip" = "Dica: \"Padrão do sistema\" segue o idioma do seu Mac.";
+"onboarding.pick.title" = "Escolha seu primeiro wallpaper";
+"onboarding.pick.subtitle" = "Toque em um para experimentá-lo agora no seu desktop. Você pode mudar a qualquer momento.";
+"onboarding.displays.title" = "Um app, cada monitor";
+"onboarding.displays.subtitle" = "Dê a cada monitor seu próprio wallpaper, ou o mesmo em todos — você decide.";
+"onboarding.premium.title" = "Grátis para usar — Premium quando quiser mais";
+"onboarding.premium.subtitle" = "O app principal é grátis. O Premium libera o catálogo completo e os recursos destaque, em compra única — sem assinatura.";
+"onboarding.premium.note" = "Você pode explorar tudo de graça primeiro — o paywall só aparece ao usar um wallpaper ou recurso Premium.";
+// Onboarding: feature rows
+"onboarding.feature.pauses.title" = "Pausa quando coberto";
+"onboarding.feature.pauses.detail" = "A renderização cai para quase zero de GPU sempre que o wallpaper não está visível.";
+"onboarding.feature.native.title" = "Nativo, sem Chromium";
+"onboarding.feature.native.detail" = "Swift, Metal e WebKit puros — não é uma casca Electron.";
+"onboarding.feature.formats.title" = "Shaders, web e vídeo";
+"onboarding.feature.formats.detail" = "Wallpapers pequenos e GPU-nativos que você não encontra em apps só de vídeo.";
+"onboarding.feature.perdisplay.title" = "Wallpaper por monitor";
+"onboarding.feature.perdisplay.detail" = "Uma faixa de monitores em escala permite escolher qualquer tela e configurá-la separadamente.";
+"onboarding.feature.rotation.title" = "Rotação e playlists";
+"onboarding.feature.rotation.detail" = "Alterne entre seus wallpapers automaticamente — cada monitor no seu ritmo. (Premium)";
+"onboarding.feature.battery.title" = "Consciente da bateria";
+"onboarding.feature.battery.detail" = "Escolha o que acontece na bateria: pausar, reduzir ou manter velocidade total.";
+"onboarding.feature.catalog.title" = "O catálogo completo de wallpapers";
+"onboarding.feature.catalog.detail" = "Todos os shaders, web e vídeos curados.";
+"onboarding.feature.ai.title" = "Wallpapers gerados por IA";
+"onboarding.feature.ai.detail" = "Descreva um visual e gere um wallpaper vivo seu.";
+"onboarding.feature.rotationPlaylists.title" = "Rotação e playlists por monitor";
+"onboarding.feature.rotationPlaylists.detail" = "Mantenha cada tela sempre renovada, automaticamente.";
+// Onboarding: navigation buttons
+"onboarding.button.skip" = "Pular";
+"onboarding.button.back" = "Voltar";
+"onboarding.button.continue" = "Continuar";
+"onboarding.button.getStarted" = "Começar";
+"onboarding.help.skip" = "Pular a introdução — você pode reabrir em Ajustes";
 
 // MARK: - Atualizações
 "update.available.message" = "Há uma nova versão disponível";
@@ -132,9 +168,128 @@
 // MARK: - Rodapé
 "footer.nowPlaying" = "Tocando agora";
 
+// MARK: - UI principal (Instalados / Explorar / Pré-visualização)
+"main.active" = "ATIVO";
+"main.allDisplays" = "Todos os monitores";
+"main.targetLine.all" = "Todos os monitores";
+"main.menuBarFull" = "Barra de menu cheia (%d)";
+
+// MARK: - Workshop (a aba Explorar / catálogo)
+"workshop.empty" = "Nenhum wallpaper encontrado.";
+"workshop.section.all" = "Todos os wallpapers";
+"workshop.sort.label" = "Ordenar";
+"workshop.help.refresh" = "Atualizar";
+"workshop.featured" = "Em destaque";
+"workshop.featured.subtitle" = "· Mais instalados";
+"workshop.badge.installed" = "Instalado";
+"workshop.action.install" = "Instalar";
+"workshop.action.unlock" = "Desbloquear";
+"workshop.menu.all" = "Instalar · todos os monitores";
+"workshop.menu.perDisplay" = "Instalar · %@";
+"workshop.menu.help" = "Instalar e aplicar a um monitor específico";
+"workshop.error.installUnavailable" = "Instalação indisponível.";
+"workshop.installs" = "%@ · %d instalações";
+"workshop.carousel.prev" = "Destaque anterior";
+"workshop.carousel.next" = "Próximo destaque";
+"workshop.carousel.a11y.prev" = "Wallpaper em destaque anterior";
+"workshop.carousel.a11y.next" = "Próximo wallpaper em destaque";
+
+// MARK: - Pré-visualização
+"preview.help" = "Pré-visualizar";
+"preview.menu.preview" = "Pré-visualizar";
+"preview.menu.customize" = "Personalizar…";
+"preview.menu.pin" = "Fixar na barra de menu";
+"preview.menu.unpin" = "Soltar da barra de menu";
+
+// MARK: - Cancelamento
+"cancel.intro.title" = "Gerenciar sua assinatura";
+"cancel.intro.body" = "Você está no plano %@.";
+"cancel.intro.note" = "Se cancelar, você mantém o Premium até %@, depois este Mac volta ao Free.";
+"cancel.reason.title" = "Por que está cancelando?";
+"cancel.reason.body" = "Isso nos ajuda a melhorar o Primo Engine.";
+"cancel.confirm.title" = "Quer nos contar algo?";
+"cancel.confirm.placeholder" = "Opcional — seu feedback vai direto para o time.";
+"cancel.confirm.note" = "Você mantém o Premium até %@.";
+"cancel.reason.tooExpensive" = "Muito caro";
+"cancel.reason.notUsing" = "Não estou usando o bastante";
+"cancel.reason.missingFeature" = "Falta um recurso que preciso";
+"cancel.reason.technical" = "Problemas técnicos";
+"cancel.reason.other" = "Outro motivo";
+"cancel.plan.annual" = "Anual";
+"cancel.plan.monthly" = "Mensal";
+"cancel.step" = "Passo %d de 3";
+"cancel.button.keep" = "Manter assinatura";
+"cancel.button.continue" = "Continuar para cancelar";
+"cancel.button.back" = "Voltar";
+"cancel.button.next" = "Avançar";
+"cancel.button.confirm" = "Confirmar cancelamento";
+
+// MARK: - Geração (sheet)
+"generate.title" = "Gerar um wallpaper";
+"generate.body" = "Descreva um visual — geramos um wallpaper vivo (validado antes de aplicar).";
+"generate.placeholder" = "ex.: aurora lenta sobre um oceano escuro, verde-água e violeta";
+"generate.generating" = "Gerando…";
+"generate.cancel" = "Cancelar";
+"generate.generate" = "Gerar";
+"generate.type" = "Tipo";
+
+// MARK: - Ajustes (adicionais)
+"settings.energy" = "Energia";
+"settings.energy.running" = "Rodando a %d fps";
+"settings.energy.paused" = "Pausado";
+"settings.energy.estimateNote" = "Custo estimado por tipo (este monitor, taxa máxima)";
+"settings.energy.disclaimer" = "São estimativas, não medições ao vivo — o app não consegue ler a energia da GPU diretamente. Reproduza números reais de CPU/GPU/energia com os scripts em docs/perf (veja docs/PERFORMANCE_REPRODUCE.md). A maior economia real é automática: os wallpapers caem para ~0 quando cobertos.";
+"settings.energy.kind.video" = "Vídeo";
+"settings.energy.kind.web" = "Web";
+"settings.energy.kind.shader" = "Shader";
+"settings.schedule" = "Agenda";
+"settings.schedule.toggle" = "Trocar wallpaper em uma agenda";
+"settings.schedule.addTime" = "Adicionar horário";
+"settings.schedule.empty" = "Adicione horários para trocar os wallpapers automaticamente ao longo do dia.";
+"settings.schedule.populated" = "Troca em cada horário, todo dia. Mudanças manuais valem até o próximo horário agendado.";
+"settings.premium.startTrial" = "Iniciar avaliação grátis de 7 dias";
+"settings.premium.noCard" = "Sem cartão de crédito";
+"settings.premium.licenseCode" = "Código de licença";
+"settings.premium.activate" = "Ativar";
+"settings.premium.deactivate" = "Desativar este Mac";
+"settings.premium.deactivate.help" = "Libera a vaga deste Mac para você ativar outro";
+"settings.premium.cancelSubscription" = "Cancelar assinatura…";
+"settings.premium.lifetimeMacs" = "O Lifetime cobre até %d Macs. Desative um aqui para mover para outro.";
+"settings.premium.subscriptionNote" = "Seu plano está licenciado para este Mac. Para usar o Premium em outro Mac, fale com o suporte.";
+"settings.premium.trialNote" = "Sua avaliação está licenciada para este Mac. Escolha um plano antes que ela termine para manter o Premium — não renova automaticamente.";
+"settings.premium.activeNote" = "Premium ativo neste Mac.";
+"settings.premium.statusFree" = "Grátis";
+"settings.premium.statusTrial" = "Avaliação grátis";
+"settings.premium.statusLifetime" = "Premium — Vitalício";
+"settings.premium.statusAnnual" = "Premium — Anual";
+"settings.premium.statusMonthly" = "Premium — Mensal";
+"settings.premium.statusActive" = "Premium ativo";
+"settings.premium.subtitleFree" = "Desbloqueie o catálogo completo, rotação por monitor, geração com IA e mais.";
+"settings.premium.subtitleLicensed" = "Licenciado para este Mac. Renova/termina em %@.";
+"settings.premium.subtitleTrial" = "%d %@ restante — termina em %@. Escolha um plano para manter o Premium.";
+"settings.premium.subtitleTrial.day" = "dia";
+"settings.premium.subtitleTrial.days" = "dias";
+"settings.premium.subtitleActive" = "Desbloqueado neste Mac.";
+"settings.premium.infoActivated" = "Premium ativado neste Mac.";
+"settings.premium.infoDeactivated" = "Este Mac foi desativado.";
+"settings.premium.infoCanceled" = "Assinatura cancelada. Você mantém o Premium até o fim do período.";
+"settings.premium.infoTrialActive" = "Sua avaliação grátis de 7 dias está ativa neste Mac.";
+"settings.premium.infoNoActiveLicense" = "Nenhuma licença ativa para este Mac ainda.";
+"settings.premium.licenseNote" = "Depois de comprar um plano, você recebe um código de licença — digite-o para desbloquear este Mac. Cada licença é vinculada à sua máquina.";
+"settings.general.device" = "Este Mac: %@";
+"settings.general.deviceHelp" = "ID da sua máquina — passe para o suporte para registrar ou mover a licença.";
+
+// MARK: - Paywall (copy adicional da sheet)
+"paywall.ctaTitle" = "Ativar este Mac";
+"paywall.ctaBenefits" = "Desbloqueie o catálogo completo, rotação por monitor, geração com IA e mais.";
+
 // MARK: - Workshop
 "workshop.notConfigured.title" = "Workshop ainda não configurado";
 "workshop.notConfigured.body" = "Defina WorkshopConfig.pocketBaseURL para o seu host PocketBase. Veja docs/M4_PLAN.md.";
 "workshop.banner.installed" = "“%@” instalado.";
 "workshop.error.premiumLocked" = "Este wallpaper é Premium. Ative este dispositivo (Ajustes → Premium) para instalá-lo.";
 "workshop.error.notConfigured" = "O workshop ainda não está configurado (defina WorkshopConfig.pocketBaseURL).";
+
+// MARK: - Personalização
+"customize.empty" = "Este wallpaper não tem parâmetros ajustáveis.";
+"customize.live" = "As mudanças entram em vigor ao vivo enquanto o wallpaper roda, e ficam salvas.";

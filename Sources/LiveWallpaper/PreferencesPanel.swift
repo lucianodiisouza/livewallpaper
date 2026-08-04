@@ -24,6 +24,13 @@ struct PreferencesView: View {
                 Stepper("Every \(prefs.rotationMinutes) min", value: $prefs.rotationMinutes, in: 1...240)
                     .disabled(!prefs.rotationEnabled)
             }
+            Section("Language") {
+                Picker(LocalizedStringKey("settings.language"), selection: $prefs.language) {
+                    ForEach(AppLanguage.allCases) { lang in
+                        Text(lang.displayName).tag(lang)
+                    }
+                }
+            }
         }
         .formStyle(.grouped)
         .frame(width: 380, height: 300)
