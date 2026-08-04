@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 import Security
 
 /// Configuration for AI wallpaper generation — **bring your own key**.
@@ -98,26 +99,40 @@ enum AIConfig {
 
     private static let service = "com.livewallpaper.app.ai"
 
-    private static func keychainGet(_ account: String) -> String? {
-        let query: [String: Any] = [
+    /// Build the query/payload fragment shared by get + set. We pin every item to the
+    /// "after-first-unlock, this-device-only" accessibility class so the OS can prove the
+    /// read came from the same app that wrote it without falling back to the login keychain
+    /// (which is what triggered the "type your password" modal every time Settings opened).
+    /// It also stops the secret from being iCloud-synced to other Macs.
+    private static func baseItem(_ account: String) -> [String: Any] {
+        [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
         ]
+    }
+
+    private static func keychainGet(_ account: String) -> String? {
+        var query = baseItem(account)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        // Fail closed: if the OS would have to prompt to satisfy the read (e.g. keychain locked
+        // and no UI allowed), return nil instead of blocking Settings with a password prompt.
+        // The user just needs to unlock their Mac once and the next read succeeds silently.
+        let ctx = LAContext()
+        ctx.interactionNotAllowed = true
+        query[kSecUseAuthenticationContext as String] = ctx
         var item: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
-              let data = item as? Data else { return nil }
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        guard status == errSecSuccess, let data = item as? Data else { return nil }
         return String(data: data, encoding: .utf8)
     }
 
     private static func keychainSet(_ value: String?, account: String) {
-        let base: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-        ]
+        let base = baseItem(account)
+        // Wipe the previous (inaccessible) entry first so a key saved before this fix doesn't
+        // keep haunting us.
         SecItemDelete(base as CFDictionary)
         guard let value, !value.isEmpty, let data = value.data(using: .utf8) else { return }
         var add = base

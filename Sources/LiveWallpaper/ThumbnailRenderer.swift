@@ -1,11 +1,11 @@
 import AppKit
 import AVFoundation
 import Metal
+import WebKit
 import simd
 
-/// Renders a single frame of a Metal fragment shader to an `NSImage` for use as a preview tile.
-/// Cached by source so each wallpaper is rendered once. Metal only; video/web fall back to a
-/// styled placeholder in the UI.
+/// Renders a single frame of a Metal fragment shader, a video file, or a web wallpaper to an
+/// `NSImage` for use as a preview tile. Cached by source so each wallpaper is rendered once.
 @MainActor
 enum ThumbnailRenderer {
 
@@ -48,6 +48,43 @@ enum ThumbnailRenderer {
         } catch {
             return nil
         }
+    }
+
+    /// A single frame of a web wallpaper, captured by loading it off-screen in a `WKWebView`,
+    /// waiting a beat for first paint + a few frames of animation, then snapshotting the view.
+    /// Used for both the built-in web wallpapers (which have no `thumbnail.png`) and installed
+    /// web packages whose authors didn't ship one.
+    static func image(forWebRoot root: URL,
+                      entry: String,
+                      allowlist: [String],
+                      size: CGSize = CGSize(width: 360, height: 220)) async -> NSImage? {
+        let key = "web:\(root.path)/\(entry)@\(Int(size.width))x\(Int(size.height))"
+        if let cached = cache[key] { return cached }
+        let frame = NSRect(origin: .zero, size: NSSize(width: size.width * 2, height: size.height * 2))
+        let view = WKWebView(frame: frame)
+        view.wantsLayer = true
+        view.layer?.backgroundColor = NSColor.black.cgColor
+        // Use a tiny per-render config so the WebRenderer's hard-locked scheme/nav policy doesn't
+        // interfere with the off-screen load. Same allowlist semantics, just local files.
+        let cfg = WKWebViewConfiguration()
+        cfg.setURLSchemeHandler(WebSchemeHandler(diskRoot: root), forURLScheme: "lwp")
+        let lo = WKWebpagePreferences()
+        lo.allowsContentJavaScript = true
+        cfg.defaultWebpagePreferences = lo
+        let capture = WKWebView(frame: frame, configuration: cfg)
+        capture.wantsLayer = true
+        capture.layer?.backgroundColor = NSColor.black.cgColor
+        // The lwp:// scheme resolves to diskRoot/entry. Pin to entry file directly.
+        let url = URL(string: "lwp://localhost/\(entry)") ?? root.appendingPathComponent(entry)
+        let _ = capture.loadFileURL(url, allowingReadAccessTo: root)
+        // Let the page render a few frames of animation before we grab one.
+        try? await Task.sleep(nanoseconds: 1_400_000_000)
+        let bitmap = capture.bitmapImageRepForCachingDisplay(in: capture.bounds)
+        guard let bitmap else { return nil }
+        capture.cacheDisplay(in: capture.bounds, to: bitmap)
+        let image = NSImage(cgImage: bitmap.cgImage!, size: size)
+        cache[key] = image
+        return image
     }
 
     private static func render(source: String, size: CGSize, time: Float) -> NSImage? {

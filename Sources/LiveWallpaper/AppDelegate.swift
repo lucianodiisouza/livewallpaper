@@ -95,6 +95,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             showOnboarding()
         }
 
+        // Pull the active rotation set on launch and again every hour, so the operator's switch
+        // in the backoffice lands without a manual refresh. Failures are silent.
+        Task { await self.model.refreshRotation() }
+        let rotTimer = Timer(timeInterval: 3600, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            Task { await self.model.refreshRotation() }
+        }
+        RunLoop.main.add(rotTimer, forMode: .common)
+
         maybeAutoCheckForUpdates()
     }
 
@@ -224,19 +233,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             AppModel.Entry(id: $0.id, title: $0.title, kind: $0.kind, isBuiltIn: true,
                            previewSource: WallpaperCatalog.shaderSource(forID: $0.id),
                            previewVideoURL: $0.kind == "video" ? bundledLoop : nil,
+                           previewWeb: WallpaperCatalog.webPreview(forID: $0.id),
+                           thumbnailFileURL: WallpaperCatalog.thumbnailFile(forID: $0.id),
                            isPremium: $0.isPremium)
         }
         entries += installed.map { pkg -> AppModel.Entry in
             var source: String?
             var videoURL: URL?
-            if pkg.manifest.type == .metal {
+            var web: AppModel.WebPreviewSource?
+            // Prefer a shipped `thumbnail.png` over any on-the-fly render.
+            let thumb = pkg.directory.appendingPathComponent("thumbnail.png")
+            let shippedThumb = FileManager.default.fileExists(atPath: thumb.path) ? thumb : nil
+            switch pkg.manifest.type {
+            case .metal:
                 source = try? String(contentsOf: pkg.directory.appendingPathComponent(pkg.manifest.entry), encoding: .utf8)
-            } else if pkg.manifest.type == .video {
+            case .video:
                 videoURL = pkg.directory.appendingPathComponent(pkg.manifest.entry)
+            case .web:
+                let entryURL = pkg.directory.appendingPathComponent(pkg.manifest.entry)
+                web = AppModel.WebPreviewSource(
+                    root: entryURL.deletingLastPathComponent(),
+                    entry: entryURL.lastPathComponent,
+                    allowlist: pkg.manifest.capabilities?.network ?? [])
             }
             return AppModel.Entry(id: pkg.manifest.id, title: pkg.manifest.title,
                                   kind: pkg.manifest.type.rawValue, isBuiltIn: false,
-                                  previewSource: source, previewVideoURL: videoURL,
+                                  previewSource: source, previewVideoURL: videoURL, previewWeb: web,
+                                  thumbnailFileURL: shippedThumb,
                                   isShareable: library.isImported(pkg.manifest.id))
         }
         model.available = entries
@@ -291,14 +314,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func rebuildMenu() {
         let menu = NSMenu()
 
-        let header = NSMenuItem(title: "Primo Engine", action: nil, keyEquivalent: "")
+        let header = NSMenuItem(title: String(localized: "menu.app"), action: nil, keyEquivalent: "")
         header.isEnabled = false
         menu.addItem(header)
         menu.addItem(.separator())
 
         let entries = model.menuEntries()
         if entries.isEmpty {
-            let none = NSMenuItem(title: "No wallpapers", action: nil, keyEquivalent: ""); none.isEnabled = false
+            let none = NSMenuItem(title: String(localized: "menu.noWallpapers"), action: nil, keyEquivalent: "")
+            none.isEnabled = false
             menu.addItem(none)
         } else {
             for e in entries {
@@ -312,16 +336,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(.separator())
         if let update = availableUpdate {
-            let banner = NSMenuItem(title: "🔔 Update available: v\(update.latestVersion)",
-                                    action: #selector(openReleasePage), keyEquivalent: "")
+            let banner = NSMenuItem(
+                title: String(format: String(localized: "menu.updateAvailable"), update.latestVersion),
+                action: #selector(openReleasePage), keyEquivalent: "")
             banner.target = self
             menu.addItem(banner)
         }
-        add(menu, "Open Primo Engine", #selector(openMainWindow), key: "o")
-        add(menu, "Check for Updates…", #selector(checkForUpdatesManually), key: "")
-        add(menu, "Quit Primo Engine", #selector(quit), key: "q")
+        add(menu, String(localized: "menu.open"), #selector(openMainWindow), key: "o")
+        add(menu, String(localized: "menu.checkUpdates"), #selector(checkForUpdatesManually), key: "")
+        add(menu, String(localized: "menu.quit"), #selector(quit), key: "q")
         menu.addItem(.separator())
-        let version = NSMenuItem(title: "v\(model.appVersion)", action: nil, keyEquivalent: ""); version.isEnabled = false
+        let version = NSMenuItem(title: "v\(model.appVersion)", action: nil, keyEquivalent: "")
+        version.isEnabled = false
         menu.addItem(version)
 
         statusItem?.menu = menu
