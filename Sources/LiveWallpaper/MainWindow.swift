@@ -1017,10 +1017,14 @@ struct WallpaperParamRows: View {
 // MARK: - Window controller
 
 @MainActor
-final class MainWindowController {
+final class MainWindowController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
 
     func show(model: AppModel) {
+        // Switch the app out of .accessory while the main window is open so the Dock icon
+        // and full menu bar appear — it's disorienting to launch a window and have nowhere
+        // to right-click / quit-from. We drop back to .accessory when the window closes.
+        NSApp.setActivationPolicy(.regular)
         if let window {
             NSApp.activate(ignoringOtherApps: true)
             window.makeKeyAndOrderFront(nil)
@@ -1036,9 +1040,19 @@ final class MainWindowController {
         w.titlebarSeparatorStyle = .automatic
         w.setContentSize(NSSize(width: 860, height: 560))
         w.isReleasedWhenClosed = false
+        w.delegate = self
         window = w
         NSApp.activate(ignoringOtherApps: true)
         w.center()
         w.makeKeyAndOrderFront(nil)
+    }
+
+    // MARK: NSWindowDelegate — return to .accessory on close so the wallpaper window stays
+    // a clean menu-bar app, and the user gets their screen back.
+
+    func windowWillClose(_ notification: Notification) {
+        // Hand the activation policy back at the next runloop tick. If we do it synchronously
+        // while -close is still unwinding, AppKit logs a warning about an unbalanced state.
+        DispatchQueue.main.async { NSApp.setActivationPolicy(.accessory) }
     }
 }
