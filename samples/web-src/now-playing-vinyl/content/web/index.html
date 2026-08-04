@@ -1,0 +1,212 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Now Playing — Vinyl (cartoon premium)</title>
+<style>
+  :root{
+    --bg-top:#2a2440; --bg-bot:#0f0c1c;
+    --deck:#7a4a2b; --deck-dark:#4b2c19; --deck-hi:#9a6238;
+    --disc:#141018; --disc-hi:#2c2833;
+    --cream:#f6efe2; --accent:#ffb454; --accent-2:#ff6d8f; --metal:#e9e2d4;
+  }
+  html,body{margin:0;height:100%;overflow:hidden;background:#0f0c1c;font-family:"Avenir Next","Segoe UI",system-ui,sans-serif;}
+  #stage{position:fixed;inset:0;display:grid;place-items:center;
+    background:radial-gradient(120% 90% at 50% 12%, var(--bg-top), var(--bg-bot) 72%);}
+  .glow{position:absolute;border-radius:50%;filter:blur(90px);opacity:.4;pointer-events:none;}
+  .glow.a{width:46vw;height:46vw;left:-8vw;top:-12vw;background:var(--bg-top);}
+  .glow.b{width:38vw;height:38vw;right:-4vw;bottom:-14vw;background:var(--accent-2);}
+  .scene{position:relative;width:min(92vw,1200px);aspect-ratio:16/9;}
+
+  /* ---- turntable base: layered gradients + bevel + SVG wood-grain overlay ---- */
+  .deck{position:absolute;left:3%;bottom:7%;width:66%;aspect-ratio:1/0.72;border-radius:30px;
+    background:
+      radial-gradient(130% 120% at 22% 8%, var(--deck-hi), rgba(0,0,0,0) 55%),
+      linear-gradient(158deg, var(--deck), var(--deck-dark));
+    box-shadow:0 48px 100px -24px rgba(0,0,0,.72),
+      inset 0 3px 0 rgba(255,255,255,.16), inset 0 -14px 30px rgba(0,0,0,.42),
+      inset 0 0 0 1px rgba(0,0,0,.25);}
+  .deck::after{content:"";position:absolute;inset:18px;border-radius:20px;
+    box-shadow:inset 0 0 0 1.5px rgba(0,0,0,.14), inset 0 2px 6px rgba(0,0,0,.2);pointer-events:none;}
+  .wood{position:absolute;inset:0;border-radius:30px;opacity:.14;mix-blend-mode:overlay;pointer-events:none;}
+
+  /* platter well + record */
+  .platter{position:absolute;left:4%;top:9%;width:64%;aspect-ratio:1/1;border-radius:50%;
+    background:radial-gradient(circle at 50% 42%, #3a3540, #17141d 72%);
+    box-shadow:inset 0 6px 22px rgba(0,0,0,.7), inset 0 0 0 6px rgba(0,0,0,.25), 0 12px 26px rgba(0,0,0,.4);}
+  .record{position:absolute;inset:4%;border-radius:50%;
+    background:
+      repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,.055) 0 0.6px, rgba(0,0,0,0) 0.7px 3.4px),
+      radial-gradient(circle at 42% 34%, var(--disc-hi), var(--disc) 76%);
+    box-shadow:inset 0 0 50px rgba(0,0,0,.9);
+    animation:spin 1.8s linear infinite;}
+  .record.paused{animation-play-state:paused;}
+  /* fixed specular that the record spins UNDER — reads as light on vinyl */
+  .sheen{position:absolute;inset:4%;border-radius:50%;pointer-events:none;z-index:3;
+    background:
+      radial-gradient(60% 45% at 34% 26%, rgba(255,255,255,.16), rgba(255,255,255,0) 60%),
+      radial-gradient(50% 40% at 72% 78%, rgba(120,150,255,.10), rgba(255,255,255,0) 60%);
+    mix-blend-mode:screen;}
+  .label{position:absolute;left:50%;top:50%;width:47%;aspect-ratio:1/1;border-radius:50%;
+    transform:translate(-50%,-50%);overflow:hidden;z-index:2;
+    box-shadow:0 0 0 3px rgba(0,0,0,.5), 0 4px 14px rgba(0,0,0,.5), inset 0 0 14px rgba(0,0,0,.35);
+    background:#2a2530;}
+  .label img{width:100%;height:100%;object-fit:cover;display:block;}
+  .label::after{content:"";position:absolute;left:50%;top:50%;width:7%;aspect-ratio:1/1;border-radius:50%;
+    transform:translate(-50%,-50%);background:var(--disc);box-shadow:0 0 0 3px rgba(255,255,255,.2);z-index:2;}
+  .spindle{position:absolute;left:50%;top:50%;width:2%;aspect-ratio:1/1;border-radius:50%;
+    transform:translate(-50%,-50%);background:linear-gradient(180deg,#fff,#b7ab95);z-index:4;box-shadow:0 0 0 2px rgba(0,0,0,.4);}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* tonearm — SVG overlay over the platter; stylus placed by trig (setArm) */
+  .armsvg{position:absolute;left:4%;top:9%;width:64%;aspect-ratio:1/1;z-index:6;overflow:visible;pointer-events:none;}
+  #armTube,#armHead{transition:all .6s cubic-bezier(.4,1.3,.5,1);}
+
+  /* ---- vitrola controls ---- */
+  .controls{position:absolute;right:5%;top:15%;width:26%;height:70%;display:flex;flex-direction:column;justify-content:space-between;}
+  .knobs{display:flex;gap:12%;}
+  .knob{width:38%;aspect-ratio:1/1;border-radius:50%;position:relative;
+    background:radial-gradient(circle at 38% 30%, #524c58, #16131b 80%);
+    box-shadow:inset 0 2px 5px rgba(255,255,255,.2), inset 0 -3px 6px rgba(0,0,0,.6), 0 8px 16px rgba(0,0,0,.5);}
+  .knob::before{content:"";position:absolute;inset:20%;border-radius:50%;
+    background:radial-gradient(circle at 40% 34%, #3a3642, #101017);box-shadow:inset 0 1px 2px rgba(255,255,255,.15);}
+  .knob::after{content:"";position:absolute;left:50%;top:14%;width:7%;height:30%;border-radius:99px;
+    transform:translateX(-50%);background:var(--accent);z-index:2;box-shadow:0 0 6px rgba(255,180,84,.6);}
+  .knob.b::after{background:var(--cream);transform:translateX(-50%) rotate(38deg);transform-origin:bottom center;box-shadow:none;}
+  .btn{align-self:flex-start;padding:.55em 1.15em;border-radius:99px;font-size:.82vw;font-weight:800;letter-spacing:.14em;
+    color:#1a141f;background:linear-gradient(180deg,var(--accent),#e8992f);text-transform:uppercase;
+    box-shadow:0 6px 14px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.55), inset 0 -2px 4px rgba(0,0,0,.2);}
+  .btn.stopped{background:linear-gradient(180deg,#8a8394,#5c5666);color:#241f2c;box-shadow:0 6px 14px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.3);}
+  .pitch{height:8%;border-radius:99px;background:linear-gradient(180deg,#1a1218,#2a1f27);position:relative;
+    box-shadow:inset 0 2px 6px rgba(0,0,0,.6), inset 0 0 0 1px rgba(0,0,0,.3);}
+  .pitch::after{content:"";position:absolute;left:44%;top:50%;width:15%;height:230%;border-radius:6px;
+    transform:translateY(-50%);background:linear-gradient(180deg,#f5eee0,#a99c86);box-shadow:0 5px 10px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.6);}
+
+  /* ---- now playing text (tonearm is the progress indicator) ---- */
+  .card{position:absolute;right:2%;top:26%;width:31%;color:var(--cream);}
+  .kicker{display:flex;align-items:center;gap:.5em;font-size:clamp(11px,1.05vw,15px);letter-spacing:.22em;text-transform:uppercase;color:var(--accent);font-weight:700;}
+  .dot{width:.6em;height:.6em;border-radius:50%;background:var(--accent-2);box-shadow:0 0 0 0 rgba(255,109,143,.6);animation:pulse 1.6s ease-out infinite;}
+  .dot.paused{animation:none;background:#8a8394;box-shadow:none;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,109,143,.5);}70%{box-shadow:0 0 0 12px rgba(255,109,143,0);}100%{box-shadow:0 0 0 0 rgba(255,109,143,0);}}
+  .title{margin:.4em 0 .12em;font-size:clamp(22px,3vw,44px);font-weight:800;line-height:1.05;text-shadow:0 2px 10px rgba(0,0,0,.4);}
+  .artist{font-size:clamp(14px,1.65vw,24px);font-weight:600;opacity:.86;}
+  .album{font-size:clamp(12px,1.2vw,17px);opacity:.6;margin-top:.15em;}
+  #stage::after{content:"";position:fixed;inset:0;pointer-events:none;box-shadow:inset 0 0 220px 60px rgba(0,0,0,.5);}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="glow a"></div><div class="glow b"></div>
+  <div class="scene">
+    <div class="deck">
+      <svg class="wood" viewBox="0 0 100 72" preserveAspectRatio="none">
+        <filter id="woodgrain"><feTurbulence type="fractalNoise" baseFrequency="0.012 0.09" numOctaves="4" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter>
+        <rect width="100" height="72" filter="url(#woodgrain)"/>
+      </svg>
+      <div class="platter">
+        <div class="record" id="record"><div class="label"><img id="art" alt=""></div></div>
+        <div class="sheen"></div>
+        <div class="spindle"></div>
+      </div>
+      <svg class="armsvg" viewBox="0 0 100 100">
+        <defs>
+          <linearGradient id="tubeG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbf6ea"/><stop offset="1" stop-color="#b6aa93"/></linearGradient>
+          <radialGradient id="pivotG" cx="0.4" cy="0.34" r="0.75"><stop offset="0" stop-color="#ffffff"/><stop offset=".55" stop-color="#e9e2d4"/><stop offset="1" stop-color="#8f836d"/></radialGradient>
+          <filter id="armShadow" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="0" dy="1.2" stdDeviation="1.1" flood-color="#000" flood-opacity="0.45"/></filter>
+        </defs>
+        <g filter="url(#armShadow)">
+          <line id="armCounter" x1="82" y1="15" x2="90" y2="9" stroke="url(#tubeG)" stroke-width="3.6" stroke-linecap="round"/>
+          <circle cx="91.5" cy="8" r="3.4" fill="url(#pivotG)"/>
+          <line id="armTube" x1="82" y1="15" x2="63" y2="40" stroke="url(#tubeG)" stroke-width="2.8" stroke-linecap="round"/>
+          <circle id="armHead" cx="63" cy="40" r="3" fill="#1b1720" stroke="#4a4552" stroke-width="0.7"/>
+          <circle cx="82" cy="15" r="5" fill="url(#pivotG)"/>
+          <circle cx="82" cy="15" r="1.5" fill="#6f6350"/>
+        </g>
+      </svg>
+      <div class="controls">
+        <div class="knobs"><div class="knob a"></div><div class="knob b"></div></div>
+        <div class="btn" id="btn">Playing</div>
+        <div class="pitch"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="kicker"><span class="dot" id="dot"></span> Now Playing</div>
+      <div class="title" id="title">—</div>
+      <div class="artist" id="artist"></div>
+      <div class="album" id="album"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* Now Playing — Vinyl (cartoon premium) · Primo Engine web wallpaper
+   nowPlaying contract: {title,artist,album,artwork(dataURI),isPlaying,position,duration}
+   config: bgTop,bgBottom,deck,disc (colors) */
+const el = id => document.getElementById(id);
+
+/* stylus lands on the real groove: intersection of arm-circle (pivot,L) and groove-circle (center,r) */
+function stylusPoint(r){
+  const P={x:82,y:15}, C={x:50,y:50}, L=45;
+  const d=Math.hypot(P.x-C.x,P.y-C.y);
+  const a=(r*r - L*L + d*d)/(2*d);
+  const h=Math.sqrt(Math.max(0,r*r - a*a));
+  const ux=(P.x-C.x)/d, uy=(P.y-C.y)/d;
+  const mx=C.x+a*ux, my=C.y+a*uy;
+  const s1={x:mx+h*uy, y:my-h*ux}, s2={x:mx-h*uy, y:my+h*ux};
+  return (s1.x<s2.x)?s1:s2;               // the record (left) side
+}
+function setArm(progress, playing){
+  const p=Math.max(0,Math.min(1,progress||0));
+  let r = 37 - (37-19)*p;                 // outer groove → label edge
+  if(!playing) r += 3;                     // lift outward a touch when paused
+  const S=stylusPoint(r);
+  el('armTube').setAttribute('x2',S.x.toFixed(2)); el('armTube').setAttribute('y2',S.y.toFixed(2));
+  el('armHead').setAttribute('cx',S.x.toFixed(2)); el('armHead').setAttribute('cy',S.y.toFixed(2));
+}
+
+let live=false;
+function render(np){
+  el('title').textContent  = np.title  || '—';
+  el('artist').textContent = np.artist || '';
+  el('album').textContent  = np.album  || '';
+  if (np.artwork) el('art').src = np.artwork;
+  const playing = np.isPlaying !== false;
+  el('record').classList.toggle('paused', !playing);
+  el('dot').classList.toggle('paused', !playing);
+  el('btn').textContent = playing ? 'Playing' : 'Paused';
+  el('btn').classList.toggle('stopped', !playing);
+  const dur=np.duration||0, pos=Math.min(np.position||0, dur||1e9);
+  setArm(dur ? pos/dur : 0, playing);
+}
+
+function shade(hex,f){const n=parseInt((hex||'').replace('#',''),16);if(isNaN(n))return hex;
+  let r=(n>>16)&255,g=(n>>8)&255,b=n&255;r=Math.min(255,r*f)|0;g=Math.min(255,g*f)|0;b=Math.min(255,b*f)|0;
+  return '#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('');}
+function applyConfig(c){if(!c)return;const r=document.documentElement.style;
+  if(c.bgTop)r.setProperty('--bg-top',c.bgTop); if(c.bgBottom)r.setProperty('--bg-bot',c.bgBottom);
+  if(c.deck){r.setProperty('--deck',c.deck);r.setProperty('--deck-dark',shade(c.deck,.6));r.setProperty('--deck-hi',shade(c.deck,1.28));}
+  if(c.disc){r.setProperty('--disc',c.disc);r.setProperty('--disc-hi',shade(c.disc,1.8));}}
+window.LiveWallpaper = window.LiveWallpaper || {};
+applyConfig(window.LiveWallpaper.config);
+window.LiveWallpaper.onConfig = applyConfig;
+window.LiveWallpaper.onNowPlaying = np => { live=true; render(np); };
+if (window.LiveWallpaper.nowPlaying) window.LiveWallpaper.onNowPlaying(window.LiveWallpaper.nowPlaying);
+
+/* DEMO feed — richer procedural covers so it reads standalone */
+function cover(c1,c2){const s=300,cv=document.createElement('canvas');cv.width=cv.height=s;const x=cv.getContext('2d');
+  const g=x.createLinearGradient(0,0,s,s);g.addColorStop(0,c1);g.addColorStop(1,c2);x.fillStyle=g;x.fillRect(0,0,s,s);
+  x.globalAlpha=.5;x.fillStyle=c1;x.beginPath();x.arc(s*.7,s*.34,s*.34,0,7);x.fill();
+  x.globalAlpha=.35;x.fillStyle='#fff';x.beginPath();x.arc(s*.3,s*.72,s*.20,0,7);x.fill();
+  x.globalAlpha=.9;x.fillStyle='rgba(0,0,0,.25)';x.fillRect(0,s*.72,s,s*.28);return cv.toDataURL('image/png');}
+const demo=[
+  {title:"Song for Someone",artist:"U2",album:"Songs of Innocence",duration:227,artwork:cover('#ff6d8f','#7a3bff')},
+  {title:"Midnight City",artist:"M83",album:"Hurry Up, We're Dreaming",duration:244,artwork:cover('#ffb454','#ff3b6d')},
+  {title:"Nightcall",artist:"Kavinsky",album:"OutRun",duration:258,artwork:cover('#2bd1ff','#1b2a6b')},
+];
+let di=0,pos=0;
+function tick(){if(live)return;const t=demo[di];pos+=1;if(pos>t.duration){di=(di+1)%demo.length;pos=0;}render({...t,isPlaying:true,position:pos});}
+render({...demo[0],isPlaying:true,position:0});
+setInterval(tick,1000);
+</script>
+</body>
+</html>

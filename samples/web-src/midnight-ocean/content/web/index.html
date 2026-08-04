@@ -1,0 +1,348 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Midnight Ocean</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #04070f; overflow: hidden; }
+  #stage { display: block; width: 100vw; height: 100vh; }
+  #fallback {
+    position: fixed; inset: 0; display: none; place-content: center; text-align: center;
+    color: #9fb4d8; font: 400 14px/1.6 system-ui, sans-serif;
+  }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<div id="fallback"><p>WebGL is unavailable,<br>so this wallpaper can't render.</p></div>
+<script>
+/* ---------------------------------------------------------------------------
+   Midnight Ocean — a calm, cinematic night sea under an enormous starfield.
+   Self-contained: no assets, no network. Single WebGL fragment shader.
+
+   Scene: 85–90% night sky (gradient + 3 parallax star layers + a realistic
+   low moon with maria/limb-darkening), a ~13% ocean sliver carrying a broken-
+   glint moonglade reflection, and rare, elegant shooting stars (one at a time).
+
+   Config (from window.LiveWallpaper.config, all optional):
+     speed     float  global time multiplier            (default 1.0)
+     moonTint  color  moonlight/reflection tint          (default "#9FB4D8")
+     meteors   bool   shooting stars on/off              (default true)
+     twinkle   bool   star twinkle on/off                (default true)
+--------------------------------------------------------------------------- */
+
+// ---- config ---------------------------------------------------------------
+const CFG = {
+  speed: 1.0,
+  moonTint: [0.62, 0.72, 0.92],
+  meteors: true,
+  twinkle: true,
+};
+function hexToRGB(hex) {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || "");
+  if (!m) return null;
+  return [parseInt(m[1], 16) / 255, parseInt(m[2], 16) / 255, parseInt(m[3], 16) / 255];
+}
+function readConfig(src) {
+  if (!src) return;
+  if (typeof src.speed === "number") CFG.speed = src.speed;
+  if (typeof src.meteors === "boolean") CFG.meteors = src.meteors;
+  if (typeof src.twinkle === "boolean") CFG.twinkle = src.twinkle;
+  if (typeof src.moonTint === "string") {
+    const rgb = hexToRGB(src.moonTint);
+    if (rgb) CFG.moonTint = rgb;
+  }
+}
+window.LiveWallpaper = window.LiveWallpaper || {};
+readConfig(window.LiveWallpaper.config);
+window.LiveWallpaper.onConfig = readConfig; // engine calls this on settings change
+
+// ---- WebGL setup ----------------------------------------------------------
+const canvas = document.getElementById("stage");
+const gl = canvas.getContext("webgl", { antialias: true, alpha: false, powerPreference: "high-performance" });
+
+if (!gl) {
+  document.getElementById("fallback").style.display = "grid";
+} else {
+  const vertSrc = `
+    attribute vec2 aPos;
+    void main() { gl_Position = vec4(aPos, 0.0, 1.0); }
+  `;
+
+  const fragSrc = `
+    precision highp float;
+
+    uniform vec2  uRes;
+    uniform float uTime;
+    uniform float uReduced;
+    uniform vec3  uTint;      // moonlight / reflection tint
+    uniform float uMeteors;   // 1 = shooting stars on
+    uniform float uTwinkle;   // 1 = star twinkle on
+
+    // ---------- hashing / noise ----------
+    float hash11(float p){
+      p = fract(p * 0.1031);
+      p *= p + 33.33;
+      p *= p + p;
+      return fract(p);
+    }
+    float hash21(vec2 p){
+      vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+      p3 += dot(p3, p3.yzx + 33.33);
+      return fract((p3.x + p3.y) * p3.z);
+    }
+    vec2 hash22(vec2 p){
+      vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+      p3 += dot(p3, p3.yzx + 33.33);
+      return fract((p3.xx + p3.yz) * p3.zy);
+    }
+    float valueNoise(vec2 p){
+      vec2 i = floor(p);
+      vec2 f = fract(p);
+      vec2 u = f * f * (3.0 - 2.0 * f);
+      float a = hash21(i + vec2(0.0, 0.0));
+      float b = hash21(i + vec2(1.0, 0.0));
+      float c = hash21(i + vec2(0.0, 1.0));
+      float d = hash21(i + vec2(1.0, 1.0));
+      return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+    }
+
+    // ---------- star field on a jittered grid ----------
+    float starLayer(vec2 uv, float density, float twinkleAmt, float t){
+      float light = 0.0;
+      vec2 gv = uv * density;
+      vec2 id = floor(gv);
+      vec2 fv = fract(gv);
+      for (int y = -1; y <= 1; y++){
+        for (int x = -1; x <= 1; x++){
+          vec2 off = vec2(float(x), float(y));
+          vec2 cid = id + off;
+          vec2 rnd = hash22(cid);
+          float present = step(0.55, hash21(cid + 7.1));
+          vec2 starPos = off + rnd;
+          float d = length(fv - starPos);
+          float bright = 0.35 + 0.65 * hash21(cid + 3.3);
+          float tw = 0.6 + twinkleAmt * sin(t * (0.8 + 1.6 * rnd.x) + rnd.y * 30.0);
+          float core = smoothstep(0.045, 0.0, d) * bright * tw;
+          float halo = smoothstep(0.14, 0.0, d) * 0.12 * bright;
+          light += present * (core + halo);
+        }
+      }
+      return light;
+    }
+
+    void main(){
+      vec2 fc = gl_FragCoord.xy;
+      vec2 uv = fc / uRes;
+      float aspect = uRes.x / uRes.y;
+      float t = uTime;
+
+      float horizon = 0.13;
+
+      // ---------- SKY ----------
+      float skyT = clamp((uv.y - horizon) / (1.0 - horizon), 0.0, 1.0);
+      vec3 zenith  = vec3(0.012, 0.020, 0.045);
+      vec3 midSky  = vec3(0.028, 0.055, 0.110);
+      vec3 horizonGlow = vec3(0.075, 0.115, 0.190);
+      vec3 sky = mix(horizonGlow, midSky, smoothstep(0.0, 0.35, skyT));
+      sky = mix(sky, zenith, smoothstep(0.30, 1.0, skyT));
+
+      float haze = valueNoise(vec2(uv.x * 3.0 + t * 0.01, uv.y * 6.0));
+      sky += horizonGlow * 0.10 * haze * smoothstep(0.55, horizon, uv.y);
+
+      // ---------- MOON ----------
+      vec2 moonPos = vec2(0.70, 0.52);
+      vec2 mp = (uv - moonPos) * vec2(aspect, 1.0);
+      float md = length(mp);
+      float moonR = 0.036;
+
+      float breathe = 0.5 + 0.5 * sin(t * 0.3);
+      float glow = smoothstep(0.30, 0.0, md) * 0.07;
+      glow += smoothstep(0.11, 0.0, md) * 0.13 * (0.92 + 0.08 * breathe);
+      vec3 moonColor = vec3(0.96, 0.96, 0.99);
+      sky += moonColor * glow;
+
+      float disc = smoothstep(moonR, moonR - 0.0035, md);
+      vec2 suv = mp / moonR;
+      float maria = valueNoise(suv * 2.1 + 3.0);
+      maria = smoothstep(0.42, 0.78, maria);
+      float craters = valueNoise(suv * 8.5 + 1.7);
+      float speckle = valueNoise(suv * 22.0);
+      float surface = 1.0 - maria * 0.30 - (1.0 - craters) * 0.05 - (1.0 - speckle) * 0.03;
+      float limb = sqrt(max(0.0, 1.0 - md * md / (moonR * moonR)));
+      surface *= mix(0.72, 1.0, limb);
+      vec3 moonSurf = moonColor * surface;
+      sky = mix(sky, moonSurf, disc);
+
+      // ---------- STARS ----------
+      float skyMask = smoothstep(horizon - 0.01, horizon + 0.02, uv.y);
+      float starFade = smoothstep(0.10, 0.30, md);
+      vec2 drift = vec2(t * 0.0025, 0.0);
+      float twk = (uReduced > 0.5) ? 0.0 : uTwinkle;
+      float stars = 0.0;
+      stars += starLayer(uv * vec2(aspect, 1.0) + drift * 1.0,       22.0, 0.35 * twk, t) * 0.9;
+      stars += starLayer(uv * vec2(aspect, 1.0) + drift * 1.7 + 5.0, 40.0, 0.25 * twk, t) * 0.6;
+      stars += starLayer(uv * vec2(aspect, 1.0) + drift * 2.6 + 11.0,70.0, 0.18 * twk, t) * 0.4;
+      vec3 starCol = vec3(0.92, 0.95, 1.0);
+      sky += starCol * stars * skyMask * starFade;
+
+      // ---------- SHOOTING STAR ----------
+      {
+        float interval = 20.0;
+        float epoch = floor(t / interval);
+        float er  = hash11(epoch * 1.37 + 0.5);
+        float er2 = hash11(epoch * 2.11 + 3.0);
+        float er3 = hash11(epoch * 0.79 + 8.0);
+        float er4 = hash11(epoch * 3.03 + 5.0);
+        float startFrac = 0.15 + 0.6 * er;
+        float startT = epoch * interval + startFrac * interval;
+        float life = 0.85;
+        float lt = (t - startT) / life;
+        float occur = step(0.42, er3);
+        float active = step(0.0, lt) * step(lt, 1.0) * occur * uMeteors * (uReduced > 0.5 ? 0.0 : 1.0);
+
+        float sgn = er4 < 0.5 ? -1.0 : 1.0;
+        vec2 sStart = vec2(0.15 + 0.7 * er2, 0.70 + 0.28 * er);
+        vec2 dir = normalize(vec2(sgn * (0.80 + 0.15 * er), -(0.22 + 0.30 * er2)));
+        vec2 head = sStart + dir * 0.55 * lt;
+
+        vec2 q = (uv - head) * vec2(aspect, 1.0);
+        float along = dot(q, dir);
+        float perp  = length(q - dir * along);
+        float tailLen = 0.16;
+        float tt = clamp(1.0 + along / tailLen, 0.0, 1.0);
+        float thickness = mix(0.0006, 0.0032, tt);
+        float streak = smoothstep(thickness, 0.0, perp) * tt * tt * step(along, 0.0);
+        float headGlow = smoothstep(0.011, 0.0, length(q));
+        float fade = smoothstep(0.0, 0.12, lt) * smoothstep(1.0, 0.55, lt);
+        vec3 meteorCol = vec3(0.85, 0.92, 1.0);
+        sky += meteorCol * (streak * 1.3 + headGlow * 0.9) * active * fade * skyMask;
+      }
+
+      // ---------- OCEAN ----------
+      vec3 col = sky;
+      if (uv.y < horizon){
+        float depth = (horizon - uv.y) / horizon;
+        vec3 waterBase = mix(horizonGlow * 0.5, vec3(0.004, 0.008, 0.018), depth);
+
+        float swell = valueNoise(vec2(uv.x * 8.0, uv.y * 24.0 + t * 0.12));
+        swell = (swell - 0.5) * (0.5 + 0.5 * depth);
+
+        float colX = abs((uv.x - moonPos.x) * aspect);
+        float width = 0.012 + 0.14 * depth;
+        float column = exp(-(colX * colX) / (width * width));
+        float core = pow(column, 1.6);
+
+        float g1 = valueNoise(vec2(uv.x * aspect * 46.0, uv.y * 200.0 - t * 0.55));
+        float g2 = valueNoise(vec2(uv.x * aspect * 92.0 + 7.0, uv.y * 95.0 + t * 0.35));
+        float glints = smoothstep(0.60, 0.90, g1) * smoothstep(0.48, 1.0, g2);
+        glints *= (0.30 + 0.70 * depth);
+
+        float sheen = core * 0.10 * (0.5 + 0.5 * depth);
+        float refl  = core * glints + sheen;
+
+        vec3 water = waterBase;
+        water += uTint * refl * 1.15;
+        water += waterBase * swell * 0.25;
+        col = water;
+      }
+
+      // ---------- FINISH ----------
+      float vig = smoothstep(1.25, 0.35, length((uv - 0.5) * vec2(aspect, 1.0)));
+      col *= mix(0.82, 1.0, vig);
+
+      col = col / (col + vec3(0.9));
+      col *= 1.35;
+      float luma = dot(col, vec3(0.299, 0.587, 0.114));
+      col = mix(vec3(luma), col, 0.9);
+
+      float grain = (hash21(fc + fract(t) * 100.0) - 0.5) * 0.015;
+      col += grain;
+
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `;
+
+  function compile(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      console.error(gl.getShaderInfoLog(s));
+      return null;
+    }
+    return s;
+  }
+
+  const prog = gl.createProgram();
+  gl.attachShader(prog, compile(gl.VERTEX_SHADER, vertSrc));
+  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fragSrc));
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+    console.error(gl.getProgramInfoLog(prog));
+    document.getElementById("fallback").style.display = "grid";
+  } else {
+    gl.useProgram(prog);
+
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const aPos = gl.getAttribLocation(prog, "aPos");
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+    const uRes = gl.getUniformLocation(prog, "uRes");
+    const uTime = gl.getUniformLocation(prog, "uTime");
+    const uReduced = gl.getUniformLocation(prog, "uReduced");
+    const uTint = gl.getUniformLocation(prog, "uTint");
+    const uMeteors = gl.getUniformLocation(prog, "uMeteors");
+    const uTwinkle = gl.getUniformLocation(prog, "uTwinkle");
+
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 1.0 : 0.0;
+
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.75);
+      const w = Math.floor(window.innerWidth * dpr);
+      const h = Math.floor(window.innerHeight * dpr);
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+      gl.viewport(0, 0, canvas.width, canvas.height);
+    }
+    window.addEventListener("resize", resize);
+    resize();
+
+    // Accumulate simulated time so live Speed changes never jump the clock.
+    let simTime = 0;
+    let last = performance.now();
+    let raf;
+    function frame(now) {
+      const dt = Math.min((now - last) / 1000, 0.1); // clamp huge gaps (tab resume)
+      last = now;
+      simTime += dt * CFG.speed;
+
+      resize();
+      gl.uniform2f(uRes, canvas.width, canvas.height);
+      gl.uniform1f(uTime, simTime);
+      gl.uniform1f(uReduced, reduced);
+      gl.uniform3f(uTint, CFG.moonTint[0], CFG.moonTint[1], CFG.moonTint[2]);
+      gl.uniform1f(uMeteors, CFG.meteors ? 1.0 : 0.0);
+      gl.uniform1f(uTwinkle, CFG.twinkle ? 1.0 : 0.0);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      raf = requestAnimationFrame(frame);
+    }
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        cancelAnimationFrame(raf);
+      } else {
+        last = performance.now();
+        raf = requestAnimationFrame(frame);
+      }
+    });
+    raf = requestAnimationFrame(frame);
+  }
+}
+</script>
+</body>
+</html>

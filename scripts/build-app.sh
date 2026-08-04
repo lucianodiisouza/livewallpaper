@@ -77,6 +77,9 @@ cat > "$CONTENTS/Info.plist" <<PLIST
     <key>LSUIElement</key><true/>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSHumanReadableCopyright</key><string>© Primo Engine contributors. MIT.</string>
+    <!-- Now-playing wallpapers read the current track + album art from Music/Spotify via Apple
+         Events. macOS shows this string in the Automation permission prompt. -->
+    <key>NSAppleEventsUsageDescription</key><string>Primo Engine shows the song you're playing (title, artist, and album art) on now-playing wallpapers.</string>
     <!-- Allow cleartext HTTP to localhost/.local only, so a local AI provider
          (Ollama / LM Studio) works for shader generation. Public hosts still
          require HTTPS under App Transport Security. -->

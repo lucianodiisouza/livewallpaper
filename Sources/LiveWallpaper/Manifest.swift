@@ -27,6 +27,9 @@ struct Manifest: Codable, Sendable {
     struct Capabilities: Codable, Sendable {
         let network: [String]?
         let audio: Bool?
+        /// Opt-in to receiving the user's now-playing track + album art (Music/Spotify). Off by
+        /// default: we never feed listening data to web content that didn't ask for it.
+        let nowPlaying: Bool?
     }
 
     /// One `config` entry. `default` is a reserved word → mapped via CodingKeys.

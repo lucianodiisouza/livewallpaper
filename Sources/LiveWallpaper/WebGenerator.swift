@@ -30,7 +30,9 @@ enum WebGenerator {
         var userText = "Create an HTML live wallpaper: \(prompt)"
         if let feedback { userText += "\n\nThe previous attempt failed: \(feedback)\nReturn a corrected, fully-offline HTML document." }
 
-        let text = try await AIProviderFactory.current().complete(system: system, user: userText)
+        // A full HTML document (inline CSS + Canvas/WebGL JS) is large; a low cap truncates it mid-JS,
+        // producing a broken page that renders black. Give it generous headroom.
+        let text = try await AIProviderFactory.current().complete(system: system, user: userText, maxTokens: 16384)
         log.notice("Generated web wallpaper (\(AIConfig.provider.label, privacy: .public)) for prompt (\(prompt.prefix(40), privacy: .public)…)")
         return AIParse.codeBlock(from: text)
     }

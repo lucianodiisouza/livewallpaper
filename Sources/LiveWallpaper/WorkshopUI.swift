@@ -208,9 +208,9 @@ struct WorkshopTile: View {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
                 } else if locked {
                     Button("Unlock") { onInstall(nil) }
-                        .controlSize(.small).buttonStyle(.borderedProminent).tint(.yellow)
+                        .controlSize(.small).buttonStyle(.glassProminent).tint(.yellow)
                 } else {
-                    Button("Install") { onInstall(nil) }.controlSize(.small).buttonStyle(.bordered)
+                    Button("Install") { onInstall(nil) }.controlSize(.small).buttonStyle(.glass)
                     if screens.count > 1 { perDisplayMenu }
                 }
             }

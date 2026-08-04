@@ -12,5 +12,15 @@
     <!-- Importing a local .livewallpaper (open panel) and exporting one (save panel). -->
     <key>com.apple.security.files.user-selected.read-write</key>
     <true/>
+    <!-- Now-playing wallpapers script Music/Spotify (via Apple Events) to read the current track
+         and album art. Under the sandbox each scriptable target must be listed explicitly. The
+         user still approves the Automation prompt per app on first use. -->
+    <key>com.apple.security.automation.apple-events</key>
+    <true/>
+    <key>com.apple.security.temporary-exception.apple-events</key>
+    <array>
+        <string>com.apple.Music</string>
+        <string>com.spotify.client</string>
+    </array>
 </dict>
 </plist>

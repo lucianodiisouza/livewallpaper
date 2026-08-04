@@ -37,7 +37,8 @@ enum ShaderGenerator {
         var userText = "Create a fragment shader: \(prompt)"
         if let feedback { userText += "\n\nThe previous attempt failed: \(feedback)\nReturn a corrected shader." }
 
-        let text = try await AIProviderFactory.current().complete(system: system, user: userText)
+        // A fragment shader is a single function — 4096 output tokens is plenty.
+        let text = try await AIProviderFactory.current().complete(system: system, user: userText, maxTokens: 4096)
         log.notice("Generated shader (\(AIConfig.provider.label, privacy: .public)) for prompt (\(prompt.prefix(40), privacy: .public)…)")
         return extractMetal(from: text)
     }

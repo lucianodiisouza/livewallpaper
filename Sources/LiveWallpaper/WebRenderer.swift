@@ -73,7 +73,7 @@ final class WebSchemeHandler: NSObject, WKURLSchemeHandler, @unchecked Sendable 
 ///
 /// See DESIGN.md §7 / SECURITY.md. Pausing is best-effort for web (WebKit throttles hidden content).
 @MainActor
-final class WebRenderer: NSObject, WallpaperRenderer, WKNavigationDelegate, WKUIDelegate {
+final class WebRenderer: NSObject, WallpaperRenderer, NowPlayingSink, WKNavigationDelegate, WKUIDelegate {
 
     private let log = Logger(subsystem: "com.livewallpaper.app", category: "WebRenderer")
 
@@ -81,25 +81,35 @@ final class WebRenderer: NSObject, WallpaperRenderer, WKNavigationDelegate, WKUI
     private let handler: WebSchemeHandler
     private let allowlist: [String]
     private let entryPath: String
+    /// Whether this wallpaper opted into now-playing (manifest `capabilities.nowPlaying`). Gates
+    /// whether we feed it the user's listening data + album art at all.
+    let nowPlayingEnabled: Bool
     private var configJSON = "{}"
+    /// Last payload we pushed, replayed once the page finishes loading so a wallpaper that starts
+    /// while music is already playing shows the current track immediately.
+    private var lastNowPlayingJSON: String?
 
     private var webView: WKWebView?
     private weak var hostView: NSView?
 
     /// Disk-backed (a package's web directory).
-    init(diskRoot: URL, entry: String, allowlist: [String], schema: [ConfigParameter]) {
+    init(diskRoot: URL, entry: String, allowlist: [String], schema: [ConfigParameter],
+         nowPlaying: Bool = false) {
         self.handler = WebSchemeHandler(diskRoot: diskRoot)
         self.entryPath = entry
         self.allowlist = allowlist
         self.configSchema = schema
+        self.nowPlayingEnabled = nowPlaying
     }
 
     /// Built-in / in-memory (a single index.html).
-    init(inlineHTML: String, allowlist: [String], schema: [ConfigParameter]) {
+    init(inlineHTML: String, allowlist: [String], schema: [ConfigParameter],
+         nowPlaying: Bool = false) {
         self.handler = WebSchemeHandler(inline: ["index.html": Data(inlineHTML.utf8)])
         self.entryPath = "index.html"
         self.allowlist = allowlist
         self.configSchema = schema
+        self.nowPlayingEnabled = nowPlaying
     }
 
     func start(in layer: CALayer) {
@@ -167,11 +177,30 @@ final class WebRenderer: NSObject, WallpaperRenderer, WKNavigationDelegate, WKUI
         webView = nil
     }
 
+    // MARK: - NowPlayingSink
+
+    var acceptsNowPlaying: Bool { nowPlayingEnabled }
+
+    /// Push a now-playing payload into the page, mirroring how `config` is delivered: set the field
+    /// and invoke the page's `onNowPlaying` hook if it registered one.
+    func updateNowPlaying(json: String) {
+        guard nowPlayingEnabled else { return }
+        lastNowPlayingJSON = json
+        webView?.evaluateJavaScript(
+            "window.LiveWallpaper&&(window.LiveWallpaper.nowPlaying=\(json),window.LiveWallpaper.onNowPlaying&&window.LiveWallpaper.onNowPlaying(window.LiveWallpaper.nowPlaying));",
+            completionHandler: nil)
+    }
+
     // MARK: - WKNavigationDelegate (block top-level navigation away from our content)
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void) {
         decisionHandler(navigationAction.request.url?.scheme == "lwp" ? .allow : .cancel)
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        // Replay the current track once the page is ready (it may have loaded mid-song).
+        if let json = lastNowPlayingJSON { updateNowPlaying(json: json) }
     }
 
     // MARK: - WKUIDelegate (deny camera/mic)
