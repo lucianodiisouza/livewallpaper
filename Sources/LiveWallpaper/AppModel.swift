@@ -21,6 +21,9 @@ final class AppModel: ObservableObject {
         var thumbnailFileURL: URL? = nil
         var isShareable: Bool = false      // user-imported ⇒ P2P-shareable (catalog content isn't)
         var isPremium: Bool = false        // locked behind the Premium entitlement
+        /// Web wallpaper that opted into now-playing (manifest `capabilities.nowPlaying`). These are
+        /// always free and show a music-note placeholder instead of the generic web globe.
+        var acceptsNowPlaying: Bool = false
     }
 
     /// Source files for a web wallpaper preview render.

@@ -277,11 +277,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     entry: entryURL.lastPathComponent,
                     allowlist: pkg.manifest.capabilities?.network ?? [])
             }
+            let acceptsNowPlaying = pkg.manifest.capabilities?.nowPlaying ?? false
             return AppModel.Entry(id: pkg.manifest.id, title: pkg.manifest.title,
                                   kind: pkg.manifest.type.rawValue, isBuiltIn: false,
                                   previewSource: source, previewVideoURL: videoURL, previewWeb: web,
                                   thumbnailFileURL: shippedThumb,
-                                  isShareable: library.isImported(pkg.manifest.id))
+                                  isShareable: library.isImported(pkg.manifest.id),
+                                  // Now-playing wallpapers are always free (never premium-gated).
+                                  isPremium: false,
+                                  acceptsNowPlaying: acceptsNowPlaying)
         }
         model.available = entries
         model.installedChecksums = Set(installed.compactMap { $0.manifest.checksum })

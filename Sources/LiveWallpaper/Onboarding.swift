@@ -207,7 +207,7 @@ private struct OnboardingPickTile: View {
                 if let thumb {
                     Image(nsImage: thumb).resizable().aspectRatio(contentMode: .fill)
                 } else {
-                    PlaceholderThumb(seed: entry.title, kind: entry.kind)
+                    PlaceholderThumb(seed: entry.title, kind: entry.kind, acceptsNowPlaying: entry.acceptsNowPlaying)
                 }
             }
             .frame(height: 84).frame(maxWidth: .infinity)

@@ -125,6 +125,8 @@ struct TopNav: View {
 struct PlaceholderThumb: View {
     let seed: String
     let kind: String
+    /// Now-playing-aware web wallpaper ⇒ show a music note instead of the generic web globe.
+    var acceptsNowPlaying: Bool = false
 
     var body: some View {
         ZStack {
@@ -133,7 +135,11 @@ struct PlaceholderThumb: View {
         }
     }
     private var icon: String {
-        switch kind { case "video": return "film"; case "web": return "globe"; default: return "sparkles" }
+        switch kind {
+        case "video": return "film"
+        case "web": return acceptsNowPlaying ? "music.note" : "globe"
+        default: return "sparkles"
+        }
     }
     static func colors(_ s: String) -> [Color] {
         let h = Double(abs(s.hashValue) % 360) / 360.0
@@ -237,7 +243,7 @@ struct WallpaperTile: View {
             if let thumb {
                 Image(nsImage: thumb).resizable().aspectRatio(contentMode: .fill)
             } else {
-                PlaceholderThumb(seed: entry.title, kind: entry.kind)
+                PlaceholderThumb(seed: entry.title, kind: entry.kind, acceptsNowPlaying: entry.acceptsNowPlaying)
             }
         }
         .frame(height: 120).frame(maxWidth: .infinity)
@@ -644,7 +650,8 @@ struct MonitorTile: View {
             if let thumb {
                 Image(nsImage: thumb).resizable().aspectRatio(contentMode: .fill)
             } else {
-                PlaceholderThumb(seed: entry?.title ?? screen.name, kind: entry?.kind ?? "metal")
+                PlaceholderThumb(seed: entry?.title ?? screen.name, kind: entry?.kind ?? "metal",
+                                 acceptsNowPlaying: entry?.acceptsNowPlaying ?? false)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 6))

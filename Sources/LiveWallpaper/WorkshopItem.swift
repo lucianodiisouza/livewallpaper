@@ -31,6 +31,10 @@ struct WorkshopItem: Codable, Identifiable, Sendable {
     /// The R2 object key for a Premium bundle (e.g. `premium/aurora.livewallpaper`). Public URL is
     /// left empty for Premium items; delivery goes through the backend `/catalog/bundle` route.
     let bundleKey: String?
+    /// Web wallpaper that opted into now-playing (mirrors the manifest `capabilities.nowPlaying`).
+    /// These are always free and show a music-note placeholder instead of the generic web globe.
+    /// Defaults to `false` when the field is absent (older records / not-yet-migrated collection).
+    let acceptsNowPlaying: Bool
 
     enum CodingKeys: String, CodingKey {
         case id, title, type, tags, checksum, tier
@@ -41,6 +45,7 @@ struct WorkshopItem: Codable, Identifiable, Sendable {
         case thumbURLString = "thumb_url"
         case previewURLString = "preview_url"
         case bundleKey = "bundle_key"
+        case acceptsNowPlaying = "now_playing"
     }
 
     init(from decoder: Decoder) throws {
@@ -58,9 +63,11 @@ struct WorkshopItem: Codable, Identifiable, Sendable {
         previewURLString = try c.decodeIfPresent(String.self, forKey: .previewURLString)
         tier = (try? c.decode(Tier.self, forKey: .tier)) ?? .free
         bundleKey = try c.decodeIfPresent(String.self, forKey: .bundleKey)
+        acceptsNowPlaying = (try? c.decode(Bool.self, forKey: .acceptsNowPlaying)) ?? false
     }
 
-    var isPremium: Bool { tier == .premium }
+    /// Now-playing wallpapers are always free, even if a record is mistakenly tagged `premium`.
+    var isPremium: Bool { tier == .premium && !acceptsNowPlaying }
     var bundleURL: URL? { URL(string: bundleURLString) }
     var thumbURL: URL? { thumbURLString.flatMap { URL(string: $0) } }
     var previewURL: URL? { previewURLString.flatMap { URL(string: $0) } }

@@ -242,7 +242,7 @@ struct WorkshopTile: View {
         if item.thumbURL != nil {
             CachedThumb(item: item)
         } else {
-            PlaceholderThumb(seed: item.title, kind: item.type.rawValue)
+            PlaceholderThumb(seed: item.title, kind: item.type.rawValue, acceptsNowPlaying: item.acceptsNowPlaying)
         }
     }
 }
@@ -259,7 +259,7 @@ struct CachedThumb: View {
             if let image {
                 Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
             } else {
-                PlaceholderThumb(seed: item.title, kind: item.type.rawValue)
+                PlaceholderThumb(seed: item.title, kind: item.type.rawValue, acceptsNowPlaying: item.acceptsNowPlaying)
             }
         }
         .task(id: item.id) {
@@ -595,6 +595,6 @@ struct FeaturedCard: View {
 
     @ViewBuilder private var preview: some View {
         if item.thumbURL != nil { CachedThumb(item: item) }
-        else { PlaceholderThumb(seed: item.title, kind: item.type.rawValue) }
+        else { PlaceholderThumb(seed: item.title, kind: item.type.rawValue, acceptsNowPlaying: item.acceptsNowPlaying) }
     }
 }
