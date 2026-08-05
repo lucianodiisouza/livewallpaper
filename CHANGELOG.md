@@ -17,6 +17,12 @@ human-readable, curated summary and is **not** the source for the release notes.
 
 ## [Unreleased]
 
+## [0.3.13] — 2026-08-04
+
+### Changed
+- **Sample wallpaper `now-playing-vinyl` bumped to v0.2.0** — tracks the in-app version surfaced
+  to users (no app-code changes; manifest + bundled sample only).
+
 ## [0.3.10] — 2026-08-04
 
 ### Fixed
